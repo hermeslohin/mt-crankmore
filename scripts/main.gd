@@ -603,6 +603,10 @@ func _debug_powerups() -> void:
 	_start_game()
 	Input.action_press("pedal")
 	await get_tree().create_timer(1.5).timeout
+	Input.action_press("steer_left")   # slide across the lane
+	await get_tree().create_timer(0.5).timeout
+	Input.action_release("steer_left")
+	print("TOWN lane: p_lat=%.2f" % city.p_lat)
 	for kind in PowerUps.TOWN:
 		var r: Dictionary = city.rival_state[0]
 		r["pos"] = city.p_pos + city.p_fwd * 1.0

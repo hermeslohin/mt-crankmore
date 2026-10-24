@@ -51,6 +51,7 @@ Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the hand
 
 ### Riding on rails
 In town you don't steer: just pedal and the bike follows the road. Your only job is choosing a direction at junctions.
+You can still pick your line: hold left / right (or squeeze a paddle) to slide across your lane, from the kerb towards the centre line and back.
 A **TURN IN ...m** panel pops up several seconds before every crossroads with three arrows. The yellow one is your choice (straight by default),
 and the green **GPS** tag marks the way to your current pickup or delivery. Painted arrows on the road show where you'll go.
 One tap is enough: the choice sticks until the junction (no need to hold the button), and the bike curves smoothly through the turn.

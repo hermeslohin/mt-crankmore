@@ -7,7 +7,7 @@ extends Node2D
 ## changes the rider's speed and is sent to the trainer as resistance.
 ##
 ## The player rides "on rails": the bike follows the road on its own and the rider only picks
-## left / straight / right at junctions (announced well ahead), so a Zwift Ride rider can focus
+## left / straight / right at junctions (announced well ahead), so a trainer rider can focus
 ## on pedalling. Pickups and deliveries happen automatically while riding past.
 
 signal interact(kind: String)
@@ -1119,8 +1119,8 @@ func _update_player(delta: float) -> void:
 
 	var bike := Game.bike()
 	grade = lerpf(grade, clampf(grade_at(p_pos, p_fwd), -0.1, 0.1), 1.0 - exp(-4.0 * delta))
-	Zwift.send_grade(grade * 100.0)
-	var mps := minf(Game.speed_from_power(Zwift.power(), bike["mass"], bike["cda"], bike["crr"], grade), MAX_TOWN_SPEED)
+	Trainer.send_grade(grade * 100.0)
+	var mps := minf(Game.speed_from_power(Trainer.power(), bike["mass"], bike["cda"], bike["crr"], grade), MAX_TOWN_SPEED)
 	var target := mps * TILES_PER_MS * PACE
 	if Game.hp_ratio() < 0.3:
 		target *= 0.85
@@ -1140,7 +1140,7 @@ func _update_player(delta: float) -> void:
 	elif target < p_speed:
 		accel = 2.0
 	p_speed = move_toward(p_speed, target, accel * delta)
-	p_phase += Zwift.cadence() / 60.0 * TAU * delta if Zwift.cadence() > 1.0 else p_speed * 2.0 * delta
+	p_phase += Trainer.cadence() / 60.0 * TAU * delta if Trainer.cadence() > 1.0 else p_speed * 2.0 * delta
 
 	if Input.is_action_just_pressed("act_down"):
 		rdir = -rdir

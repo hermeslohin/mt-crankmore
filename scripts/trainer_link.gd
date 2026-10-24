@@ -1,7 +1,7 @@
 extends Node
-## Talks to bridge/zwift_bridge.py over localhost UDP, and runs that bridge ("the Bluetooth helper")
+## Talks to bridge/trainer_bridge.py over localhost UDP, and runs that bridge ("the Bluetooth helper")
 ## for the player: it installs it into bridge/.venv, launches it in --managed mode, and sends it
-## scan / connect / disconnect commands from the Connect Zwift Ride screen.
+## scan / connect / disconnect commands from the Connect Trainer screen.
 ## Bridge -> game (port 9871): {"type":"data", "power","cadence","speed","buttons":[...],"trainer","controller"}
 ##                             {"type":"status", "scanning", "devices":[...], "trainer":{...}, "controller":{...}, "error"}
 ## Game -> bridge (port 9872): {"grade": percent, "gear": ratio, "mass": kg} or {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}
@@ -18,10 +18,10 @@ const START_GEAR := 11
 const EASIEST := 0.5     # gear 1, ratio to gear 11
 const HARDEST := 1.7     # gear 21
 
-## Zwift Ride shifter buttons: LS1 = easier, RS1 = harder.
+## Shifter buttons: LS1 = easier, RS1 = harder.
 const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}
 
-## Zwift Ride button name -> game action.
+## Controller button name -> game action.
 const BUTTON_ACTIONS := {
 	"LEFT": "steer_left",
 	"RIGHT": "steer_right",
@@ -74,7 +74,7 @@ var _grade_clock := 0.0
 func _ready() -> void:
 	var err := rx.bind(RX_PORT, "127.0.0.1")
 	if err != OK:
-		push_warning("Zwift link: could not bind UDP %d (%s). Keyboard only." % [RX_PORT, error_string(err)])
+		push_warning("Trainer link: could not bind UDP %d (%s). Keyboard only." % [RX_PORT, error_string(err)])
 	tx.set_dest_address("127.0.0.1", TX_PORT)
 
 
@@ -119,7 +119,7 @@ func start_helper() -> void:
 		helper_state = "error"
 		helper_msg = "The Bluetooth helper isn't installed yet."
 		return
-	helper_pid = OS.create_process(py, [bridge_dir() + "/zwift_bridge.py", "--managed"])
+	helper_pid = OS.create_process(py, [bridge_dir() + "/trainer_bridge.py", "--managed"])
 	if helper_pid > 0:
 		helper_state = "starting"
 		helper_msg = "Starting the Bluetooth helper..."
@@ -307,13 +307,13 @@ func cadence() -> float:
 
 func status_text() -> String:
 	if trainer_live and controller_live:
-		return "Zwift Ride: trainer + controllers connected"
+		return "Trainer + controllers connected"
 	if trainer_live:
 		return "Trainer connected (controls: keyboard)"
 	if controller_live:
 		return "Controllers connected (pedalling: keyboard)"
 	if bridge_live:
-		return "Bluetooth ready - Connect Zwift Ride on the title screen"
+		return "Bluetooth ready - Connect Trainer on the title screen"
 	if helper_state == "installing" or helper_state == "starting":
 		return helper_msg
 	return "Keyboard mode"

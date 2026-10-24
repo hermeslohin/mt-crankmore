@@ -4,7 +4,7 @@
 
 A colorful 16-bit-style isometric pizza-delivery racing game set in Crankmore Village, an isolated mountain resort town in summer, built in **Godot 4**.
 The game renders at 640x360 and scales up with crisp integer pixels (2x in the default 1280x720 window).
-Pedal a **Zwift Ride** (trainer + handlebar controllers) to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
+Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
 
 ## Play
 
@@ -19,7 +19,7 @@ The first time you start delivering (and any time from the title screen or the p
 * **Difficulty**: rivals get a W/kg similar to yours: *Easy* about 85% of it, *Medium* about the same, *Hard* about 12% more and better bikes. In a race they ride close to threshold, so on Medium you have to ride near your FTP to win.
 * **Rival bikers**: how many ride against you, 1 to 7 (default 3).
 
-Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the Zwift Ride D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.
+Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the handlebar D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.
 
 ### Riding on rails
 In town you don't steer: just pedal and the bike follows the road. Your only job is choosing a direction at junctions.
@@ -30,7 +30,7 @@ If a car is heading for the junction you'll see **CAR COMING!** and you can brak
 Pickups and deliveries happen automatically: the bike coasts up to the window and the pizza is handed over as you ride past.
 
 ### Controls
-| Zwift Ride | Keyboard | Action |
+| Controller | Keyboard | Action |
 |---|---|---|
 | pedal | W (210 W), Shift+W sprint | ride |
 | D-pad left / right | Left / Right (or A / D) | choose turn at the next junction |
@@ -48,28 +48,28 @@ Pickups and deliveries happen automatically: the bike coasts up to the window an
 ### Virtual shifting
 The bike has 21 gears: 1 is the easiest, 21 the hardest, and you start in 11. There is no front/rear shifter juggling, just up and down. The current gear shows at the top of the WEEHOO bike computer.
 With a trainer connected, the gear changes the resistance the trainer sends to your pedals. An easier gear pushes back less, so at the same cadence you make fewer watts and go slower; a harder gear is the reverse. Speed in the game still comes from your real power. Keyboard riders get the same effect: W makes fewer watts and spins faster in low gears.
-Resistance needs a trainer that accepts FTMS simulation control (the Zwift Hub does).
+Resistance needs a trainer that accepts FTMS simulation control.
 
-### Zwift Ride
-On the title screen choose **Connect Zwift Ride**:
+### Bicycle trainer
+On the title screen choose **Connect Trainer**:
 
 1. **Install Bluetooth helper (one time)**: the game sets up a private Python environment in `bridge/.venv` with the Bluetooth library. Needs Python 3 (`brew install python` or python.org) and internet, about a minute.
 2. The helper starts and scans. Pedal / press a button so your devices wake up; they appear as `TRAINER ...` and `CONTROLS ...`.
-3. Select your trainer and your Zwift Ride controls. The status lines show live power/cadence and the buttons you press, so you can check everything works.
+3. Select your trainer and your handlebar controllers. The status lines show live power/cadence and the buttons you press, so you can check everything works.
 4. Done. Your choices are remembered (`bridge/devices.json`) and reconnect automatically every time you start the game; select a connected device to disconnect it.
 
-Quit the Zwift app first: BLE devices only accept one connection. On macOS, allow Bluetooth for Godot (or your terminal) when asked
+Quit any other trainer app first: BLE devices only accept one connection. On macOS, allow Bluetooth for Godot (or your terminal) when asked
 (System Settings > Privacy & Security > Bluetooth).
 
-Godot itself can't use Bluetooth, which is why the helper (`bridge/zwift_bridge.py`) exists. You can also run it by hand:
-`bridge/.venv/bin/python bridge/zwift_bridge.py` (auto-connects the first trainer/controls it finds), `--scan`, `--dump`, `--fake`.
+Godot itself can't use Bluetooth, which is why the helper (`bridge/trainer_bridge.py`) exists. You can also run it by hand:
+`bridge/.venv/bin/python bridge/trainer_bridge.py` (auto-connects the first trainer/controls it finds), `--scan`, `--dump`, `--fake`.
 
 * **Trainer**: standard FTMS. Your real power and cadence drive your speed. The game puts the trainer in simulation mode and sends the road grade (town hills and Mt. Crankmore, up to 10%) so climbs get harder and descents easier; it repeats the grade every 2 s so the trainer doesn't fall back to a fixed resistance, and goes flat in menus, the bike shop and the ER. The helper log (`grade -> +6.3%`, `trainer: resistance control ready`) shows what is being sent.
 * **Controllers**: see the controls table above.
 
-> **Heads-up:** the trainer side uses a published standard. The Ride controller protocol is proprietary and reverse-engineered by the community. The button bit-map in `bridge/zwift_bridge.py` is a best-effort default that I could not test against real hardware. If a button misbehaves, run `bridge/.venv/bin/python bridge/zwift_bridge.py --learn`: it asks you to press each button and writes `bridge/buttons.json`, which overrides the defaults.
+> **Heads-up:** the trainer side uses a published standard. The handlebar controller protocol is proprietary and reverse-engineered by the community. The button bit-map in `bridge/trainer_bridge.py` is a best-effort default that I could not test against real hardware. If a button misbehaves, run `bridge/.venv/bin/python bridge/trainer_bridge.py --learn`: it asks you to press each button and writes `bridge/buttons.json`, which overrides the defaults.
 
-The game shows connection status at the bottom of the screen ("Zwift Ride: trainer + controllers connected").
+The game shows connection status at the bottom of the screen ("Trainer + controllers connected").
 
 ## The game
 
@@ -90,14 +90,14 @@ The game shows connection status at the bottom of the screen ("Zwift Ride: train
 project.godot
 scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
-scripts/zwift_link.gd     autoload: UDP link to the bridge + keyboard fallback
+scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
 scripts/main.gd           mode switching and menus
 scripts/city.gd           isometric city, traffic, rivals, orders
 scripts/race.gd           Mt. Crankmore heightfield + race sim
 scripts/hud.gd            HUD and menus
 scripts/iso.gd, bike_draw.gd   drawing helpers
-bridge/zwift_bridge.py    BLE <-> UDP bridge (Python, bleak)
+bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
 Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots.

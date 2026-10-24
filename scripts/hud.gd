@@ -1,5 +1,5 @@
 extends Control
-## Heads-up display, toasts, rival chat feed, and keyboard/Zwift-navigable menus.
+## Heads-up display, toasts, rival chat feed, and keyboard/controller-navigable menus.
 ## Laid out for the 640x360 pixel canvas: chunky bordered panels, small aliased text.
 
 const INK := Color(0.1, 0.08, 0.16)
@@ -254,7 +254,7 @@ func _draw_title(w: float, h: float) -> void:
 	for k in 3:
 		_text("MT. CRANKMORE", Vector2(k - 1, 58 + (k % 2)), 48, [Color(0.9, 0.25, 0.2), Color(1.0, 0.85, 0.25), Color(0.9, 0.25, 0.2)][k], w, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(Game.SLOGAN, Vector2(0, 80), 12, Color(1, 1, 1), w, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(Zwift.status_text(), Vector2(0, h - 8), 9, Color(0.6, 1.0, 0.7) if Zwift.bridge_live else Color(1.0, 0.85, 0.5), w, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(Trainer.status_text(), Vector2(0, h - 8), 9, Color(0.6, 1.0, 0.7) if Trainer.bridge_live else Color(1.0, 0.85, 0.5), w, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_city_hud(w: float, h: float) -> void:
@@ -388,19 +388,19 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	for k in 2:   # side buttons
 		draw_rect(Rect2(d.position.x - 2 + k * (d.size.x + 1), d.position.y + 40, 3, 16), Color(0.25, 0.25, 0.28))
 	draw_style_box(weehoo_sb, d)
-	if Zwift.shift_flash > 0.0:   # big gear number just above the computer after a shift
-		var fa := clampf(Zwift.shift_flash / 0.3, 0.0, 1.0)
+	if Trainer.shift_flash > 0.0:   # big gear number just above the computer after a shift
+		var fa := clampf(Trainer.shift_flash / 0.3, 0.0, 1.0)
 		var gr := Rect2(d.position.x + 24, d.position.y - 30, 80, 26)
 		draw_rect(gr, Color(0.08, 0.08, 0.1, 0.85 * fa))
-		var lo := Zwift.gear == 1 or Zwift.gear == Zwift.GEARS
-		draw_string(font, Vector2(gr.position.x, gr.position.y + 19), "GEAR %d" % Zwift.gear, HORIZONTAL_ALIGNMENT_CENTER, gr.size.x, 16,
+		var lo := Trainer.gear == 1 or Trainer.gear == Trainer.GEARS
+		draw_string(font, Vector2(gr.position.x, gr.position.y + 19), "GEAR %d" % Trainer.gear, HORIZONTAL_ALIGNMENT_CENTER, gr.size.x, 16,
 			Color(1.0, 0.55, 0.3, fa) if lo else Color(1.0, 0.85, 0.3, fa))
-		for i in Zwift.GEARS:   # a little cassette of 21 ticks, the current one lit
+		for i in Trainer.GEARS:   # a little cassette of 21 ticks, the current one lit
 			var tx := gr.position.x + 5 + i * 3.4
-			draw_rect(Rect2(tx, gr.end.y - 4, 2, 2), Color(1.0, 0.85, 0.3, fa) if i + 1 == Zwift.gear else Color(0.5, 0.5, 0.55, fa))
+			draw_rect(Rect2(tx, gr.end.y - 4, 2, 2), Color(1.0, 0.85, 0.3, fa) if i + 1 == Trainer.gear else Color(0.5, 0.5, 0.55, fa))
 	var dark := Color(0.12, 0.12, 0.15)
 	# LED strip: lights up left to right with power, coloured by zone
-	var frac := Zwift.power() / maxf(Game.ftp, 1.0)
+	var frac := Trainer.power() / maxf(Game.ftp, 1.0)
 	for i in 8:
 		var lf := (i + 0.5) / 8.0 * 1.5
 		var lit := frac >= lf - 0.09
@@ -421,12 +421,12 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	draw_rect(Rect2(x, y, sc.size.x, 10), dark)
 	var tm := Time.get_time_dict_from_system()
 	draw_string(font, Vector2(x + 3, y + 8), "%d:%02d" % [tm["hour"], tm["minute"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.9, 0.9, 0.9))
-	var link := Color(0.4, 1.0, 0.5) if Zwift.trainer_live else (Color(1.0, 0.85, 0.3) if Zwift.bridge_live else Color(0.45, 0.45, 0.5))
+	var link := Color(0.4, 1.0, 0.5) if Trainer.trainer_live else (Color(1.0, 0.85, 0.3) if Trainer.bridge_live else Color(0.45, 0.45, 0.5))
 	draw_rect(Rect2(x + sc.size.x - 30, y + 3, 4, 4), link)
 	draw_rect(Rect2(x + sc.size.x - 21, y + 2, 15, 6), Color(0.9, 0.9, 0.9), false, 1.0)
 	draw_rect(Rect2(x + sc.size.x - 6, y + 4, 2, 2), Color(0.9, 0.9, 0.9))
 	draw_rect(Rect2(x + sc.size.x - 19, y + 4, 9, 2), Color(0.4, 1.0, 0.5))
-	draw_string(font, Vector2(x, y + 8), "GEAR %d" % Zwift.gear, HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
+	draw_string(font, Vector2(x, y + 8), "GEAR %d" % Trainer.gear, HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
 	# map page
 	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, 56)
 	map_fn.call(mr)
@@ -435,7 +435,7 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	# 2x2 fields
 	var gcol := Color(0.8, 0.2, 0.15) if grade_pct > 0.5 else (Color(0.1, 0.55, 0.25) if grade_pct < -0.5 else dark)
 	var pcol := _zone_col(frac).darkened(0.25) if frac >= 0.55 else dark
-	var fields := [["KM/H", "%.1f" % speed_kmh, dark], ["WATTS", "%d" % int(Zwift.power()), pcol], cell,
+	var fields := [["KM/H", "%.1f" % speed_kmh, dark], ["WATTS", "%d" % int(Trainer.power()), pcol], cell,
 		["GRADE", "%+.1f%%" % grade_pct if absf(grade_pct) >= 0.05 else "0.0%", gcol]]
 	var cw := sc.size.x * 0.5
 	for i in 4:
@@ -458,7 +458,7 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 		draw_rect(br.grow(1.0), dark)
 		draw_rect(br, Color(0.75, 0.77, 0.75))
 		draw_rect(Rect2(br.position, Vector2(floorf(bw * clampf(bar[1], 0.0, 1.0)), 5)), bar[2])
-	draw_string(font, Vector2(x + sc.size.x - 32, y + 10), "%d" % int(Zwift.cadence()), HORIZONTAL_ALIGNMENT_RIGHT, 18, 8, dark)
+	draw_string(font, Vector2(x + sc.size.x - 32, y + 10), "%d" % int(Trainer.cadence()), HORIZONTAL_ALIGNMENT_RIGHT, 18, 8, dark)
 	draw_string(font, Vector2(x + sc.size.x - 13, y + 10), "rpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
 
 
@@ -484,7 +484,7 @@ func _draw_race_hud(w: float, h: float) -> void:
 		_text(gtxt if not r["done"] else "FIN", Vector2(70, 25 + i * 10), 8, col, 40, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	var pos := order.find(me) + 1
-	var legs: Array = ["LEGS", race.stamina, Color(0.2, 0.55, 0.9)] if not Zwift.trainer_live else ["HP", Game.hp_ratio(), Color(0.2, 0.7, 0.25)]
+	var legs: Array = ["LEGS", race.stamina, Color(0.2, 0.55, 0.9)] if not Trainer.trainer_live else ["HP", Game.hp_ratio(), Color(0.2, 0.7, 0.25)]
 	_draw_weehoo(w, h, me["v"] * 3.6, race._grade_at(me["s"]) * 100.0, _draw_race_profile,
 		["POS", "%d/%d" % [pos, order.size()], Color(0.12, 0.12, 0.15)],
 		legs, ["TURBO", race.boost_charge if race.boost_left <= 0.0 else race.boost_left / 6.0, Color(0.95, 0.55, 0.1)])

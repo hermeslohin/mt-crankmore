@@ -283,7 +283,7 @@ func _process(delta: float) -> void:
 		if bubbles[k]["t"] <= 0.0:
 			bubbles.erase(k)
 	var me: Dictionary = riders[0]
-	Zwift.send_grade(_grade_at(me["s"]) * 100.0 if countdown <= 0.0 and not me["done"] else 0.0)
+	Trainer.send_grade(_grade_at(me["s"]) * 100.0 if countdown <= 0.0 and not me["done"] else 0.0)
 	queue_redraw()
 
 
@@ -293,8 +293,8 @@ func _step_riders(delta: float) -> void:
 	var me: Dictionary = riders[0]
 	if not me["done"]:
 		var g := _grade_at(me["s"])
-		var p := Zwift.power()
-		if not Zwift.trainer_live:
+		var p := Trainer.power()
+		if not Trainer.trainer_live:
 			if p > Game.ftp * 1.1:
 				stamina = maxf(0.0, stamina - delta * 0.1)
 				if stamina <= 0.0:
@@ -319,7 +319,7 @@ func _step_riders(delta: float) -> void:
 		me["v"] += (vt - me["v"]) * (1.0 - exp(-1.5 * delta))
 		me["lat"] = clampf(me["lat"] + Input.get_axis("steer_left", "steer_right") * 1.1 * delta, -0.4, 0.4)
 		me["s"] += me["v"] * delta
-		me["phase"] += (Zwift.cadence() if Zwift.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
+		me["phase"] += (Trainer.cadence() if Trainer.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
 		if me["s"] >= length:
 			_finish(0)
 	# rivals
@@ -429,7 +429,7 @@ func _banter() -> void:
 func _end_race() -> void:
 	over = true
 	active = false
-	Zwift.send_grade(0.0)
+	Trainer.send_grade(0.0)
 	var order := riders.duplicate()
 	order.sort_custom(func(a, b):
 		if a["done"] and b["done"]:

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-Mt. Crankmore <-> Zwift Ride bridge.
+Mt. Crankmore <-> bicycle trainer bridge.
 
 Godot has no Bluetooth LE support, so this small program talks BLE and relays over localhost UDP:
 
   trainer  (FTMS, standard)  -> power / cadence / speed        -> game  (UDP 9871)
   game  -> road grade (town hills, Mt. Crankmore) + virtual gear -> trainer resistance (FTMS simulation)
-  Zwift Ride controllers (proprietary, service 0xFC82) -> button presses -> game
+  handlebar controllers (proprietary, service 0xFC82) -> button presses -> game
 
-Normally the game starts this for you ("Connect Zwift Ride" on the title screen) in --managed mode,
+Normally the game starts this for you ("Connect Trainer" on the title screen) in --managed mode,
 where the game tells it what to scan for and which devices to connect, and the chosen devices are
 remembered in devices.json.
 
 Manual usage:
-  python zwift_bridge.py              # scan, auto-connect the first trainer + controllers, relay
-  python zwift_bridge.py --scan       # list nearby BLE devices and exit
-  python zwift_bridge.py --dump       # also print raw controller messages (for debugging)
-  python zwift_bridge.py --learn      # teach the bridge your controller's buttons (writes buttons.json)
-  python zwift_bridge.py --fake       # fake trainer data, no Bluetooth (tests the game link)
+  python trainer_bridge.py              # scan, auto-connect the first trainer + controllers, relay
+  python trainer_bridge.py --scan       # list nearby BLE devices and exit
+  python trainer_bridge.py --dump       # also print raw controller messages (for debugging)
+  python trainer_bridge.py --learn      # teach the bridge your controller's buttons (writes buttons.json)
+  python trainer_bridge.py --fake       # fake trainer data, no Bluetooth (tests the game link)
 
-Close the Zwift app (and anything else holding the devices) first: BLE devices accept one connection.
+Close any other trainer app (and anything else holding the devices) first: BLE devices accept one connection.
 """
 import argparse
 import asyncio
@@ -43,20 +43,20 @@ FTMS_SERVICE = "00001826-0000-1000-8000-00805f9b34fb"
 INDOOR_BIKE_DATA = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_CONTROL_POINT = "00002ad9-0000-1000-8000-00805f9b34fb"
 
-ZWIFT_SERVICE = "0000fc82-0000-1000-8000-00805f9b34fb"
-ZWIFT_ASYNC = "00000002-19ca-4651-86e5-fa29dcdd09d1"      # notifications: buttons
-ZWIFT_SYNC_RX = "00000003-19ca-4651-86e5-fa29dcdd09d1"     # write: handshake
-ZWIFT_SYNC_TX = "00000004-19ca-4651-86e5-fa29dcdd09d1"     # indications: handshake replies
-ZWIFT_COMPANY_ID = 0x094A
+CTRL_SERVICE = "0000fc82-0000-1000-8000-00805f9b34fb"
+CTRL_ASYNC = "00000002-19ca-4651-86e5-fa29dcdd09d1"      # notifications: buttons
+CTRL_SYNC_RX = "00000003-19ca-4651-86e5-fa29dcdd09d1"     # write: handshake
+CTRL_SYNC_TX = "00000004-19ca-4651-86e5-fa29dcdd09d1"     # indications: handshake replies
+CTRL_COMPANY_ID = 0x094A
 HANDSHAKE = b"RideOn"
 
-# Zwift Ride button bits (reported active-low). Reverse-engineered by the community and not
+# Handlebar controller button bits (reported active-low). Reverse-engineered by the community and not
 # officially documented: if a button does nothing, run --learn to record your own mapping.
 DEFAULT_BITS = {
     0x00001: "LEFT", 0x00002: "UP", 0x00004: "RIGHT", 0x00008: "DOWN",
     0x00010: "A", 0x00020: "B", 0x00040: "Y", 0x00080: "Z",
     0x00100: "LS1", 0x00200: "LS2", 0x00400: "POWERUP_L", 0x00800: "ONOFF_L",       # left shifter
-    0x01000: "RS1", 0x02000: "RS2", 0x04000: "POWERUP_R", 0x08000: "ONOFF_R",       # right shifter (RS1 = 0x1000, checked on a real Ride)
+    0x01000: "RS1", 0x02000: "RS2", 0x04000: "POWERUP_R", 0x08000: "ONOFF_R",       # right shifter (RS1 = 0x1000, checked on real hardware)
 }
 LEARN_ORDER = ["LEFT", "RIGHT", "UP", "DOWN", "A", "B", "Y", "Z", "LS1", "LS2", "RS1", "RS2",
                "POWERUP_L", "POWERUP_R"]
@@ -124,10 +124,10 @@ def is_trainer(dev, adv):
     return FTMS_SERVICE in uuids(adv)
 
 
-def is_zwift_controller(dev, adv):
+def is_controller(dev, adv):
     if is_trainer(dev, adv):
         return False
-    return (ZWIFT_SERVICE in uuids(adv) or ZWIFT_COMPANY_ID in (adv.manufacturer_data or {})
+    return (CTRL_SERVICE in uuids(adv) or CTRL_COMPANY_ID in (adv.manufacturer_data or {})
             or "zwift" in name_of(dev, adv).lower())
 
 
@@ -179,7 +179,7 @@ class Discovery:
             if time.time() - ts > 25:
                 continue
             trainer = is_trainer(dev, adv)
-            controller = is_zwift_controller(dev, adv)
+            controller = is_controller(dev, adv)
             if not (trainer or controller):
                 continue
             out.append({"address": addr, "name": name_of(dev, adv) or "(unnamed)", "rssi": adv.rssi or -99,
@@ -294,7 +294,7 @@ async def trainer_session(client, state: State, addr: str):
     state.control_ready = False
 
 
-# ---------------------------------------------------------------- Zwift Ride controllers
+# ---------------------------------------------------------------- handlebar controllers
 
 def read_varint(buf: bytes, i: int):
     shift = 0
@@ -377,12 +377,12 @@ async def controller_session(client, state: State, addr: str, dump: bool):
         if dump:
             log("sync", bytes(data).hex())
 
-    await client.start_notify(ZWIFT_ASYNC, on_async)
+    await client.start_notify(CTRL_ASYNC, on_async)
     try:
-        await client.start_notify(ZWIFT_SYNC_TX, on_sync)
+        await client.start_notify(CTRL_SYNC_TX, on_sync)
     except Exception:
         pass
-    await client.write_gatt_char(ZWIFT_SYNC_RX, HANDSHAKE, response=False)
+    await client.write_gatt_char(CTRL_SYNC_RX, HANDSHAKE, response=False)
     state.controller = True
     while client.is_connected and state.want["controller"] == addr and not state.quit:
         await asyncio.sleep(0.3)
@@ -394,7 +394,7 @@ async def controller_session(client, state: State, addr: str, dump: bool):
 
 async def role_task(role: str, state: State, disc: Discovery, args):
     """Keeps one device (trainer or controller) connected to whatever the game asked for."""
-    auto_pred = is_trainer if role == "trainer" else is_zwift_controller
+    auto_pred = is_trainer if role == "trainer" else is_controller
     name_filter = args.trainer if role == "trainer" else args.controller
     while not state.quit:
         addr = state.want[role]
@@ -574,8 +574,8 @@ async def scan_once():
         tags = []
         if is_trainer(dev, adv):
             tags.append("TRAINER(FTMS)")
-        if is_zwift_controller(dev, adv):
-            tags.append("ZWIFT")
+        if is_controller(dev, adv):
+            tags.append("CONTROLLER")
         print(f"  {adv.rssi:>4} dB  {name_of(dev, adv) or '?':<28} {addr}  {' '.join(tags)}")
 
 

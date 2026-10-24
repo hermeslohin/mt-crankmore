@@ -65,8 +65,8 @@ func _ready() -> void:
 			hud.close_menu()
 		"rails":
 			_debug_rails()
-		"zwift":
-			_debug_zwift()
+		"trainer":
+			_debug_trainer()
 		"roads":
 			_debug_roads()
 		"latch":
@@ -77,31 +77,31 @@ func _ready() -> void:
 			_debug_gears()
 		"link":
 			await get_tree().create_timer(3.0).timeout
-			print("LINK: ", Zwift.status_text(), " power=", int(Zwift.power()), " cadence=", int(Zwift.cadence()),
-				" gear=", Zwift.gear, " ratio=", snappedf(Zwift.gear_ratio(), 0.001))
-			Zwift.send_grade(5.5)
+			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
+				" gear=", Trainer.gear, " ratio=", snappedf(Trainer.gear_ratio(), 0.001))
+			Trainer.send_grade(5.5)
 			for i in 20:
 				await get_tree().process_frame
 			get_tree().quit()
 
 
-## Feeds fake Zwift Ride shifter presses through the link and prints gear, ratio and keyboard watts.
+## Feeds fake shifter presses through the link and prints gear, ratio and keyboard watts.
 func _debug_gears() -> void:
 	var packet := func(buttons: Array) -> void:
-		Zwift._on_message({"type": "data", "trainer": false, "controller": true, "buttons": buttons})
+		Trainer._on_message({"type": "data", "trainer": false, "controller": true, "buttons": buttons})
 		await get_tree().process_frame
 	for b in [["RS1"], [], ["RS1"], ["RS1"], ["RS1", "A"], [], ["LS2"], ["LS1"], []]:
 		await packet.call(b)
-	print("GEARS: after RS1,RS1(held),RS1,LS2(no shift),LS1 -> gear ", Zwift.gear, " (want 12)")
+	print("GEARS: after RS1,RS1(held),RS1,LS2(no shift),LS1 -> gear ", Trainer.gear, " (want 12)")
 	for i in 30:
 		await packet.call(["RS1"] if i % 2 == 0 else [])
-	print("GEARS: top gear ", Zwift.gear, " ratio ", snappedf(Zwift.gear_ratio(), 0.001))
+	print("GEARS: top gear ", Trainer.gear, " ratio ", snappedf(Trainer.gear_ratio(), 0.001))
 	for g in [1, 6, 11, 16, 21]:
-		Zwift.gear = g
+		Trainer.gear = g
 		Input.action_press("pedal")
 		for i in 240:
 			await get_tree().process_frame
-		print("GEARS: gear %2d ratio %.3f  keyboard %3d W  %3d rpm" % [g, Zwift.gear_ratio(), int(Zwift.kb_power), int(Zwift.kb_cadence)])
+		print("GEARS: gear %2d ratio %.3f  keyboard %3d W  %3d rpm" % [g, Trainer.gear_ratio(), int(Trainer.kb_power), int(Trainer.kb_cadence)])
 	get_tree().quit()
 
 
@@ -126,7 +126,7 @@ func _process(delta: float) -> void:
 	cam.position = cam.position.lerp(target, 1.0 - exp(-6.0 * delta))
 	# flat road on the trainer whenever you're not riding (title, menus, the bike shop, the ER)
 	if mode == Mode.TITLE or (mode == Mode.CITY and (not city.active or city.er_timer > 0.0)):
-		Zwift.send_grade(0.0)
+		Trainer.send_grade(0.0)
 	var z := 1.0 if mode == Mode.TITLE else (1.8 if mode == Mode.RACE else 1.75)
 	if OS.has_environment("PIZZA_ZOOM"):  # dev helper for overview screenshots
 		z = OS.get_environment("PIZZA_ZOOM").to_float()
@@ -141,7 +141,7 @@ func _process(delta: float) -> void:
 
 func on_menu_closed() -> void:
 	if mode == Mode.TITLE:
-		Zwift.scan(false)
+		Trainer.scan(false)
 		_show_title()
 	elif mode == Mode.CITY:
 		city.active = true
@@ -163,21 +163,21 @@ func _show_title() -> void:
 				{"label": "Rider setup", "fn": _open_setup.bind(_show_title),
 					"detail": "FTP %d W  |  %s  |  %.1f W/kg  |  %s  |  %d rival%s" % [int(Game.ftp), Game.weight_text(), Game.wkg(),
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
-				{"label": "Connect Zwift Ride", "fn": _open_zwift_menu, "detail": Zwift.status_text()},
+				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Quit", "fn": get_tree().quit},
 			], "live": true}, true)
 
 
-# ---- Zwift Ride connection screen ----------------------------------------
+# ---- Trainer connection screen -------------------------------------------
 
-func _open_zwift_menu() -> void:
-	if Zwift.bridge_live:
-		Zwift.scan(true)
-	hud.open_menu(_zwift_menu)
+func _open_trainer_menu() -> void:
+	if Trainer.bridge_live:
+		Trainer.scan(true)
+	hud.open_menu(_trainer_menu)
 
 
 func _role_line(label: String, role: String, live_text: String) -> String:
-	var info := Zwift.role_info(role)
+	var info := Trainer.role_info(role)
 	var st: String = info.get("state", "idle")
 	match st:
 		"connected":
@@ -191,60 +191,60 @@ func _role_line(label: String, role: String, live_text: String) -> String:
 	return "%s: not connected" % label
 
 
-func _zwift_menu() -> Dictionary:
+func _trainer_menu() -> Dictionary:
 	var items: Array = []
 	var lines: Array = []
-	if not Zwift.bridge_live:
-		lines.append("Your game talks to the Zwift Ride through a small Bluetooth helper.")
-		if Zwift.helper_state == "installing" or Zwift.helper_state == "starting":
+	if not Trainer.bridge_live:
+		lines.append("Your game talks to your bicycle trainer through a small Bluetooth helper.")
+		if Trainer.helper_state == "installing" or Trainer.helper_state == "starting":
 			items.append({"label": "Please wait...", "fn": func(): pass, "enabled": false})
-		elif not Zwift.helper_installed():
-			items.append({"label": "Install Bluetooth helper (one time)", "fn": Zwift.install_helper,
+		elif not Trainer.helper_installed():
+			items.append({"label": "Install Bluetooth helper (one time)", "fn": Trainer.install_helper,
 				"detail": "Sets up a private copy of the Bluetooth library in bridge/.venv. Needs Python 3 and internet, about a minute."})
 		else:
 			items.append({"label": "Start Bluetooth helper", "fn": func():
-				Zwift.start_helper()
-				Zwift.scan(true),
-				"detail": "Starts scanning for your trainer and Zwift Ride controllers."})
-		if Zwift.helper_msg != "":
-			lines.append(Zwift.helper_msg)
+				Trainer.start_helper()
+				Trainer.scan(true),
+				"detail": "Starts scanning for your trainer and handlebar controllers."})
+		if Trainer.helper_msg != "":
+			lines.append(Trainer.helper_msg)
 	else:
-		var trainer_live := "(%dW %drpm)" % [int(Zwift.trainer_power), int(Zwift.trainer_cadence)] if Zwift.trainer_live else ""
-		var pressed := "  buttons: " + " ".join(Zwift.pressed_names) if not Zwift.pressed_names.is_empty() else ""
+		var trainer_live := "(%dW %drpm)" % [int(Trainer.trainer_power), int(Trainer.trainer_cadence)] if Trainer.trainer_live else ""
+		var pressed := "  buttons: " + " ".join(Trainer.pressed_names) if not Trainer.pressed_names.is_empty() else ""
 		lines.append(_role_line("Trainer", "trainer", trainer_live))
 		lines.append(_role_line("Controls", "controller", pressed))
-		var err: String = Zwift.status.get("error", "")
+		var err: String = Trainer.status.get("error", "")
 		if err != "":
 			lines.append("! " + err)
-		var scanning: bool = Zwift.status.get("scanning", false)
-		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Zwift.scan(true),
-			"detail": "Pedal or press a button so the devices wake up. Close the Zwift app first: Bluetooth devices only accept one connection."})
+		var scanning: bool = Trainer.status.get("scanning", false)
+		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Trainer.scan(true),
+			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: Bluetooth devices only accept one connection."})
 		var shown := {}
-		for d in Zwift.devices():
+		for d in Trainer.devices():
 			var role: String = d["kind"]
 			var addr: String = d["address"]
 			shown[addr] = true
-			var info := Zwift.role_info(role)
+			var info := Trainer.role_info(role)
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
 			var tag := "TRAINER " if role == "trainer" else "CONTROLS"
 			var signal_bars := "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
 			if connected:
-				items.append({"label": "%s  %s  [connected - disconnect]" % [tag, d["name"]], "fn": Zwift.disconnect_device.bind(role),
+				items.append({"label": "%s  %s  [connected - disconnect]" % [tag, d["name"]], "fn": Trainer.disconnect_device.bind(role),
 					"detail": "Select to disconnect this device."})
 			else:
-				items.append({"label": "%s  %s  %s" % [tag, d["name"], signal_bars], "fn": Zwift.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % ("trainer (power, cadence, climbs)" if role == "trainer" else "Zwift Ride controls (buttons)")})
+				items.append({"label": "%s  %s  %s" % [tag, d["name"], signal_bars], "fn": Trainer.connect_device.bind(role, addr),
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % ("trainer (power, cadence, climbs)" if role == "trainer" else "handlebar controllers (buttons)")})
 		for role in ["trainer", "controller"]:
-			var info := Zwift.role_info(role)
+			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
 				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", info.get("name", "device")],
-					"fn": Zwift.disconnect_device.bind(role), "detail": "Stop using this device."})
-		if Zwift.devices().is_empty():
-			lines.append("No trainers or Zwift controllers found yet.")
+					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
+		if Trainer.devices().is_empty():
+			lines.append("No trainers or handlebar controllers found yet.")
 	items.append({"label": "Back", "fn": func():
-		Zwift.scan(false)
+		Trainer.scan(false)
 		_show_title(), "detail": ""})
-	return {"title": "Connect Zwift Ride", "sub": "\n".join(lines), "items": items, "live": true}
+	return {"title": "Connect Trainer", "sub": "\n".join(lines), "items": items, "live": true}
 
 
 func _rivals_text() -> String:
@@ -268,7 +268,7 @@ func _start_or_setup() -> void:
 # ---- rider setup ---------------------------------------------------------
 
 ## FTP, weight (kg or lbs), difficulty and how many rivals ride. Everything is changed with LEFT / RIGHT,
-## so it works from the Zwift Ride D-pad as well as the keyboard. `done` runs when the rider confirms.
+## so it works from the handlebar D-pad as well as the keyboard. `done` runs when the rider confirms.
 func _open_setup(done: Callable) -> void:
 	var before := {"n": Game.rival_count}
 	var finish := func():
@@ -419,7 +419,7 @@ func _on_race_finished(result: Dictionary) -> void:
 
 func _leave_race() -> void:
 	hud.close_menu()
-	Zwift.send_grade(0.0)
+	Trainer.send_grade(0.0)
 	race.active = false
 	race.visible = false
 	city.visible = true
@@ -484,21 +484,21 @@ func _debug_rails() -> void:
 	get_tree().quit()
 
 
-## Dev helper: drive the Connect Zwift Ride screen headlessly and print what the helper reports.
-func _debug_zwift() -> void:
-	_open_zwift_menu()
+## Dev helper: drive the Connect Trainer screen headlessly and print what the helper reports.
+func _debug_trainer() -> void:
+	_open_trainer_menu()
 	for i in 4000:
 		await get_tree().create_timer(0.05).timeout
 		if i % 40 == 0:
-			print("helper=", Zwift.helper_state, " msg='", Zwift.helper_msg, "' live=", Zwift.bridge_live,
-				" scanning=", Zwift.status.get("scanning", false), " devices=", Zwift.devices().size(), " err='", Zwift.status.get("error", ""), "'")
-		if Zwift.helper_state in ["stopped", "error"] and not Zwift.helper_installed() and i == 10:
-			Zwift.install_helper()
-		if Zwift.bridge_live and i % 100 == 0:
-			Zwift.scan(true)
-		if Zwift.bridge_live and i > 400 and (Zwift.devices().size() > 0 or i > 900):
+			print("helper=", Trainer.helper_state, " msg='", Trainer.helper_msg, "' live=", Trainer.bridge_live,
+				" scanning=", Trainer.status.get("scanning", false), " devices=", Trainer.devices().size(), " err='", Trainer.status.get("error", ""), "'")
+		if Trainer.helper_state in ["stopped", "error"] and not Trainer.helper_installed() and i == 10:
+			Trainer.install_helper()
+		if Trainer.bridge_live and i % 100 == 0:
+			Trainer.scan(true)
+		if Trainer.bridge_live and i > 400 and (Trainer.devices().size() > 0 or i > 900):
 			break
-	for d in Zwift.devices():
+	for d in Trainer.devices():
 		print("  found: ", d)
 	print("menu items: ", hud.menu_cache.get("items", []).map(func(it): return it["label"]))
 	get_tree().quit()
@@ -534,7 +534,7 @@ func _debug_shot() -> void:
 		else:
 			await get_tree().create_timer(1.0).timeout
 			if OS.has_environment("PIZZA_SHIFT"):   # shift up before each shot, to see the gear pop-up
-				Zwift.shift(1)
+				Trainer.shift(1)
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/shot_%02d.png" % [out, k])

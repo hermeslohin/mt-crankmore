@@ -101,6 +101,28 @@ Godot itself can't use Bluetooth, which is why the helper (`bridge/trainer_bridg
 
 The game shows connection status at the bottom of the screen ("Trainer + controllers connected").
 
+### Strava
+Every ride is recorded: distance, speed, power, cadence and altitude (built up from the road grade, in town and on Mt. Crankmore), plus the pizzas you deliver, the races you win and up to 4 screenshots (deliveries, race finishes and the odd bit of scenery; the best moments are kept). Power and cadence only come from a trainer: on the keyboard only speed and distance are logged, so Strava never gets made-up watts.
+The ride is kept until you post it, even if you quit the game, and is posted as a **Virtual Ride**. Its notes look like this:
+
+```
+Pizza delivered: 5
+Races won: 1
+
+Mt Crankmore - Pizza pays the bills, Cycling is life
+https://github.com/hermeslohin/mt-crankmore/releases
+```
+
+**Linking (one time).** Strava doesn't give games shared app keys, so you make your own free API app:
+
+1. Title screen > **Strava** > **Open Strava API settings** (or go to <https://www.strava.com/settings/api>) and create an app. Any name, category and website will do; set **Authorization Callback Domain** to `localhost`.
+2. Copy the **Client ID**, then pick **Paste Client ID**. Click **Show** next to the Client Secret, copy it, then pick **Paste Client Secret**. They're kept only on your computer (`strava.json` in the game's user data folder).
+3. Pick **Link Strava account**, approve Mt. Crankmore in your browser (leave *Upload your activities* ticked) and come back to the game.
+
+**Posting.** Pause (Esc / B) > **Post ride to Strava**, or title screen > **Strava** > **Post this ride to Strava**. Rides need to be at least a minute long. **Discard this ride** starts a new one.
+
+**Screenshots.** Strava's API doesn't let apps add photos to an activity, so after posting, pick **Add screenshots to the last ride**: it opens the activity in your browser and the folder with that ride's screenshots, ready to drag in.
+
 ## The game
 
 * **Orders**: pizza shops ring you with orders. A pizza man dances outside the shop holding the steaming box over his head; ride up, slow down, and he hands it to you. The steam on your bike shows how hot the pizza still is: deliver before the timer runs out or the customer won't pay at all. Faster means bigger tips, crashes hurt the pizza.
@@ -130,6 +152,8 @@ scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
 scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
+scripts/ride_log.gd       autoload: records the ride (samples, screenshots) and writes it as TCX
+scripts/strava.gd         autoload: Strava linking (OAuth via localhost) and ride upload
 scripts/main.gd           mode switching and menus
 scripts/city.gd           isometric city, traffic, rivals, orders
 scripts/race.gd           Mt. Crankmore switchbacks, terrain, obstacles, wildlife + race sim
@@ -139,4 +163,4 @@ scripts/iso.gd, bike_draw.gd   drawing helpers
 bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
-Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`.
+Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`; `PIZZA_DEBUG=ride [PIZZA_OUT=dir]` rides for a few seconds and writes the Strava TCX file and screenshots.

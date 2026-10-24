@@ -81,6 +81,8 @@ func _ready() -> void:
 			_debug_powerups()
 		"gears":
 			_debug_gears()
+		"ride":
+			_debug_ride()
 		"link":
 			await get_tree().create_timer(3.0).timeout
 			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
@@ -133,6 +135,12 @@ func _process(delta: float) -> void:
 	# flat road on the trainer whenever you're not riding (title, menus, the bike shop, the ER)
 	if mode == Mode.TITLE or (mode == Mode.CITY and (not city.active or city.er_timer > 0.0)):
 		Trainer.send_grade(0.0)
+	# log the ride for Strava (the dev helpers don't, so they never leave fake rides behind)
+	if OS.get_environment("PIZZA_DEBUG") in ["", "ride"]:
+		if mode == Mode.CITY and city.active and city.er_timer <= 0.0:
+			Ride.tick(delta, city.p_speed / (city.TILES_PER_MS * city.PACE), city.grade)
+		elif mode == Mode.RACE and race.active and not race.over:
+			Ride.tick(delta, race.riders[0]["v"], race._grade_at(race.riders[0]["s"]))
 	var z := 1.0 if mode == Mode.TITLE else (1.8 if mode == Mode.RACE else 1.75)
 	if OS.has_environment("PIZZA_ZOOM"):  # dev helper for overview screenshots
 		z = OS.get_environment("PIZZA_ZOOM").to_float()
@@ -172,6 +180,7 @@ func _show_title() -> void:
 					"detail": "FTP %d W  |  %s  |  %.1f W/kg  |  %s  |  %d rival%s" % [int(Game.ftp), Game.weight_text(), Game.wkg(),
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
+				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
 				{"label": "Quit", "fn": get_tree().quit},
 			], "live": true}, true)
 	if not Game.has_save():
@@ -258,6 +267,52 @@ func _trainer_menu() -> Dictionary:
 	return {"title": "Connect Trainer", "sub": "\n".join(lines), "items": items, "live": true}
 
 
+# ---- Strava ----------------------------------------------------------------
+
+## Link a Strava account and post the ride. `back` reopens the screen this was opened from (title or pause).
+func _open_strava_menu(back: Callable) -> void:
+	if Strava.state in ["done", "error"]:
+		Strava.state = "idle"
+		Strava.msg = ""
+	hud.open_menu(_strava_menu.bind(back))
+
+
+func _strava_menu(back: Callable) -> Dictionary:
+	var items: Array = []
+	var lines: Array = ["This ride: " + Ride.summary()]
+	if not Strava.has_app():
+		lines.append("One-time setup: on strava.com/settings/api create an app (any name and website; Authorization Callback Domain: localhost). Copy its Client ID, pick Paste Client ID, then do the same for the Client Secret.")
+		items.append({"label": "Open Strava API settings", "fn": func(): OS.shell_open(Strava.SETTINGS_URL),
+			"detail": "Opens %s in your browser." % Strava.SETTINGS_URL})
+		items.append({"label": "Paste Client ID" + ("  (%s)" % Strava.client_id if Strava.client_id != "" else ""), "fn": Strava.paste_client_id,
+			"detail": "Copy the Client ID from the Strava page first."})
+		items.append({"label": "Paste Client Secret" + ("  (set)" if Strava.client_secret != "" else ""), "fn": Strava.paste_client_secret,
+			"detail": "On the Strava page click Show next to Client Secret, copy it, then pick this. It's kept only on this computer."})
+	elif not Strava.linked():
+		items.append({"label": "Waiting for Strava..." if Strava.state == "linking" else "Link Strava account", "fn": Strava.start_link,
+			"enabled": Strava.state != "linking", "detail": "Opens Strava in your browser. Approve Mt. Crankmore (leave \"Upload your activities\" ticked) and come back."})
+		items.append({"label": "Change Client ID / Secret", "fn": func():
+			Strava.client_secret = ""
+			Strava._save(), "detail": "Clears the Client Secret so you can paste new app details."})
+	else:
+		lines.append(Strava.status_text() + ".")
+		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
+		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
+			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
+		if not Strava.last_activity.is_empty():
+			var shots_dir: String = Strava.last_activity.get("shots_dir", "")
+			items.append({"label": "Add screenshots to the last ride" if shots_dir != "" else "Open the last ride on Strava", "fn": Strava.open_last_activity,
+				"detail": "Strava doesn't let games attach photos, so this opens the activity and the folder with its screenshots: drag them onto the activity." if shots_dir != "" else "Opens the activity in your browser."})
+		items.append({"label": "Unlink Strava", "fn": Strava.unlink, "enabled": not Strava.busy(), "detail": "Disconnects the game from your Strava account."})
+	if Ride.seconds() > 0:
+		items.append({"label": "Discard this ride", "fn": func(): Ride.reset(), "enabled": not Strava.busy(),
+			"detail": "Throws away the ride recorded so far (and its screenshots) and starts a new one."})
+	if Strava.msg != "":
+		lines.append(("! " if Strava.state == "error" else "") + Strava.msg)
+	items.append({"label": "Back", "fn": back, "detail": ""})
+	return {"title": "Strava", "sub": "\n".join(lines), "items": items, "live": true}
+
+
 func _rivals_text() -> String:
 	var words := ["", "one", "two", "three", "four", "five", "six", "seven"]
 	var n: int = Talk.rivals.size()
@@ -339,6 +394,7 @@ func _open_pause() -> void:
 			"items": [
 				{"label": "Resume", "fn": func(): hud.close_menu(); on_menu_closed()},
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
+				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
 				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
 			]})
 
@@ -423,6 +479,7 @@ func _start_race(i: int) -> void:
 
 
 func _on_race_finished(result: Dictionary) -> void:
+	Ride.on_race_finished(result["place"])
 	hud.open_menu(func():
 		var lines := ""
 		for i in result["order"].size():
@@ -444,6 +501,36 @@ func _leave_race() -> void:
 	city.place_on(city.zone_anchor("race"))
 	city.invuln = 1.5
 	cam.position = city.cam_target()
+
+
+## Dev helper: PIZZA_DEBUG=ride [PIZZA_OUT=dir] rides the town for a few seconds, then writes the Strava TCX file to
+## PIZZA_OUT (default user://shots) and prints the ride summary and notes. The recorded ride is put back afterwards.
+func _debug_ride() -> void:
+	var path := Ride.DIR.path_join("ride.json")
+	var backup := FileAccess.get_file_as_string(path)
+	Ride.reset()
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	_start_game()
+	Input.action_press("pedal")
+	await get_tree().create_timer(6.0).timeout
+	Game.deliveries += 2
+	Ride.on_race_finished(1)
+	await get_tree().create_timer(1.5).timeout
+	print("RIDE: ", Ride.summary(), "  samples=", Ride.samples.size(), "  can_post=", Ride.can_post())
+	print("RIDE title: ", Ride.title())
+	print("RIDE notes:\n", Ride.description())
+	FileAccess.open(out.path_join("ride.tcx"), FileAccess.WRITE).store_string(Ride.to_tcx())
+	print("RIDE tcx: ", ProjectSettings.globalize_path(out.path_join("ride.tcx")))
+	for s in Ride.shots:
+		DirAccess.copy_absolute(Ride.DIR.path_join(s["file"]), out.path_join(s["file"]))
+		print("RIDE shot: ", s["kind"], " ", s["file"])
+	Game.deliveries -= 2
+	Ride.reset()
+	if backup != "":
+		FileAccess.open(path, FileAccess.WRITE).store_string(backup)
+		Ride._load()
+	get_tree().quit()
 
 
 ## Dev helper: scripted pickup + delivery to check the order loop headlessly.

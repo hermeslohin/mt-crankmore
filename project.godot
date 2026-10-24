@@ -14,6 +14,8 @@ config/features=PackedStringArray("4.3")
 Game="*res://scripts/game.gd"
 Trainer="*res://scripts/trainer_link.gd"
 Talk="*res://scripts/trash_talk.gd"
+Ride="*res://scripts/ride_log.gd"
+Strava="*res://scripts/strava.gd"
 
 [display]
 

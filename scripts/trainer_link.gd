@@ -15,8 +15,8 @@ const TX_PORT := 9872
 
 const GEARS := 21
 const START_GEAR := 11
-const EASIEST := 0.5     # gear 1, ratio to gear 11
-const HARDEST := 1.7     # gear 21
+const EASIEST := 0.33    # gear 1, ratio to gear 11
+const HARDEST := 2.55    # gear 21
 
 ## Shifter buttons: LS1 = easier, RS1 = harder.
 const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}

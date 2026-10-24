@@ -16,9 +16,9 @@ const LB_PER_KG := 2.20462
 ## Rival strength relative to the player's own W/kg, how good their bikes are (offset on their usual bike tier),
 ## and the share of YOUR FTP (as W/kg, at their own weight) they hold in a race ("race").
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "race": 0.5, "blurb": "Rivals race at about 50% of your FTP. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "race": 0.6, "blurb": "Rivals race at about 60% of your FTP. Push a bit and you'll win."},
-	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "race": 0.7, "blurb": "Rivals race at about 70% of your FTP on better bikes. Good luck."},
+	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "race": 0.4, "blurb": "Rivals race at about 40% of your FTP. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "race": 0.5, "blurb": "Rivals race at about 50% of your FTP. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "race": 0.6, "blurb": "Rivals race at about 60% of your FTP on better bikes. Good luck."},
 	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]

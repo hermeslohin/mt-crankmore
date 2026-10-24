@@ -163,13 +163,18 @@ func _show_title() -> void:
 	hud.open_menu(func():
 		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\nSummer in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Space turbo, H shout, E select." % [Game.SLOGAN, _cap(_rivals_text())],
 			"items": [
-				{"label": "Start delivering", "fn": _start_or_setup},
+				{"label": "Continue game", "fn": _start_or_setup, "enabled": Game.has_save(),
+					"detail": "$%d  |  %d deliveries" % [Game.money, Game.deliveries] if Game.has_save() else "No saved game yet"},
+				{"label": "New game", "fn": _new_game, "detail": "Start over with $%d. Deletes your save." % Game.START_MONEY},
 				{"label": "Rider setup", "fn": _open_setup.bind(_show_title),
 					"detail": "FTP %d W  |  %s  |  %.1f W/kg  |  %s  |  %d rival%s" % [int(Game.ftp), Game.weight_text(), Game.wkg(),
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Quit", "fn": get_tree().quit},
 			], "live": true}, true)
+	if not Game.has_save():
+		hud.menu_index = 1  # nothing to continue: start on "New game"
+		hud._rebuild_menu()
 
 
 # ---- Trainer connection screen -------------------------------------------
@@ -262,6 +267,11 @@ func _cap(s: String) -> String:
 
 
 ## First ride: ask for FTP / weight / difficulty before heading out.
+func _new_game() -> void:
+	Game.new_game()
+	_start_or_setup()
+
+
 func _start_or_setup() -> void:
 	if Game.setup_done:
 		_start_game()

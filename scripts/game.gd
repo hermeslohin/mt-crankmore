@@ -38,7 +38,8 @@ var bikes: Array = [
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
 
-var money := 150
+const START_MONEY := 100
+var money := START_MONEY
 var owned: Array = [0]
 var hp := {0: 60.0}
 var equipped := 0
@@ -202,6 +203,22 @@ func speed_from_power(power: float, bike_mass: float, cda: float, crr: float, gr
 
 
 # ---- save --------------------------------------------------------------
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+
+## Wipes the save and resets progress (money, garage, stats). Rider settings (FTP, weight, rivals) are kept.
+func new_game() -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	money = START_MONEY
+	owned = [0]
+	hp = {0: bikes[0]["hp"]}
+	equipped = 0
+	deliveries = 0
+	race_wins = 0
+	money_changed.emit()
+
 
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)

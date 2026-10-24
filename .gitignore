@@ -4,3 +4,4 @@ __pycache__/
 *.import
 bridge/devices.json
 bridge/buttons.json
+dist/

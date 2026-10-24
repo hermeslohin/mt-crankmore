@@ -2798,5 +2798,5 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 	for i in rival_state.size():
 		ci.draw_rect(Rect2(minimap_point(rival_state[i]["pos"], rect) - Vector2(1, 1), Vector2(3, 3)), Talk.rivals[i]["color"])
 	var pp := minimap_point(p_pos, rect)
-	ci.draw_rect(Rect2(pp - Vector2(3, 3), Vector2(6, 6)), Iso.OUTLINE)
-	ci.draw_rect(Rect2(pp - Vector2(2, 2), Vector2(4, 4)), Color.WHITE)
+	ci.draw_circle(pp, 4.0, Iso.OUTLINE)
+	ci.draw_circle(pp, 3.0, Color(0.7, 0.25, 1.0))

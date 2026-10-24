@@ -12,7 +12,7 @@ Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; riv
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.1**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.2**):
 
 | Platform | File | How to run |
 |---|---|---|
@@ -44,13 +44,14 @@ The title screen has **Continue game** (resumes your save, showing your money an
 The first time you start delivering (and any time from the title screen or the pause menu) the **Rider setup** screen asks for:
 
 * **FTP** (watts) and **weight**, shown in **kg or lbs**. Your weight is used in the physics, so climbs feel like they do outside.
-* **Difficulty**: rivals get a W/kg similar to yours: *Easy* about 85% of it, *Medium* about the same, *Hard* about 12% more and better bikes. In a race they ride close to threshold, so on Medium you have to ride near your FTP to win.
+* **Difficulty**: in town, rivals get a W/kg similar to yours (*Easy* about 85% of it, *Medium* about the same, *Hard* about 12% more, *Ludicrous* about 20% more, with better bikes on the harder levels). In a race they hold a share of *your* FTP (as W/kg, at their own weight): about 40% on *Easy*, 50% on *Medium*, 60% on *Hard* and 80% on *Ludicrous* (plus the odd surge).
 * **Rival bikers**: how many ride against you, 1 to 7 (default 3).
 
 Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the handlebar D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.
 
 ### Riding on rails
 In town you don't steer: just pedal and the bike follows the road. Your only job is choosing a direction at junctions.
+You can still pick your line: squeeze a handlebar paddle to slide across your lane, from the kerb towards the centre line and back. Turns are only picked with the D-pad (or the arrow keys).
 A **TURN IN ...m** panel pops up several seconds before every crossroads with three arrows. The yellow one is your choice (straight by default),
 and the green **GPS** tag marks the way to your current pickup or delivery. Painted arrows on the road show where you'll go.
 One tap is enough: the choice sticks until the junction (no need to hold the button), and the bike curves smoothly through the turn.
@@ -61,14 +62,15 @@ Pickups and deliveries happen automatically: the bike coasts up to the window an
 | Controller | Keyboard | Action |
 |---|---|---|
 | pedal | W (210 W), Shift+W sprint | ride |
-| D-pad left / right | Left / Right (or A / D) | choose turn at the next junction |
+| D-pad left / right | Left / Right (or A / D) | choose turn at the next junction; in a race, move across the road |
+| left / right paddle | | move across the road (town and races); never picks a turn |
 | D-pad up | Up | choose straight |
 | D-pad down | Down | U-turn |
 | A | E / Enter | enter bike shop / race HQ, menu select |
 | B | Esc | pause / back |
 | RS1 (right shifter) | R or ] | shift up (harder gear) |
 | LS1 (left shifter) | Q or [ | shift down (easier gear) |
-| Y, RS2 or right power-up | Space | turbo cheese |
+| Y, RS2 or right power-up | Y or Space | use your power-up |
 | LS2 or left power-up | S | brake |
 | Z | H | shout at the rivals |
 | | F11 or Alt+Enter | toggle fullscreen (the game starts fullscreen) |
@@ -108,11 +110,15 @@ The game shows connection status at the bottom of the screen ("Trainer + control
 * **Cars**: get hit and you wake up at **St. Pedro's ER** with a medical bill (money can go negative) and a banged-up bike.
 * **The village**: winding roads around a cobbled plaza full of shops and market stalls, a lake with a beach and dock, hotels by the water and the gondola, chalet neighbourhoods in the woods, and only light traffic.
 * **Hills**: the plaza and the lakeshore are flat; the chalet neighbourhoods, Summit Road, Ridge Road and the climb up to the gondola roll up to about 7% (Gondola Way pitches to 9%). The grade is shown on your WEEHOO, slows you down uphill and speeds you up downhill (rivals too), and is sent to your trainer.
-* **Mt. Crankmore**: enter races at the Race HQ (the checkered building by the gondola). Two ~20-minute gravel races against your rivals (Foothill Gravel Grind, 6 km averaging 4%; Summit Gravel Showdown, 4.4 km averaging 6.5% with ramps up to 12%) using a real power/weight/aero/grade model with extra gravel rolling resistance, drafting, a turbo-cheese boost, and prize money. The Gravel Grinder bike shines here.
+* **Mt. Crankmore**: enter races at the Race HQ (the checkered building by the gondola). Three gravel races against your rivals (Foothill Gravel Grind, 6 km averaging 4%; Summit Gravel Showdown, 4.4 km averaging 6.5% with ramps up to 12%; and **Flour Run**, a 3 km, mostly flat ride through the flower meadows with a few gentle rollers, about 10 minutes) using a real power/weight/aero/grade model with extra gravel rolling resistance, drafting, power-ups, and prize money. The Gravel Grinder bike shines here.
+  * **Drafting**: sit 1 to 9 m behind another rider in the same line (steer with LEFT / RIGHT or the paddles) and the same speed takes fewer watts: about 18% less at 13 km/h, 24% at 17 km/h and 30% at 40 km/h and above. **DRAFTING -n% watts** shows at the bottom of the screen, with wind streaks around your bike. The rivals draft too, off you and off each other.
   * The mountain is built at the same scale as the town (about 3.3 m per tile), so race speeds look like town speeds. Long switchbacks with hairpins zig-zag up a hillside of meadows, pine forest, rock and snow, and the profile rolls: long climbs broken up by short plunges and steep kickers.
-  * **Jumps** on the descents (hit one above ~30 km/h for BIG AIR and a turbo top-up), **fallen trees** you hop (they scrub some speed), and **creek fords** that drag you down while you splash through. Yellow warning signs come up before each one, and they're marked on the WEEHOO profile (blue creeks, orange jumps, brown logs).
+  * **Jumps** on the descents (hit one above ~30 km/h for BIG AIR), **fallen trees** you hop (they scrub some speed), and **creek fords** that drag you down while you splash through. Yellow warning signs come up before each one, and they're marked on the WEEHOO profile (blue creeks, orange jumps, brown logs).
   * **Wildlife**: deer, foxes and squirrels dash across the road in front of you, rabbits bolt, moose wade near the creeks, goats and marmots watch from the rocks, eagles circle overhead, and bears give chase. Keep pedalling or the bear takes a swipe at your bike.
-* **WEEHOO**: your bike computer in the bottom-right corner. It shows the town map (or the course profile in a race), speed, watts, money (race position in a race), grade, cadence, HP and turbo. The LED strip along the top lights up with your power, coloured by zone relative to your FTP.
+* **Power-ups**: about 1 in 8 townsfolk hold up a gift box, and spectators along the race course do too. Ride past with empty hands and they toss you a power-up. You carry one at a time; it shows on the WEEHOO, and **Y** (or Space) uses it. The rivals grab and use them too.
+  * *Town only*: **Pepperoni Portal** warps you to the nearest pizza shop with a pizza waiting. **Bike Wrench** fixes your bike to full HP. **Walkie Talkie** summons a pizza mascot that dances in front of the nearest rival and slows them to a crawl for 12 s.
+  * *Town and races*: **Pizza Frisbee** knocks a rival within 5 m off their bike for 5 s (out of range, you keep it). **Fire Socks** make you 30% faster for 15 s. **Breadsticks** make you huge for 12 s, and anyone you ride into falls over. **Dough Roller** rolls the hills flat for 15 s: climbs feel like flat road (on the trainer too), descents still count.
+* **WEEHOO**: your bike computer in the bottom-right corner. It shows the town map (or the course profile in a race), speed, watts, money (race position in a race), grade, cadence, HP and the power-up you are carrying (or how long Fire Socks / Breadsticks have left). The LED strip along the top lights up with your power, coloured by zone relative to your FTP.
 * Progress (money, bikes, HP) is saved automatically. Start over any time with **New game** on the title screen.
 
 ## Layout
@@ -127,9 +133,10 @@ scripts/trash_talk.gd     autoload: rivals and their trash talk
 scripts/main.gd           mode switching and menus
 scripts/city.gd           isometric city, traffic, rivals, orders
 scripts/race.gd           Mt. Crankmore switchbacks, terrain, obstacles, wildlife + race sim
+scripts/powerups.gd       power-up definitions and drawing (icons, gift, frisbee, mascot)
 scripts/hud.gd            HUD and menus
 scripts/iso.gd, bike_draw.gd   drawing helpers
 bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
-Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`.
+Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`.

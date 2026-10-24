@@ -77,6 +77,8 @@ func _ready() -> void:
 			_debug_race_shot()
 		"readme":
 			_debug_readme()
+		"powerups":
+			_debug_powerups()
 		"gears":
 			_debug_gears()
 		"link":
@@ -161,7 +163,7 @@ func _show_title() -> void:
 	city.visible = true
 	race.visible = false
 	hud.open_menu(func():
-		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\nSummer in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Space turbo, H shout, E select." % [Game.SLOGAN, _cap(_rivals_text())],
+		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\nSummer in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Y use power-up, H shout, E select." % [Game.SLOGAN, _cap(_rivals_text())],
 			"items": [
 				{"label": "Continue game", "fn": _start_or_setup, "enabled": Game.has_save(),
 					"detail": "$%d  |  %d deliveries" % [Game.money, Game.deliveries] if Game.has_save() else "No saved game yet"},
@@ -558,6 +560,7 @@ func _debug_shot() -> void:
 ## Dev helper: PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] [PIZZA_OUT=dir] saves race screenshots just before the first
 ## jump, log, creek and bear, and at the finish. The player's save file is put back afterwards.
 func _debug_race_shot() -> void:
+	Trainer._autostart_clock = 0.0   # leave a real trainer alone
 	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
@@ -565,6 +568,13 @@ func _debug_race_shot() -> void:
 	Game.money = maxi(Game.money, 1000)
 	_start_race(OS.get_environment("PIZZA_COURSE").to_int())
 	Input.action_press("pedal")
+	var gmin := 1.0
+	var gmax := -1.0
+	for g in race.grade_a:
+		gmin = minf(gmin, g)
+		gmax = maxf(gmax, g)
+	print("COURSE %s: %.0f m, gain %.0f m, grade %+.1f%% to %+.1f%%, %d obstacles" % [race.course["name"], race.course["length"],
+		race.gain, gmin * 100.0, gmax * 100.0, race.obstacles.size()])
 	var spots: Array = race.debug_spots()
 	for k in spots.size():
 		race.debug_place(spots[k])
@@ -576,6 +586,97 @@ func _debug_race_shot() -> void:
 		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
 		f.store_string(backup)
 		f.close()
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=powerups [PIZZA_OUT=dir] uses every power-up next to a rival in town and in a race, saving a
+## screenshot of each and printing what happened, then lets the town run fast so the rivals grab and use them on
+## their own. The player's save file is put back afterwards.
+func _debug_powerups() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	var save := func(file: String) -> void:
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	Trainer._autostart_clock = 0.0   # leave a real trainer alone
+	_start_game()
+	Input.action_press("pedal")
+	await get_tree().create_timer(1.5).timeout
+	Input.action_press("lane_left")   # slide across the lane
+	await get_tree().create_timer(0.5).timeout
+	Input.action_release("lane_left")
+	print("TOWN lane: p_lat=%.2f" % city.p_lat)
+	for kind in PowerUps.TOWN:
+		var r: Dictionary = city.rival_state[0]
+		r["pos"] = city.p_pos + city.p_fwd * 1.0
+		r["path"] = []
+		r["state"] = "idle"
+		r["idle"] = 99.0
+		r["stun"] = 0.0
+		if kind == "portal" and city.orders.is_empty():
+			city._post_order()
+		if kind == "wrench":
+			Game.hp[Game.equipped] = 10.0
+		city.pu = kind
+		city._use_powerup(-1)
+		await get_tree().create_timer(0.7).timeout
+		cam.position = city.cam_target()
+		print("TOWN %s: active=%s used=%s rival_stun=%.1f hp=%d socks=%.1f bread=%.1f mascots=%d carry=%s" % [kind, city.active, city.pu == "",
+			r["stun"], int(Game.bike_hp()), city.socks_t, city.bread_t, city.mascots.size(), not city.carry.is_empty()])
+		await save.call("pu_town_%s.png" % kind)
+		city.socks_t = 0.0
+		city.bread_t = 0.0
+		city.p_down = 0.0
+	# breadsticks run-over: ride into a rival while huge
+	var rv: Dictionary = city.rival_state[0]
+	rv["stun"] = 0.0
+	city.bread_t = PowerUps.BREAD_TIME
+	rv["pos"] = city.p_pos
+	await get_tree().process_frame
+	print("TOWN squash: rival_stun=%.1f" % rv["stun"])
+	city.bread_t = 0.0
+	# let the rivals loose: they should grab and use power-ups themselves
+	var grabbed := 0
+	var seen := {}
+	Engine.time_scale = 10.0
+	for i in 600:
+		await get_tree().create_timer(0.1).timeout
+		for k in city.rival_state.size():
+			var kind: String = city.rival_state[k]["pu"]
+			if kind != "" and not seen.get(k, false):
+				grabbed += 1
+			seen[k] = kind != ""
+	Engine.time_scale = 1.0
+	print("TOWN rivals: grabbed=%d player_down=%.1f" % [grabbed, city.p_down])
+	# race
+	Game.money = maxi(Game.money, 1000)
+	_start_race(0)
+	Input.action_press("pedal")
+	race.debug_place(float(race.givers[1]["s"]) + 3.0)
+	race.riders[0]["s"] = float(race.givers[1]["s"]) - 1.0
+	race.riders[0]["gv"] = 1
+	await get_tree().create_timer(0.5).timeout
+	print("RACE giver: player has %s" % race.riders[0]["pu"])
+	cam.position = race.cam_target()
+	await save.call("pu_race_giver.png")
+	for kind in PowerUps.RACE:
+		var me: Dictionary = race.riders[0]
+		var r: Dictionary = race.riders[1]
+		r["s"] = float(me["s"]) + 2.5
+		r["lat"] = me["lat"]
+		r["down"] = 0.0
+		me["down"] = 0.0
+		me["pu"] = kind
+		race._use_powerup(0)
+		await get_tree().create_timer(0.7).timeout
+		cam.position = race.cam_target()
+		var downs: int = race.riders.filter(func(o): return float(o["down"]) > 0.0).size()
+		print("RACE %s: used=%s riders_down=%d socks=%.1f bread=%.1f roller=%.1f draft=%d%%" % [kind, me["pu"] == "", downs,
+			me["socks"], me["bread"], me["roller"], roundi(float(me["draft"]) * 100.0)])
+		await save.call("pu_race_%s.png" % kind)
+	if backup != "":
+		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
 

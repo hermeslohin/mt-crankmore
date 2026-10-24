@@ -29,12 +29,14 @@ const BUTTON_ACTIONS := {
 	"DOWN": "act_down",
 	"A": "act_select",
 	"B": "act_back",
-	"Y": "boost",
+	"Y": "powerup",
 	"Z": "honk",
-	"RS2": "boost",
+	"RS2": "powerup",
 	"LS2": "brake",
-	"POWERUP_R": "boost",
+	"POWERUP_R": "powerup",
 	"POWERUP_L": "brake",
+	"PADDLE_L": "lane_left",
+	"PADDLE_R": "lane_right",
 }
 
 var rx := PacketPeerUDP.new()

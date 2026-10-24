@@ -13,13 +13,15 @@ const SAVE_PATH := "user://pizza_city_save.json"
 const SLOGAN := "Pizza pays the bills, cycling is life"
 const LB_PER_KG := 2.20462
 
-## Rival strength relative to the player's own W/kg, and how good their bikes are (offset on their usual bike tier).
+## Rival strength relative to the player's own W/kg, how good their bikes are (offset on their usual bike tier),
+## and the share of YOUR FTP (as W/kg, at their own weight) they hold in a race ("race").
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "blurb": "Rivals ride at about 80% of your FTP. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "blurb": "Rivals ride close to your FTP. You'll need to push to win races."},
-	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "blurb": "Rivals are stronger than you on paper and ride better bikes. Good luck."},
+	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "race": 0.4, "blurb": "Rivals race at about 40% of your FTP. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "race": 0.5, "blurb": "Rivals race at about 50% of your FTP. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "race": 0.6, "blurb": "Rivals race at about 60% of your FTP on better bikes. Good luck."},
+	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of your FTP on their best bikes. Bring snacks."},
 }
-const DIFF_ORDER := ["easy", "medium", "hard"]
+const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 const MAX_RIVALS := 7
 
 var bikes: Array = [
@@ -68,8 +70,10 @@ func _setup_input() -> void:
 		"pedal": [KEY_W],
 		"brake": [KEY_S],
 		"sprint": [KEY_SHIFT],
-		"boost": [KEY_SPACE],
+		"powerup": [KEY_Y, KEY_SPACE],
 		"honk": [KEY_H],
+		"lane_left": [],      # the handlebar paddles: move across the road (never pick a turn)
+		"lane_right": [],
 		"shift_up": [KEY_R, KEY_BRACKETRIGHT],
 		"shift_down": [KEY_Q, KEY_BRACKETLEFT],
 		"act_up": [KEY_UP],
@@ -160,11 +164,11 @@ func weight_text() -> String:
 	return "%d lbs" % roundi(weight_kg * LB_PER_KG) if units == "lbs" else "%d kg" % roundi(weight_kg)
 
 
-## A rival's FTP in watts: the player's W/kg, scaled by difficulty, with a small personal spread
-## (the stronger characters stay a little stronger) so the pack doesn't ride as one.
-func rival_ftp(info: Dictionary, rider_mass: float) -> float:
+## A rival's FTP in watts: the player's W/kg, scaled by difficulty (unless `scaled` is false), with a small personal
+## spread (the stronger characters stay a little stronger) so the pack doesn't ride as one.
+func rival_ftp(info: Dictionary, rider_mass: float, scaled := true) -> float:
 	var spread := 1.0 + (float(info["ftp"]) / 244.0 - 1.0) * 0.5
-	return wkg() * float(DIFFICULTIES[difficulty]["wkg"]) * spread * rider_mass
+	return wkg() * (float(DIFFICULTIES[difficulty]["wkg"]) if scaled else 1.0) * spread * rider_mass
 
 
 func rival_mass(i: int) -> float:

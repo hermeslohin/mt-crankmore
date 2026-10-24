@@ -68,7 +68,7 @@ func _setup_input() -> void:
 		"pedal": [KEY_W],
 		"brake": [KEY_S],
 		"sprint": [KEY_SHIFT],
-		"boost": [KEY_SPACE],
+		"powerup": [KEY_Y, KEY_SPACE],
 		"honk": [KEY_H],
 		"shift_up": [KEY_R, KEY_BRACKETRIGHT],
 		"shift_down": [KEY_Q, KEY_BRACKETLEFT],

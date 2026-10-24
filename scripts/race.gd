@@ -64,8 +64,8 @@ var countdown := 0.0
 var over := false
 var over_clock := 0.0
 var finish_count := 0
-var boost_left := 0.0
-var boost_charge := 1.0
+var givers: Array = []                # power-up people along the course {s, lat, shirt, skin, hair, phase}, sorted by s
+var frisbees: Array = []              # pizzas in flight {"from", "to", "u"} (rider indices)
 var stamina := 1.0
 var kick_t := 0.0
 var bubbles: Dictionary = {}
@@ -104,14 +104,14 @@ func setup(course_id: int) -> void:
 	_build_stream_geometry()
 	_build_road_geometry()
 	_build_animals(rng)
+	_build_givers(rng)
 	_build_riders()
 	clock = 0.0
 	countdown = 4.0
 	over = false
 	over_clock = 0.0
 	finish_count = 0
-	boost_left = 0.0
-	boost_charge = 1.0
+	frisbees.clear()
 	stamina = 1.0
 	kick_t = 0.0
 	lead_clock = 0.0
@@ -618,12 +618,31 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 		s += rng.randf_range(80.0, 150.0)
 
 
+## People along the course handing out power-ups (frisbee, socks, breadsticks) to every rider who passes.
+func _build_givers(rng: RandomNumberGenerator) -> void:
+	givers.clear()
+	var shirts := [Color(0.95, 0.3, 0.3), Color(0.3, 0.6, 0.95), Color(1.0, 0.85, 0.2), Color(0.4, 0.85, 0.4), Color(0.95, 0.55, 0.85)]
+	var length: float = course["length"]
+	var s := 220.0
+	var side := 1.0
+	while s < length - 120.0:
+		if _clear_of(s, 25.0):
+			givers.append({"s": s, "lat": side * 1.25, "shirt": shirts[rng.randi() % shirts.size()],
+				"skin": Color(0.96, 0.8, 0.65).lerp(Color(0.55, 0.38, 0.28), rng.randf()), "hair": Color(0.3, 0.2, 0.1).lerp(Color(0.9, 0.8, 0.4), rng.randf()),
+				"phase": rng.randf() * TAU})
+			side = -side
+			s += rng.randf_range(300.0, 420.0)
+		else:
+			s += 20.0
+
+
 func _build_riders() -> void:
 	riders.clear()
 	var b := Game.bike()
 	riders.append({"name": Game.player_name, "color": Color(0.95, 0.95, 0.95), "frame": b["color"], "s": 0.0, "v": 0.0, "lat": 0.0,
 		"bike": b, "player": true, "phase": 0.0, "done": false, "time": 0.0, "mass": Game.weight_kg, "power": 0.0,
-		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false})
+		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
+		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "down": 0.0, "gv": 0})
 	var n := Talk.rivals.size()
 	for i in n:
 		var info: Dictionary = Talk.rivals[i]
@@ -633,7 +652,8 @@ func _build_riders() -> void:
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i,
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
-			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false})
+			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "down": 0.0, "gv": 0})
 
 
 # ---------------------------------------------------------------------
@@ -736,15 +756,14 @@ func _step_riders(delta: float) -> void:
 		if Game.hp_ratio() < 0.3:
 			vt *= 0.92
 		vt *= 1.0 + _draft(0)
-		if Input.is_action_just_pressed("boost") and boost_charge >= 1.0:
-			boost_left = 6.0
-			boost_charge = 0.0
-			Game.toast.emit("TURBO CHEESE!", Color(1.0, 0.8, 0.2))
-		if boost_left > 0.0:
-			boost_left -= delta
-			vt *= 1.28
-		else:
-			boost_charge = minf(1.0, boost_charge + delta / 40.0)
+		_tick_powerups(0, delta)
+		if Input.is_action_just_pressed("powerup"):
+			_use_powerup(0)
+		if float(me["socks"]) > 0.0:
+			vt *= PowerUps.SOCKS_BOOST
+		if float(me["down"]) > 0.0:
+			vt = 0.0
+			me["v"] = move_toward(me["v"], 0.0, 14.0 * delta)
 		if float(me["air"]) <= 0.0:   # no traction in the air
 			me["v"] += (minf(vt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
 		me["lat"] = clampf(me["lat"] + Input.get_axis("steer_left", "steer_right") * 1.1 * delta, -0.4, 0.4)
@@ -777,6 +796,14 @@ func _step_riders(delta: float) -> void:
 		r["power"] = pw
 		var bk: Dictionary = r["bike"]
 		var vt := Game.speed_from_power(pw, bk["mass"], bk["cda"], _crr(bk) + (FORD_CRR if r["wet"] else 0.0), _grade_at(r["s"]), r["mass"])
+		_tick_powerups(k, delta)
+		if r["pu"] != "" and _rival_wants(k):
+			_use_powerup(k)
+		if float(r["socks"]) > 0.0:
+			vt *= PowerUps.SOCKS_BOOST
+		if float(r["down"]) > 0.0:
+			vt = 0.0
+			r["v"] = move_toward(r["v"], 0.0, 14.0 * delta)
 		if float(r["air"]) <= 0.0:
 			r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
 		r["s"] += r["v"] * delta
@@ -785,6 +812,8 @@ func _step_riders(delta: float) -> void:
 		_terrain_events(k, delta)
 		if r["s"] >= length:
 			_finish(k)
+	_step_frisbees(delta)
+	_squash()
 	if finish_count > 0 and not over:
 		over_clock += delta
 	if not over and (finish_count >= riders.size() or (me["done"] and over_clock > 10.0) or over_clock > 420.0):
@@ -817,8 +846,7 @@ func _terrain_events(k: int, delta: float) -> void:
 					r["air"] = r["air_tot"]
 					if r["player"]:
 						if v > 8.5:
-							_pop(k, "BIG AIR! +TURBO", Color(1.0, 0.85, 0.2))
-							boost_charge = minf(1.0, boost_charge + 0.25)
+							_pop(k, "BIG AIR!", Color(1.0, 0.85, 0.2))
 							if randf() < 0.5:
 								Talk.say_random("race_air")
 						else:
@@ -857,6 +885,124 @@ func _draft(i: int) -> float:
 		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35:
 			return 0.05
 	return 0.0
+
+
+# ---------------------------------------------------------------------
+# Power-ups (see PowerUps): frisbee, socks and breadsticks, handed out along the course
+# ---------------------------------------------------------------------
+
+func _tick_powerups(k: int, delta: float) -> void:
+	var r: Dictionary = riders[k]
+	r["socks"] = maxf(0.0, float(r["socks"]) - delta)
+	r["bread"] = maxf(0.0, float(r["bread"]) - delta)
+	r["down"] = maxf(0.0, float(r["down"]) - delta)
+	if r["pu"] != "":
+		r["pu_hold"] = float(r["pu_hold"]) + delta
+	while int(r["gv"]) < givers.size() and float(r["s"]) >= float(givers[int(r["gv"])]["s"]):
+		r["gv"] = int(r["gv"]) + 1
+		if r["pu"] == "" and float(r["down"]) <= 0.0:
+			r["pu"] = PowerUps.pick(PowerUps.RACE)
+			r["pu_hold"] = 0.0
+			if r["player"]:
+				Game.toast.emit("POWER-UP: %s! Press Y." % PowerUps.label(r["pu"]), PowerUps.col(r["pu"]))
+
+
+## Metres between two riders, counting the sideways gap across the road.
+func _gap_m(a: int, b: int) -> float:
+	var ra: Dictionary = riders[a]
+	var rb: Dictionary = riders[b]
+	return Vector2(float(rb["s"]) - float(ra["s"]), (float(rb["lat"]) - float(ra["lat"])) * M_PER_TILE).length()
+
+
+func _nearest_opponent(k: int, within: float) -> int:
+	var best := -1
+	var bd := within
+	for o in riders.size():
+		if o == k or riders[o]["done"] or float(riders[o]["down"]) > 0.0:
+			continue
+		var d := _gap_m(k, o)
+		if d < bd:
+			bd = d
+			best = o
+	return best
+
+
+func _use_powerup(k: int) -> bool:
+	var r: Dictionary = riders[k]
+	var kind: String = r["pu"]
+	if kind == "" or r["done"] or float(r["down"]) > 0.0:
+		return false
+	match kind:
+		"frisbee":
+			var v := _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M)
+			if v < 0:
+				if r["player"]:
+					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
+				return false
+			frisbees.append({"from": k, "to": v, "u": 0.0})
+		"socks":
+			r["socks"] = PowerUps.SOCKS_TIME
+			_pop(k, "FIRE SOCKS!", PowerUps.col(kind))
+		"breadsticks":
+			r["bread"] = PowerUps.BREAD_TIME
+			_pop(k, "BREADSTICKS!", PowerUps.col(kind))
+	r["pu"] = ""
+	return true
+
+
+func _rival_wants(k: int) -> bool:
+	var r: Dictionary = riders[k]
+	var hold: float = r["pu_hold"]
+	if hold < 1.5:
+		return false
+	match r["pu"]:
+		"frisbee":
+			return _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M) >= 0
+		"socks":
+			return _grade_at(r["s"]) > 0.03 or hold > 12.0
+		"breadsticks":
+			return _nearest_opponent(k, 10.0) >= 0 or hold > 30.0
+	return false
+
+
+func _knock_down(k: int, secs: float, by: int, how: String) -> void:
+	var r: Dictionary = riders[k]
+	r["down"] = secs
+	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
+	if r["player"]:
+		Game.toast.emit("%s %s! Down for %d s." % [riders[by]["short"], how, int(secs)], Color(1.0, 0.45, 0.35))
+		Talk.say(int(riders[by]["idx"]), "pu_hit_player", true)
+	elif riders[by]["player"]:
+		Talk.say(int(r["idx"]), "pu_ouch", true)
+
+
+func _step_frisbees(delta: float) -> void:
+	for i in range(frisbees.size() - 1, -1, -1):
+		var fz: Dictionary = frisbees[i]
+		fz["u"] += delta / 0.45
+		if fz["u"] >= 1.0:
+			frisbees.remove_at(i)
+			var to: int = fz["to"]
+			if not riders[to]["done"] and float(riders[to]["down"]) <= 0.0:
+				_knock_down(to, PowerUps.DOWN_TIME, fz["from"], "beaned you with a Pizza Frisbee")
+
+
+## A rider on breadsticks flattens anyone they ride into.
+func _squash() -> void:
+	for a in riders.size():
+		var ra: Dictionary = riders[a]
+		if float(ra["bread"]) <= 0.0 or float(ra["down"]) > 0.0 or ra["done"]:
+			continue
+		for b in riders.size():
+			var rb: Dictionary = riders[b]
+			if b == a or float(rb["bread"]) > 0.0 or float(rb["down"]) > 0.0 or rb["done"]:
+				continue
+			if absf(float(rb["s"]) - float(ra["s"])) < 1.8 and absf(float(rb["lat"]) - float(ra["lat"])) < 0.4:
+				_knock_down(b, PowerUps.SQUASH_TIME, a, "flattened you with breadstick power")
+
+
+func _bread_k(t: float) -> float:
+	return 1.0 + (PowerUps.BREAD_SCALE - 1.0) * clampf(minf(PowerUps.BREAD_TIME - t, t) / 0.4, 0.0, 1.0) if t > 0.0 else 1.0
 
 
 func _step_animals(delta: float) -> void:
@@ -1096,6 +1242,9 @@ func debug_place(s: float) -> void:
 		r["ob"] = 0
 		while int(r["ob"]) < obstacles.size() and float(obstacles[int(r["ob"])]["s"]) < r["s"]:
 			r["ob"] = int(r["ob"]) + 1
+		r["gv"] = 0
+		while int(r["gv"]) < givers.size() and float(givers[int(r["gv"])]["s"]) < r["s"]:
+			r["gv"] = int(r["gv"]) + 1
 
 
 # ---------------------------------------------------------------------
@@ -1133,6 +1282,14 @@ func _draw() -> void:
 		if not buckets.has(d):
 			buckets[d] = []
 		buckets[d].append([1, a])
+	for g in givers:
+		if absf(float(g["s"]) - float(riders[0]["s"])) > 140.0:
+			continue
+		var gp := _pose(g["s"], g["lat"])
+		var d := _diag(gp["pos"])
+		if not buckets.has(d):
+			buckets[d] = []
+		buckets[d].append([2, g, gp])
 
 	# flat ground first (terrain, creeks, road, fords): the mountainside faces the camera, so nothing on the
 	# ground needs to hide the road. Then everything standing up, back to front.
@@ -1201,7 +1358,14 @@ func _draw() -> void:
 				match it[0]:
 					0: _draw_rider(it[1], it[2])
 					1: _draw_animal(it[1])
+					2: _draw_giver(it[1], it[2])
 	_draw_birds(me_pos)
+	for fz in frisbees:
+		var ra: Dictionary = riders[int(fz["from"])]
+		var rb: Dictionary = riders[int(fz["to"])]
+		var pa := _pose(ra["s"], ra["lat"])
+		var pb := _pose(rb["s"], rb["lat"])
+		PowerUps.draw_frisbee(self, Iso.to_screen(pa["pos"], pa["z"] + 22.0), Iso.to_screen(pb["pos"], pb["z"] + 16.0), fz["u"], t_)
 	# speech bubbles and pop-ups on top
 	for k in bubbles:
 		if k < riders.size():
@@ -1603,11 +1767,28 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 			var dp := ground + Vector2(sin(q * 2.1 + k) * (6.0 + u * 8.0), -sin(u * PI) * 12.0)
 			draw_rect(Rect2(dp, Vector2(2, 2)), Color(0.8, 0.92, 1.0, 1.0 - u))
 		draw_arc(ground, 9.0 + sin(t_ * 6.0) * 1.5, 0.0, TAU, 12, Color(0.9, 0.97, 1.0, 0.7), 1.0)
-	BikeDraw.draw(self, c, ds, r["frame"], r["color"], r["phase"], true, "YOU" if r["player"] else r["short"])
+	var kb := _bread_k(r["bread"])
+	var down := float(r["down"]) > 0.0
+	if float(r["socks"]) > 0.0 and not down:
+		PowerUps.draw_flames(self, c, -ds.normalized(), t_ + k)
+	var dsd := Iso.to_screen(Iso.to_world(ds).rotated(1.2)) if down else ds   # tipped over, turned in world space
+	var phase: float = 0.0 if down else r["phase"]
+	if kb != 1.0:
+		draw_set_transform(c, 0.0, Vector2(kb, kb))
+		BikeDraw.draw(self, Vector2.ZERO, dsd, r["frame"], r["color"], phase, true, "YOU" if r["player"] else r["short"])
+		draw_set_transform(Vector2.ZERO)
+	else:
+		BikeDraw.draw(self, c, dsd, r["frame"], r["color"], phase, true, "YOU" if r["player"] else r["short"])
+	if down:
+		for q in 3:
+			var a := t_ * 5.0 + q * TAU / 3.0
+			var sp := c + Vector2(cos(a) * 9.0, -30.0 + sin(a) * 3.0)
+			draw_rect(Rect2(sp - Vector2(1, 1), Vector2(3, 3)), Iso.OUTLINE)
+			draw_rect(Rect2(sp, Vector2(1, 1)), Color(1.0, 0.95, 0.3))
 	if r["player"] or not _crowded(k):
 		var label: String = "YOU" if r["player"] else r["short"]
 		var outline_col: Color = Color(1, 1, 1) if r["player"] else r["color"]
-		var p := c + Vector2(-100, -54)
+		var p := c + Vector2(-100, -54 * kb)
 		draw_string_outline(font, p, label, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 8, 4, Iso.OUTLINE)
 		draw_string(font, p, label, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 8, outline_col)
 	var dust := clampf(float(r["v"]) / 5.0, 0.0, 1.0) * (0.0 if air > 0.0 or r["wet"] else 1.0)
@@ -1618,9 +1799,13 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 		var u := 1.0 - float(r["land"]) / 0.4
 		for q in 2:
 			draw_circle(ground + Vector2((q * 2 - 1) * (8.0 + u * 10.0), -3.0), 4.0 + u * 4.0, Color(0.8, 0.72, 0.58, 0.5 * (1.0 - u)))
-	if boost_left > 0.0 and r["player"]:
-		for q in 4:
-			draw_circle(c - ds.normalized() * (20.0 + q * 9.0) + Vector2(0, -14), 5.0 - q, Color(1.0, 0.8 - q * 0.15, 0.2, 0.8))
+
+
+## A power-up person at the roadside, holding a gift out to the riders.
+func _draw_giver(g: Dictionary, gp: Dictionary) -> void:
+	var ground := Iso.to_screen(gp["pos"], gp["z"])
+	PowerUps.draw_person(self, ground, g["shirt"], g["skin"], g["hair"], t_ + float(g["phase"]), true)
+	PowerUps.draw_gift(self, ground + Vector2(7, -24), t_ + float(g["phase"]))
 
 
 func _wrap(text: String, width: int) -> Array:

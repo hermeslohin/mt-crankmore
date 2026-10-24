@@ -114,7 +114,13 @@ var p_pos := Vector2.ZERO
 var p_head := 0.0
 var p_speed := 0.0
 var p_phase := 0.0
-var boost_energy := 1.0
+var pu := ""                  # the power-up you're carrying (see PowerUps), "" = none
+var socks_t := 0.0            # Fire Socks seconds left
+var bread_t := 0.0            # Breadsticks seconds left
+var p_down := 0.0             # seconds left lying on the road after a frisbee hit or being run over
+var p_blocked := false        # a pizza mascot is dancing in your way
+var mascots: Array = []       # {"victim": -1 player / rival index, "t", "pos", "phase"}
+var frisbees: Array = []      # pizzas in flight {"from", "to", "u"}
 var invuln := 0.0
 var carry: Dictionary = {}
 var handoff := 0.0
@@ -159,6 +165,8 @@ func respawn_rivals() -> void:
 	rival_score.resize(Talk.rivals.size())
 	rival_score.fill(0)
 	bubbles.clear()
+	mascots.clear()
+	frisbees.clear()
 	for o in orders:
 		if o["state"] == "rival" and int(o["rival"]) >= Talk.rivals.size():
 			o["state"] = "done"
@@ -219,6 +227,12 @@ func reset_player() -> void:
 	carry = {}
 	er_timer = 0.0
 	invuln = 1.0
+	pu = ""
+	socks_t = 0.0
+	bread_t = 0.0
+	p_down = 0.0
+	mascots.clear()
+	frisbees.clear()
 
 
 ## Puts the rider on the road at an anchor ({"road", "s"}), e.g. a shop or the ER.
@@ -1051,7 +1065,8 @@ func _spawn_rivals() -> void:
 		rival_state.append({"pos": p, "head": 0.0, "path": [], "state": "idle", "idle": randf_range(1.0, 5.0), "order": 0,
 			"stun": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
 			"bike": Game.rival_bike(Talk.rivals[i]), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
-			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35))})
+			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35)),
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "blocked": false})
 
 
 func _spawn_life() -> void:
@@ -1082,6 +1097,12 @@ func _spawn_life() -> void:
 			"col": shirts[randi() % shirts.size()], "hair": hairs[randi() % hairs.size()], "skin": skins[randi() % skins.size()],
 			"t": randf_range(5.0, 20.0), "phase": randf() * TAU, "cheer": 0.0, "cool": 0.0, "shout": ""})
 		made += 1
+	# 1 in 8 of them hand out power-ups to whoever rides past
+	var idx := range(peds.size())
+	idx.shuffle()
+	for k in peds.size():
+		peds[idx[k]]["giver"] = k < ceili(peds.size() / float(PowerUps.GIVER_ODDS))
+		peds[idx[k]]["gcool"] = 0.0
 	for k in 3:
 		boats.append({"a": randf() * TAU, "rf": randf_range(0.35, 0.65), "w": randf_range(0.05, 0.09) * (1.0 if k % 2 == 0 else -1.0), "col": PIZZA_COLORS[k]})
 
@@ -1100,6 +1121,9 @@ func _process(delta: float) -> void:
 	_update_cars(delta)
 	_update_rivals(delta)
 	_update_life(delta)
+	_update_mascots(delta)
+	_update_frisbees(delta)
+	_update_squash()
 	if active:
 		_update_orders(delta)
 		_update_player(delta)
@@ -1117,6 +1141,16 @@ func _update_player(delta: float) -> void:
 			_leave_er()
 		return
 
+	socks_t = maxf(0.0, socks_t - delta)
+	bread_t = maxf(0.0, bread_t - delta)
+	if p_down > 0.0:
+		p_down = maxf(0.0, p_down - delta)
+		p_speed = 0.0
+		Trainer.send_grade(0.0)
+		if p_down <= 0.0:
+			invuln = maxf(invuln, 1.0)
+		return
+
 	var bike := Game.bike()
 	grade = lerpf(grade, clampf(grade_at(p_pos, p_fwd), -0.1, 0.1), 1.0 - exp(-4.0 * delta))
 	Trainer.send_grade(grade * 100.0)
@@ -1124,11 +1158,12 @@ func _update_player(delta: float) -> void:
 	var target := mps * TILES_PER_MS * PACE
 	if Game.hp_ratio() < 0.3:
 		target *= 0.85
-	if Input.is_action_pressed("boost") and boost_energy > 0.02:
-		target = maxf(target, 2.0 * PACE) * 1.35
-		boost_energy = maxf(0.0, boost_energy - delta * 0.35)
-	else:
-		boost_energy = minf(1.0, boost_energy + delta * 0.08)
+	if socks_t > 0.0:
+		target *= PowerUps.SOCKS_BOOST
+	if p_blocked:
+		target = minf(target, 0.4 * PACE)
+	if Input.is_action_just_pressed("powerup"):
+		_use_powerup(-1)
 	# coast in gently when riding up to a pickup window or a delivery door
 	var obj := _objective()
 	if obj["has"] and p_pos.distance_to(obj["pos"]) < 4.0:
@@ -1497,6 +1532,9 @@ func _hit_by_car(c: Dictionary) -> void:
 	er_text = ER_JOKES.pick_random()
 	invuln = 99.0
 	p_speed = 0.0
+	socks_t = 0.0
+	bread_t = 0.0
+	p_down = 0.0
 	if not carry.is_empty():
 		Game.toast.emit("The pizza went flying. Order #%d is lost." % carry["id"], Color.ORANGE)
 		carry = {}
@@ -1593,6 +1631,10 @@ func _update_life(delta: float) -> void:
 	for p in peds:
 		p["t"] -= delta
 		p["cool"] = maxf(0.0, p["cool"] - delta)
+		if p["giver"]:
+			p["gcool"] = maxf(0.0, p["gcool"] - delta)
+			if p["gcool"] <= 0.0:
+				_try_give(p, riding)
 		# townsfolk cheer you on as you ride past: they stop, jump and shout
 		if p["cheer"] > 0.0:
 			p["cheer"] -= delta
@@ -1630,6 +1672,12 @@ func _update_rivals(delta: float) -> void:
 	for i in rival_state.size():
 		var r: Dictionary = rival_state[i]
 		r["phase"] += delta * 9.0 if r["state"] != "idle" else 0.0
+		r["socks"] = maxf(0.0, r["socks"] - delta)
+		r["bread"] = maxf(0.0, r["bread"] - delta)
+		if r["pu"] != "":
+			r["pu_hold"] += delta
+			if _rival_wants(i):
+				_use_powerup(i)
 		if r["stun"] > 0.0:
 			r["stun"] -= delta
 			continue
@@ -1689,6 +1737,10 @@ func _follow(r: Dictionary, delta: float) -> bool:
 		var bk: Dictionary = r["bike"]
 		var g := clampf(grade_at(r["pos"], path[0] - r["pos"]), -0.1, 0.1)
 		var mps := minf(Game.speed_from_power(float(r["ftp"]) * 0.75, bk["mass"], bk["cda"], bk["crr"], g, r["mass"]), MAX_TOWN_SPEED)
+		if r["socks"] > 0.0:
+			mps *= PowerUps.SOCKS_BOOST
+		if r["blocked"]:
+			mps = minf(mps, 1.2)
 		r["speed"] = move_toward(r["speed"], mps * TILES_PER_MS * PACE, 3.0 * delta)
 	var step: float = r["speed"] * delta
 	while not path.is_empty() and step > 0.0:
@@ -1838,6 +1890,258 @@ func _on_rival_say(rival: int, text: String) -> void:
 
 
 # ======================================================================
+# Power-ups (see PowerUps). "who" is -1 for the player, otherwise a rival index; -2 means nobody.
+# ======================================================================
+
+func _rider_pos(who: int) -> Vector2:
+	return p_pos if who < 0 else rival_state[who]["pos"]
+
+
+func _rider_fwd(who: int) -> Vector2:
+	return p_fwd if who < 0 else Vector2.from_angle(rival_state[who]["head"])
+
+
+func _rider_name(who: int) -> String:
+	return Game.player_name if who < 0 else Talk.rivals[who]["short"]
+
+
+## On the ground, in the ER or otherwise out of play.
+func _is_down(who: int) -> bool:
+	if who < 0:
+		return not active or er_timer > 0.0 or p_down > 0.0
+	return rival_state[who]["stun"] > 0.0
+
+
+func _is_big(who: int) -> bool:
+	return (bread_t if who < 0 else float(rival_state[who]["bread"])) > 0.0
+
+
+## The closest opponent of `who` within `within` tiles (-2 if none). Rivals go for the player first.
+func _nearest_opponent(who: int, within: float, prefer_player := false) -> int:
+	var me := _rider_pos(who)
+	var player_ok := who >= 0 and not _is_down(-1) and p_pos.distance_to(me) < within
+	if player_ok and prefer_player:
+		return -1
+	var best := -1 if player_ok else -2
+	var bd := p_pos.distance_to(me) if player_ok else within
+	for i in rival_state.size():
+		if i == who or _is_down(i):
+			continue
+		var d: float = rival_state[i]["pos"].distance_to(me)
+		if d < bd:
+			best = i
+			bd = d
+	return best
+
+
+## The pizza shop with a pizza waiting (an open order) nearest to `p`, or -1.
+func _nearest_order_shop(p: Vector2) -> int:
+	var best := -1
+	var bd := 1e9
+	for o in orders:
+		if o["state"] == "open":
+			var d: float = shops[o["shop"]]["window"].distance_to(p)
+			if d < bd:
+				bd = d
+				best = o["shop"]
+	return best
+
+
+func _knock_down(who: int, secs: float, by: int, how: String) -> void:
+	if who < 0:
+		p_down = secs
+		p_speed = 0.0
+		Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
+		if by >= 0:
+			Talk.say(by, "pu_hit_player", true)
+	else:
+		var r: Dictionary = rival_state[who]
+		r["stun"] = secs
+		r["speed"] = 0.0
+		if by < 0:
+			Game.feed.emit("Got %s! Down for %d s." % [Talk.rivals[who]["short"], int(secs)], Color(0.5, 1.0, 0.5))
+			Talk.say(who, "pu_ouch", true)
+
+
+## A power-up person hands one to whoever rides past with empty hands.
+func _try_give(p: Dictionary, riding: bool) -> void:
+	if riding and pu == "" and p_down <= 0.0 and p_pos.distance_to(p["pos"]) < 2.0:
+		pu = PowerUps.pick(PowerUps.TOWN)
+		p["gcool"] = 25.0
+		p["cheer"] = 1.5
+		p["shout"] = "Catch!"
+		Game.toast.emit("POWER-UP: %s! %s. Press Y." % [PowerUps.label(pu), PowerUps.DEFS[pu]["blurb"].capitalize()], PowerUps.col(pu))
+		return
+	for i in rival_state.size():
+		var r: Dictionary = rival_state[i]
+		if r["pu"] == "" and r["stun"] <= 0.0 and r["pos"].distance_to(p["pos"]) < 2.0:
+			r["pu"] = PowerUps.pick(PowerUps.TOWN)
+			r["pu_hold"] = 0.0
+			p["gcool"] = 25.0
+			if active and p_pos.distance_to(r["pos"]) < 25.0:
+				Game.feed.emit("%s grabbed a %s!" % [Talk.rivals[i]["short"], PowerUps.label(r["pu"])], Talk.rivals[i]["color"])
+			return
+
+
+## Uses the power-up `who` is carrying. Returns false (and keeps it) when it can't be used right now.
+func _use_powerup(who: int) -> bool:
+	var kind: String = pu if who < 0 else rival_state[who]["pu"]
+	if kind == "":
+		return false
+	var me := _rider_pos(who)
+	match kind:
+		"portal":
+			var si := _nearest_order_shop(me)
+			if who < 0:
+				if not carry.is_empty():
+					Game.toast.emit("You already have a pizza on board. Save the portal for later!", Color(1.0, 0.8, 0.5))
+					return false
+				if si < 0:
+					Game.toast.emit("No pizzas waiting anywhere yet. Hang on to the portal!", Color(1.0, 0.8, 0.5))
+					return false
+				place_on(shops[si])
+				invuln = maxf(invuln, 1.0)
+				Game.toast.emit("PEPPERONI PORTAL! Whoosh, straight to %s." % shops[si]["name"], PowerUps.col(kind))
+			else:
+				if si < 0:
+					return false
+				var r: Dictionary = rival_state[who]
+				for o in orders:
+					if o["state"] == "open" and o["shop"] == si:
+						r["order"] = o["id"]
+				r["pos"] = shops[si]["window"]
+				r["path"] = []
+				r["state"] = "handoff"
+				r["wait"] = 0.8
+				if active:
+					Game.feed.emit("%s portalled to %s!" % [Talk.rivals[who]["short"], shops[si]["name"]], Talk.rivals[who]["color"])
+		"wrench":
+			if who < 0:
+				if Game.bike_hp() >= float(Game.bike()["hp"]):
+					Game.toast.emit("Your bike is already in perfect shape. Keep the wrench for later!", Color(1.0, 0.8, 0.5))
+					return false
+				Game.hp[Game.equipped] = float(Game.bike()["hp"])
+				Game.save_game()
+				Game.toast.emit("BIKE WRENCH! Clank clank... good as new.", PowerUps.col(kind))
+			else:
+				rival_state[who]["stun"] = 0.0
+		"walkie":
+			var v := _nearest_opponent(who, 1e9, who >= 0)
+			if v == -2:
+				return false
+			mascots.append({"victim": v, "t": PowerUps.MASCOT_TIME, "pos": _rider_pos(v) + _rider_fwd(v) * 3.0, "phase": randf() * TAU})
+			if who < 0:
+				Game.toast.emit("WALKIE TALKIE! \"Mascot, go dance on %s!\"" % _rider_name(v), PowerUps.col(kind))
+			elif v < 0:
+				Game.toast.emit("%s radioed a pizza mascot into your way!" % _rider_name(who), Color(1.0, 0.55, 0.45))
+		"frisbee":
+			var v := _nearest_opponent(who, PowerUps.FRISBEE_RANGE_M / M_PER_TILE)
+			if v == -2:
+				if who < 0:
+					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
+				return false
+			frisbees.append({"from": who, "to": v, "u": 0.0})
+			if who < 0:
+				player_bubble = {"text": "Pizza frisbee!", "t": 1.5}
+		"socks":
+			if who < 0:
+				socks_t = PowerUps.SOCKS_TIME
+				Game.toast.emit("FIRE SOCKS! 30% faster for 15 s!", PowerUps.col(kind))
+			else:
+				rival_state[who]["socks"] = PowerUps.SOCKS_TIME
+		"breadsticks":
+			if who < 0:
+				bread_t = PowerUps.BREAD_TIME
+				Game.toast.emit("BREADSTICKS! You're HUGE. Run 'em over!", PowerUps.col(kind))
+			else:
+				rival_state[who]["bread"] = PowerUps.BREAD_TIME
+				if active and p_pos.distance_to(me) < 25.0:
+					Game.feed.emit("%s ate the breadsticks and got HUGE!" % Talk.rivals[who]["short"], Talk.rivals[who]["color"])
+	if who < 0:
+		pu = ""
+	else:
+		rival_state[who]["pu"] = ""
+	return true
+
+
+## When a rival fires off what it's carrying.
+func _rival_wants(i: int) -> bool:
+	var r: Dictionary = rival_state[i]
+	var hold: float = r["pu_hold"]
+	if hold < 1.5:
+		return false
+	if r["stun"] > 0.0:
+		return r["pu"] == "wrench"
+	var near_player := active and not _is_down(-1) and p_pos.distance_to(r["pos"]) < 18.0
+	match r["pu"]:
+		"portal":
+			return r["state"] in ["idle", "wander"] and _nearest_order_shop(r["pos"]) >= 0
+		"wrench":
+			return hold > 30.0
+		"walkie":
+			return near_player or hold > 40.0
+		"frisbee":
+			return _nearest_opponent(i, PowerUps.FRISBEE_RANGE_M / M_PER_TILE) != -2
+		"socks":
+			return r["state"] in ["to_shop", "to_dest"]
+		"breadsticks":
+			return (near_player and p_pos.distance_to(r["pos"]) < 6.0) or hold > 40.0
+	return false
+
+
+## Pizza mascots dance just in front of their victim, slowing them to a crawl.
+func _update_mascots(delta: float) -> void:
+	p_blocked = false
+	for r in rival_state:
+		r["blocked"] = false
+	for k in range(mascots.size() - 1, -1, -1):
+		var m: Dictionary = mascots[k]
+		m["t"] -= delta
+		m["phase"] += delta
+		var v: int = m["victim"]
+		if m["t"] <= 0.0 or v >= rival_state.size():
+			mascots.remove_at(k)
+			continue
+		var f := _rider_fwd(v)
+		var goal := _rider_pos(v) + f * 0.9 + Vector2(-f.y, f.x) * sin(m["phase"] * 2.0) * 0.35
+		m["pos"] = m["pos"].move_toward(goal, 6.0 * delta)
+		if m["pos"].distance_to(goal) < 0.8:
+			if v < 0:
+				p_blocked = true
+			else:
+				rival_state[v]["blocked"] = true
+
+
+func _update_frisbees(delta: float) -> void:
+	for k in range(frisbees.size() - 1, -1, -1):
+		var fz: Dictionary = frisbees[k]
+		fz["u"] += delta / 0.45
+		if fz["u"] >= 1.0:
+			frisbees.remove_at(k)
+			var to: int = fz["to"]
+			if to < rival_state.size() and not _is_down(to) and not (to < 0 and invuln > 0.0):
+				_knock_down(to, PowerUps.DOWN_TIME, fz["from"], "beaned you with a Pizza Frisbee")
+
+
+## A rider on breadsticks flattens anyone they ride into.
+func _update_squash() -> void:
+	var who: Array = [-1]
+	who.append_array(range(rival_state.size()))
+	for a in who:
+		if not _is_big(a) or _is_down(a):
+			continue
+		for b in who:
+			if b == a or _is_big(b) or _is_down(b) or (b < 0 and invuln > 0.0):
+				continue
+			if _rider_pos(a).distance_to(_rider_pos(b)) < 0.8:
+				_knock_down(b, PowerUps.SQUASH_TIME, a, "flattened you with breadstick power")
+
+
+func _bread_k(t: float) -> float:
+	return 1.0 + (PowerUps.BREAD_SCALE - 1.0) * clampf(minf(PowerUps.BREAD_TIME - t, t) / 0.4, 0.0, 1.0) if t > 0.0 else 1.0
+
+
+# ======================================================================
 # Drawing
 # ======================================================================
 
@@ -1890,6 +2194,9 @@ func _draw_world() -> void:
 		var cp: Vector2 = shops[si]["chef"]
 		if tv.has_point(Iso.to_screen(cp)):
 			items.append([cp.x + cp.y, 7, si])
+	for m in mascots:
+		if tv.has_point(Iso.to_screen(m["pos"])):
+			items.append([m["pos"].x + m["pos"].y, 8, m])
 	items.append([p_pos.x + p_pos.y, 4, null])
 	items.sort_custom(func(a, b): return a[0] < b[0])
 	for it in items:
@@ -1907,6 +2214,7 @@ func _draw_world() -> void:
 			5: Iso.held(Iso.ground_z(it[2]["pos"]), _draw_prop.bind(it[2]))
 			6: Iso.held(Iso.ground_z(it[2]["pos"]), _draw_ped.bind(it[2]))
 			7: Iso.held(Iso.ground_z(shops[it[2]]["chef"]), _draw_chef.bind(it[2]))
+			8: PowerUps.draw_mascot(self, Iso.to_screen(it[2]["pos"]), it[2]["phase"])
 	_draw_gondola_cable()
 	_draw_overlays()
 
@@ -2485,6 +2793,11 @@ func _draw_ped(p: Dictionary) -> void:
 	if cheering:
 		draw_rect(Rect2(base + Vector2(-1, -15), Vector2(2, 1)), Iso.OUTLINE)   # open mouth
 		_label(p["shout"], base + Vector2(0, -24), 8, Color(1.0, 0.95, 0.45))
+	elif p["giver"] and p["gcool"] <= 0.0:
+		# holding a power-up gift out over the road
+		draw_line(base + Vector2(3, -12), base + Vector2(6, -19), Iso.OUTLINE, 2.0)
+		draw_line(base + Vector2(3, -12), base + Vector2(6, -19), skin, 1.0)
+		PowerUps.draw_gift(self, base + Vector2(7, -23), t_ + p["phase"])
 
 
 ## The pizza man outside each shop. With an order waiting he dances with the steaming box held high,
@@ -2611,8 +2924,15 @@ func _draw_player() -> void:
 		return
 	var bike := Game.bike()
 	var heat := 0.0 if carry.is_empty() else clampf(float(carry["t_left"]) / float(carry["t_total"]), 0.0, 1.0)
-	_draw_bike(p_pos, p_head, bike["color"], Color(0.95, 0.95, 0.95), p_phase, not carry.is_empty(), "YOU", heat)
-	_label(Game.player_name, Iso.to_screen(p_pos) + Vector2(0, -46), 8, Color(1, 1, 1))
+	var k := _bread_k(bread_t)
+	if socks_t > 0.0 and p_down <= 0.0:
+		PowerUps.draw_flames(self, Iso.to_screen(p_pos), -BikeDraw.world_dir(p_head).normalized(), t_)
+	if p_down > 0.0:
+		_draw_bike(p_pos, p_head + 1.2, bike["color"], Color(0.95, 0.95, 0.95), 0.0, not carry.is_empty(), "YOU", heat, k)
+		_dizzy(Iso.to_screen(p_pos) + Vector2(0, -30))
+	else:
+		_draw_bike(p_pos, p_head, bike["color"], Color(0.95, 0.95, 0.95), p_phase, not carry.is_empty(), "YOU", heat, k)
+	_label(Game.player_name, Iso.to_screen(p_pos) + Vector2(0, -46 * k), 8, Color(1, 1, 1))
 	if handoff > 0.0 and handoff_shop >= 0:
 		# the pizza slides out of the window into your hands
 		var hatch := Iso.to_screen(shops[handoff_shop]["chef"], 22.0)
@@ -2627,16 +2947,35 @@ func _draw_rival(i: int) -> void:
 	var r: Dictionary = rival_state[i]
 	var info: Dictionary = Talk.rivals[i]
 	var frame_col: Color = Color(info["color"]).lerp(Color.WHITE, 0.15)
+	var k := _bread_k(r["bread"])
+	if r["socks"] > 0.0 and r["stun"] <= 0.0:
+		PowerUps.draw_flames(self, Iso.to_screen(r["pos"]), -BikeDraw.world_dir(r["head"]).normalized(), t_ + i)
 	if r["stun"] > 0.0:
 		_label("*ouch*", Iso.to_screen(r["pos"]) + Vector2(0, -38), 8, Color(1, 0.8, 0.3))
-		_draw_bike(r["pos"], r["head"] + 1.2, frame_col, info["color"], 0.0, false, info["short"])
+		_draw_bike(r["pos"], r["head"] + 1.2, frame_col, info["color"], 0.0, false, info["short"], 1.0, k)
+		_dizzy(Iso.to_screen(r["pos"]) + Vector2(0, -28))
 	else:
-		_draw_bike(r["pos"], r["head"], frame_col, info["color"], r["phase"], r["state"] == "to_dest", info["short"])
-	_label(info["short"], Iso.to_screen(r["pos"]) + Vector2(0, -46), 8, info["color"])
+		_draw_bike(r["pos"], r["head"], frame_col, info["color"], r["phase"], r["state"] == "to_dest", info["short"], 1.0, k)
+	_label(info["short"], Iso.to_screen(r["pos"]) + Vector2(0, -46 * k), 8, info["color"])
 
 
-func _draw_bike(pos: Vector2, head: float, frame_col: Color, shirt: Color, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0) -> void:
-	BikeDraw.draw(self, Iso.to_screen(pos), BikeDraw.world_dir(head), frame_col, shirt, phase, has_pizza, who, heat)
+## `k` scales the whole rider up (breadsticks).
+func _draw_bike(pos: Vector2, head: float, frame_col: Color, shirt: Color, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0, k := 1.0) -> void:
+	if k == 1.0:
+		BikeDraw.draw(self, Iso.to_screen(pos), BikeDraw.world_dir(head), frame_col, shirt, phase, has_pizza, who, heat)
+		return
+	draw_set_transform(Iso.to_screen(pos), 0.0, Vector2(k, k))
+	BikeDraw.draw(self, Vector2.ZERO, BikeDraw.world_dir(head), frame_col, shirt, phase, has_pizza, who, heat)
+	draw_set_transform(Vector2.ZERO)
+
+
+## Little stars circling a knocked-down rider's head.
+func _dizzy(c: Vector2) -> void:
+	for q in 3:
+		var a := t_ * 5.0 + q * TAU / 3.0
+		var p := c + Vector2(cos(a) * 9.0, sin(a) * 3.0)
+		draw_rect(Rect2(p - Vector2(1, 1), Vector2(3, 3)), Iso.OUTLINE)
+		draw_rect(Rect2(p - Vector2(0, 0), Vector2(1, 1)), Color(1.0, 0.95, 0.3))
 
 
 func _draw_gondola_cable() -> void:
@@ -2717,6 +3056,11 @@ func _draw_overlays() -> void:
 		_bubble(Iso.to_screen(r["pos"]) + Vector2(0, -54), bubbles[i]["text"], Talk.rivals[i]["color"])
 	if player_bubble["t"] > 0.0:
 		_bubble(Iso.to_screen(p_pos) + Vector2(0, -54), player_bubble["text"], Color(0.2, 0.6, 1.0))
+	for fz in frisbees:
+		var to: int = fz["to"]
+		var from: int = fz["from"]
+		if to < rival_state.size() and from < rival_state.size():
+			PowerUps.draw_frisbee(self, Iso.to_screen(_rider_pos(from), 18.0), Iso.to_screen(_rider_pos(to), 14.0), fz["u"], t_)
 	if not active or er_timer > 0.0:
 		return
 	_draw_junction_arrows()

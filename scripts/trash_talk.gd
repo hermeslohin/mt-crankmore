@@ -168,6 +168,20 @@ var _lines := {
 		"That curb came out of nowhere!",
 		"Ow. The ground is very hard today.",
 	],
+	"pu_hit_player": [
+		"Special delivery, {n}! Extra cheese, extra splat.",
+		"Bullseye! Pizza frisbee hall of fame, baby.",
+		"Oops, did that hurt? Asking for a pepperoni.",
+		"That's what we call a hot drop, {n}.",
+		"Stay down there, {n}. The view's nice.",
+	],
+	"pu_ouch": [
+		"Hey! Who throws a pizza?!",
+		"I've got sauce in my ears, {n}!",
+		"Not cool, {n}. Not cool at all.",
+		"My jersey! This was dry clean only!",
+		"I'll remember this, {n}. I have a great memory for toppings.",
+	],
 	"banter": [
 		"{o}, your cadence is a crime scene.",
 		"Hey {o}, I'll race you for the last slice!",

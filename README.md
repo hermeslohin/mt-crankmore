@@ -17,7 +17,7 @@ Download the latest build for your system from the [Releases page](https://githu
 | Platform | File | How to run |
 |---|---|---|
 | Windows | `MtCrankmore-windows-x86_64.zip` | unzip, run `MtCrankmore.exe` |
-| macOS | `MtCrankmore-macos.zip` (universal) | unzip, open the app; it's unsigned, so right-click > Open the first time |
+| macOS | `MtCrankmore-macos.zip` (universal) | unzip, then right-click the app > Open the first time (it's ad-hoc signed, not notarized). If macOS says it's "damaged", run `xattr -cr "Mt. Crankmore.app"` once |
 | Linux | `MtCrankmore-linux-x86_64.tar.gz` | extract, `chmod +x MtCrankmore-linux-x86_64`, run it |
 
 The game works with just a keyboard. A trainer needs Python 3 and internet once (see [Bicycle trainer](#bicycle-trainer)).

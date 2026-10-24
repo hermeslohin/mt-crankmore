@@ -24,6 +24,8 @@ const MAX_SPEED := 16.0       # m/s cap on the descents
 const FORD_HALF := 2.5        # metres of water either side of a ford's centre
 const FORD_CRR := 0.05        # extra rolling resistance while wading
 const WATER := Color(0.3, 0.62, 0.92)
+## Speed (km/h) -> share of the watts saved riding in a slipstream; linear in between, flat above the last point.
+const DRAFT_CURVE := [[0.0, 0.0], [13.0, 0.18], [17.0, 0.24], [40.0, 0.30]]
 
 var active := false
 var course: Dictionary = {}
@@ -752,10 +754,10 @@ func _step_riders(delta: float) -> void:
 				stamina = minf(1.0, stamina + delta * 0.06)
 		me["power"] = p
 		var b: Dictionary = me["bike"]
-		var vt := Game.speed_from_power(p, b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
+		# in a slipstream the same speed takes fewer watts, so your watts go further
+		var vt := Game.speed_from_power(p / (1.0 - _draft(0)), b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
 		if Game.hp_ratio() < 0.3:
 			vt *= 0.92
-		vt *= 1.0 + _draft(0)
 		_tick_powerups(0, delta)
 		if Input.is_action_just_pressed("powerup"):
 			_use_powerup(0)
@@ -875,6 +877,7 @@ func _crr(b: Dictionary) -> float:
 	return float(b["crr"]) + Game.GRAVEL_EXTRA_CRR * float(b.get("gravel", 1.0))
 
 
+## Share of the watts rider `i` saves in the slipstream of someone 1-9 m ahead in the same line (0 if none).
 func _draft(i: int) -> float:
 	var me: Dictionary = riders[i]
 	for k in riders.size():
@@ -883,8 +886,17 @@ func _draft(i: int) -> float:
 		var o: Dictionary = riders[k]
 		var d: float = o["s"] - me["s"]
 		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35:
-			return 0.05
+			return draft_saving(float(me["v"]) * 3.6)
 	return 0.0
+
+
+static func draft_saving(kmh: float) -> float:
+	for j in range(1, DRAFT_CURVE.size()):
+		var a: Array = DRAFT_CURVE[j - 1]
+		var b: Array = DRAFT_CURVE[j]
+		if kmh <= float(b[0]):
+			return lerpf(a[1], b[1], (kmh - float(a[0])) / (float(b[0]) - float(a[0])))
+	return DRAFT_CURVE[DRAFT_CURVE.size() - 1][1]
 
 
 # ---------------------------------------------------------------------

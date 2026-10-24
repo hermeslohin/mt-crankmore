@@ -48,6 +48,36 @@ var _lines := {
 		"{n} is leading?! Somebody check the weather.",
 		"Don't get used to it, {n}.",
 	],
+	"race_bear": [
+		"BEAR!! Every rider for themselves!",
+		"I don't have to outrun the bear, {n}. I just have to outrun YOU.",
+		"Nobody make eye contact with the bear!",
+		"Is that bear drafting you, {n}? Bold strategy.",
+		"Throw it a pepperoni and keep pedaling!",
+	],
+	"race_wildlife": [
+		"Oh deer. Oh deer oh deer oh deer.",
+		"Watch the wildlife, {n}! They have right of way!",
+		"That deer has better form than you, {n}.",
+		"Even the deer are passing you, {n}.",
+	],
+	"race_air": [
+		"Show-off! ...Okay, that was sick.",
+		"Nice air, {n}! Shame about the landing. Kidding. Mostly.",
+		"Did {n} just fly? Somebody check their bike for wings.",
+		"Ten points for style, zero for humility.",
+	],
+	"race_log": [
+		"Bunny hop! Look at you, {n}!",
+		"Who leaves a whole tree on a race course?!",
+		"Logs: one. Your rear rim: zero.",
+	],
+	"race_splash": [
+		"Wet socks for the rest of the race, {n}! Enjoy!",
+		"Hope your pizza box is waterproof!",
+		"Splash zone! Splash zone!",
+		"That creek is colder than your chances, {n}.",
+	],
 	"race_win_rival": [
 		"Another victory, extra cheese. You're welcome.",
 		"Winner winner pizza dinner!",

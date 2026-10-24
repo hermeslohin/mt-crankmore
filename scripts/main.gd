@@ -49,7 +49,7 @@ func _ready() -> void:
 			Input.action_press("pedal")
 		"race_fast":
 			_start_game()
-			_start_race(0)
+			_start_race(OS.get_environment("PIZZA_COURSE").to_int())
 			Input.action_press("pedal")
 			Engine.time_scale = 40.0
 		"shop":
@@ -73,6 +73,8 @@ func _ready() -> void:
 			_debug_latch()
 		"shot":
 			_debug_shot()
+		"race_shot":
+			_debug_race_shot()
 		"readme":
 			_debug_readme()
 		"gears":
@@ -540,6 +542,30 @@ func _debug_shot() -> void:
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/shot_%02d.png" % [out, k])
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] [PIZZA_OUT=dir] saves race screenshots just before the first
+## jump, log, creek and bear, and at the finish. The player's save file is put back afterwards.
+func _debug_race_shot() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	_start_game()
+	Game.money = maxi(Game.money, 1000)
+	_start_race(OS.get_environment("PIZZA_COURSE").to_int())
+	Input.action_press("pedal")
+	var spots: Array = race.debug_spots()
+	for k in spots.size():
+		race.debug_place(spots[k])
+		cam.position = race.cam_target()
+		await get_tree().create_timer(0.9).timeout
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/race_%02d.png" % [out, k])
+	if backup != "":
+		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(backup)
+		f.close()
 	get_tree().quit()
 
 

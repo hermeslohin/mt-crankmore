@@ -501,6 +501,11 @@ func _draw_race_profile(mr: Rect2) -> void:
 		pts.append(pr.position + Vector2(race.s_m[i] / length * pr.size.x, pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0)))
 	pts.append(pr.position + pr.size)
 	draw_colored_polygon(pts, Color(0.72, 0.62, 0.45))
+	# creeks, jumps and fallen trees on the profile
+	for ob in race.obstacles:
+		var ox: float = pr.position.x + float(ob["s"]) / length * pr.size.x
+		var oc: Color = {"ford": Color(0.25, 0.55, 0.95), "jump": Color(0.95, 0.55, 0.1), "log": Color(0.4, 0.25, 0.12)}[ob["kind"]]
+		draw_rect(Rect2(floorf(ox), pr.position.y + pr.size.y - 3, 1, 3), oc)
 	var done := clampf(me["s"] / length, 0.0, 1.0)
 	draw_rect(Rect2(pr.position.x + done * pr.size.x, pr.position.y, 1, pr.size.y), Color(0.12, 0.12, 0.15, 0.5))
 	for k in range(race.riders.size() - 1, -1, -1):

@@ -783,7 +783,7 @@ func _step_riders(delta: float) -> void:
 		if r["surge_in"] <= 0.0:
 			r["surge"] = 6.0
 			r["surge_in"] = randf_range(30.0, 60.0)
-		var pw: float = r["ftp"] * (0.95 + 0.04 * sin(clock * 0.21 + r["wiggle"]))
+		var pw: float = r["ftp"] * (float(Game.DIFFICULTIES[Game.difficulty]["race"]) + 0.04 * sin(clock * 0.21 + r["wiggle"]))
 		pw *= 1.0 - 0.00001 * r["s"]  # slow fade
 		if r["surge"] > 0.0:
 			r["surge"] -= delta

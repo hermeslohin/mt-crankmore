@@ -222,6 +222,8 @@ static func _flush(ci: CanvasItem) -> void:
 					ci.draw_circle(it[2], it[3] + 0.9, INK)
 				ci.draw_circle(it[2], it[3], it[5])
 			POLY:
+				if Geometry2D.triangulate_polygon(it[2]).is_empty():
+					continue   # seen edge-on: a sliver the renderer can't fill
 				ci.draw_colored_polygon(it[2], it[5])
 				if it[3]:
 					ci.draw_polyline(it[2], INK, 1.0)

@@ -30,8 +30,20 @@ const BREAD_SCALE := 1.7
 const MASCOT_TIME := 12.0
 
 
+## How often each one turns up, relative to the others (1 = normal).
+const ODDS := {"walkie": 0.3}
+
+
 static func pick(pool: Array) -> String:
-	return pool.pick_random()
+	var total := 0.0
+	for k in pool:
+		total += float(ODDS.get(k, 1.0))
+	var r := randf() * total
+	for k in pool:
+		r -= float(ODDS.get(k, 1.0))
+		if r <= 0.0:
+			return k
+	return pool[pool.size() - 1]
 
 
 static func label(kind: String) -> String:

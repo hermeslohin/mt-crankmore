@@ -1,0 +1,6 @@
+.godot/
+.venv/
+__pycache__/
+*.import
+bridge/devices.json
+bridge/buttons.json

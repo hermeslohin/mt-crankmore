@@ -779,7 +779,8 @@ func _step_riders(delta: float) -> void:
 			me["v"] = move_toward(me["v"], 0.0, 14.0 * delta)
 		if float(me["air"]) <= 0.0:   # no traction in the air
 			me["v"] += (minf(vt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
-		me["lat"] = clampf(me["lat"] + Input.get_axis("steer_left", "steer_right") * 1.1 * delta, -0.4, 0.4)
+		var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
+		me["lat"] = clampf(me["lat"] + steer * 1.1 * delta, -0.4, 0.4)
 		me["s"] += me["v"] * delta
 		me["phase"] += (Trainer.cadence() if Trainer.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
 		_terrain_events(0, delta)

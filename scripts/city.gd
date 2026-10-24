@@ -1195,8 +1195,8 @@ func _update_player(delta: float) -> void:
 	_update_pending()
 	var w := _update_turn(p_speed * delta)
 	p_fwd = p_fwd.slerp(w[1], 1.0 - exp(-10.0 * delta)).normalized()
-	# holding left / right (the paddles, the D-pad) slides you across your lane; a tap still picks the turn
-	p_lat = clampf(p_lat + Input.get_axis("steer_left", "steer_right") * 0.9 * delta, -0.75, 0.0)
+	# the paddles slide you across your lane; turns are picked with the D-pad / arrows only
+	p_lat = clampf(p_lat + Input.get_axis("lane_left", "lane_right") * 0.9 * delta, -0.75, 0.0)
 	rail_pos = w[0] + Vector2(-p_fwd.y, p_fwd.x) * p_lat
 	if p_pos.distance_to(rail_pos) > 3.0:
 		p_pos = rail_pos

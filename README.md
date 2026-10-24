@@ -51,7 +51,7 @@ Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the hand
 
 ### Riding on rails
 In town you don't steer: just pedal and the bike follows the road. Your only job is choosing a direction at junctions.
-You can still pick your line: hold left / right (or squeeze a paddle) to slide across your lane, from the kerb towards the centre line and back.
+You can still pick your line: squeeze a handlebar paddle to slide across your lane, from the kerb towards the centre line and back. Turns are only picked with the D-pad (or the arrow keys).
 A **TURN IN ...m** panel pops up several seconds before every crossroads with three arrows. The yellow one is your choice (straight by default),
 and the green **GPS** tag marks the way to your current pickup or delivery. Painted arrows on the road show where you'll go.
 One tap is enough: the choice sticks until the junction (no need to hold the button), and the bike curves smoothly through the turn.
@@ -63,7 +63,7 @@ Pickups and deliveries happen automatically: the bike coasts up to the window an
 |---|---|---|
 | pedal | W (210 W), Shift+W sprint | ride |
 | D-pad left / right | Left / Right (or A / D) | choose turn at the next junction; in a race, move across the road |
-| left / right paddle | | same as D-pad left / right (handy for picking your line in a race) |
+| left / right paddle | | move across the road (town and races); never picks a turn |
 | D-pad up | Up | choose straight |
 | D-pad down | Down | U-turn |
 | A | E / Enter | enter bike shop / race HQ, menu select |

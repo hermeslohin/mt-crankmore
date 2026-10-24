@@ -72,6 +72,8 @@ func _setup_input() -> void:
 		"sprint": [KEY_SHIFT],
 		"powerup": [KEY_Y, KEY_SPACE],
 		"honk": [KEY_H],
+		"lane_left": [],      # the handlebar paddles: move across the road (never pick a turn)
+		"lane_right": [],
 		"shift_up": [KEY_R, KEY_BRACKETRIGHT],
 		"shift_down": [KEY_Q, KEY_BRACKETLEFT],
 		"act_up": [KEY_UP],

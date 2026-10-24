@@ -35,8 +35,6 @@ const BUTTON_ACTIONS := {
 	"LS2": "brake",
 	"POWERUP_R": "powerup",
 	"POWERUP_L": "brake",
-	"PADDLE_L": "steer_left",
-	"PADDLE_R": "steer_right",
 }
 
 var rx := PacketPeerUDP.new()

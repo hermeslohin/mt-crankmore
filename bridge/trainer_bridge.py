@@ -17,6 +17,7 @@ Manual usage:
   python trainer_bridge.py --scan       # list nearby BLE devices and exit
   python trainer_bridge.py --dump       # also print raw controller messages (for debugging)
   python trainer_bridge.py --learn      # teach the bridge your controller's buttons (writes buttons.json)
+  python trainer_bridge.py --inspect --no-trainer   # record what every button / paddle sends (writes inspect.log)
   python trainer_bridge.py --fake       # fake trainer data, no Bluetooth (tests the game link)
 
 Close any other trainer app (and anything else holding the devices) first: BLE devices accept one connection.
@@ -58,10 +59,6 @@ DEFAULT_BITS = {
     0x00100: "LS1", 0x00200: "LS2", 0x00400: "POWERUP_L", 0x00800: "ONOFF_L",       # left shifter
     0x01000: "RS1", 0x02000: "RS2", 0x04000: "POWERUP_R", 0x08000: "ONOFF_R",       # right shifter (RS1 = 0x1000, checked on real hardware)
 }
-# The paddles behind the shifters are analog: each keypad message carries repeated (location, value) pairs in
-# field 2, value a zigzag sint32 from about -100 to 100. Pushed past PADDLE_ON they count as a held button.
-PADDLES = {0: "PADDLE_L", 1: "PADDLE_R"}
-PADDLE_ON = 25
 LEARN_ORDER = ["LEFT", "RIGHT", "UP", "DOWN", "A", "B", "Y", "Z", "LS1", "LS2", "RS1", "RS2",
                "POWERUP_L", "POWERUP_R"]
 BUTTONS_FILE = Path(__file__).with_name("buttons.json")
@@ -83,6 +80,7 @@ class State:
         self.gear = 1.0             # virtual gear ratio relative to the neutral gear (1.0 = no change)
         self.mass = 85.0            # rider + bike, kg
         self.mask = None            # last raw button mask (for --learn)
+        self.recorder = None        # --inspect: called with every raw controller message
         self.control_ready = False
         # what the game asked for, and what is actually happening
         self.want = {"trainer": None, "controller": None}
@@ -360,6 +358,8 @@ async def controller_session(client, state: State, addr: str, dump: bool):
 
     def on_async(_, data: bytearray):
         data = bytes(data)
+        if state.recorder:
+            state.recorder(data)
         if dump:
             log("async", data.hex())
         if len(data) < 2 or data[0] not in (0x23, 0x07):
@@ -368,28 +368,14 @@ async def controller_session(client, state: State, addr: str, dump: bool):
             fields = parse_pb(data[1:])
         except Exception:
             return
-        pressed = None
         for fn, wt, v in fields:
             if fn == 1 and wt == 0:
                 state.mask = v
-                pressed = decode_mask(v, active_low, bits)
-            elif fn == 2 and wt == 2:
-                try:
-                    sub = dict((f, x) for f, w, x in parse_pb(v) if w == 0)
-                except Exception:
-                    continue
-                loc = sub.get(1, 0)
-                raw = sub.get(2, 0)
-                val = (raw >> 1) ^ -(raw & 1)   # zigzag
-                if dump and val:
-                    log("paddle", loc, val)
-                if pressed is not None and loc in PADDLES and abs(val) >= PADDLE_ON:
-                    pressed.add(PADDLES[loc])
-        if pressed is not None:
-            state.pressed = pressed
-            state.taps |= pressed
-            if dump:
-                log("mask", hex(state.mask), sorted(pressed))
+                state.pressed = decode_mask(v, active_low, bits)
+                state.taps |= state.pressed
+                if dump:
+                    log("mask", hex(v), sorted(state.pressed))
+                break
 
     def on_sync(_, data: bytearray):
         if dump:
@@ -492,6 +478,72 @@ async def learn_task(state: State):
     BUTTONS_FILE.write_text(json.dumps({"active_low": True if active_low is None else active_low,
                                         "bits": {str(k): v for k, v in bits.items()}}, indent=2))
     log("saved", BUTTONS_FILE, "- restart the bridge without --learn")
+    state.quit = True
+
+
+def describe_pb(buf: bytes, depth: int = 0) -> str:
+    """Every protobuf field in a message, nested ones in braces; varints also shown zigzag-decoded (z=...)."""
+    try:
+        fields = parse_pb(buf)
+    except Exception:
+        return buf.hex()
+    out = []
+    for fn, wt, v in fields:
+        if wt == 0:
+            out.append(f"{fn}={v:#x}" + (f"(z={(v >> 1) ^ -(v & 1)})" if v < 0x10000 else ""))
+        elif wt == 2 and depth < 3 and v:
+            out.append(f"{fn}{{{describe_pb(v, depth + 1)}}}")
+        else:
+            out.append(f"{fn}:{v.hex() if isinstance(v, bytes) else v}")
+    return " ".join(out)
+
+
+INSPECT_STEPS = [
+    ("leave everything alone", 5),
+    ("press and release LS1 (left shift) a few times", 6),
+    ("press and release RS1 (right shift) a few times", 6),
+    ("squeeze the LEFT paddle slowly all the way, then let go", 6),
+    ("squeeze the RIGHT paddle slowly all the way, then let go", 6),
+    ("press and release LS2", 5),
+    ("press and release RS2", 5),
+    ("press each of the D-pad buttons", 6),
+]
+INSPECT_FILE = Path(__file__).with_name("inspect.log")
+
+
+async def inspect_task(state: State):
+    """Guided: asks for one button / paddle at a time and records every distinct message it sends to inspect.log."""
+    lines = []
+    step = ["(connecting)"]
+    seen = set()
+
+    def note(text):
+        print(text, flush=True)
+        lines.append(text)
+
+    def rec(data: bytes):
+        key = (step[0], data)
+        if key in seen:
+            return
+        seen.add(key)
+        mask = None
+        for fn, wt, v in parse_pb(data[1:]) if len(data) > 1 else []:
+            if fn == 1 and wt == 0:
+                mask = v
+        names = sorted(decode_mask(mask, True, dict(DEFAULT_BITS))) if mask is not None else []
+        note(f"    {data.hex()}   type {data[0]:#04x}   {describe_pb(data[1:])}   buttons {names}")
+
+    log("INSPECT MODE: waiting for the controller (pedal / press a button to wake it)...")
+    while not state.controller:
+        await asyncio.sleep(0.5)
+    state.recorder = rec
+    for text, secs in INSPECT_STEPS:
+        step[0] = text
+        note(f"\n>>> {text.upper()}  ({secs} s)")
+        await asyncio.sleep(secs)
+    state.recorder = None
+    INSPECT_FILE.write_text("\n".join(lines) + "\n")
+    log("saved", INSPECT_FILE)
     state.quit = True
 
 
@@ -622,6 +674,8 @@ async def amain(args):
         tasks.append(role_task("controller", state, disc, args))
     if args.learn:
         tasks.append(learn_task(state))
+    if args.inspect:
+        tasks.append(inspect_task(state))
     log(f"relaying to game at {GAME_ADDR[0]}:{GAME_ADDR[1]}; listening on {LISTEN_PORT}" + (" (managed by the game)" if args.managed else ""))
     runners = [asyncio.ensure_future(t) for t in tasks]
     while not state.quit:
@@ -637,6 +691,7 @@ def main():
     ap.add_argument("--scan", action="store_true", help="list nearby BLE devices and exit")
     ap.add_argument("--dump", action="store_true", help="print raw controller messages")
     ap.add_argument("--learn", action="store_true", help="record your controller's button bits")
+    ap.add_argument("--inspect", action="store_true", help="guided: record what each button and paddle sends (writes inspect.log)")
     ap.add_argument("--fake", action="store_true", help="send fake trainer data (no Bluetooth)")
     ap.add_argument("--no-trainer", action="store_true")
     ap.add_argument("--no-controller", action="store_true")

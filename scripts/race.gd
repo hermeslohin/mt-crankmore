@@ -650,7 +650,7 @@ func _build_riders() -> void:
 		var lane := (i - (n - 1) * 0.5) * 0.1 + 0.05
 		riders.append({"name": info["name"], "short": info["short"], "color": info["color"], "frame": Color(info["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
-			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i,
+			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass, false), "idx": i,
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "down": 0.0, "gv": 0})

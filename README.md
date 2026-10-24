@@ -44,7 +44,7 @@ The title screen has **Continue game** (resumes your save, showing your money an
 The first time you start delivering (and any time from the title screen or the pause menu) the **Rider setup** screen asks for:
 
 * **FTP** (watts) and **weight**, shown in **kg or lbs**. Your weight is used in the physics, so climbs feel like they do outside.
-* **Difficulty**: rivals get a W/kg similar to yours (*Easy* about 85% of it, *Medium* about the same, *Hard* about 12% more, *Ludicrous* about 20% more, with better bikes on the harder levels). In a race they hold a share of their FTP: about 50% on *Easy*, 60% on *Medium*, 70% on *Hard* and 80% on *Ludicrous* (plus the odd surge).
+* **Difficulty**: in town, rivals get a W/kg similar to yours (*Easy* about 85% of it, *Medium* about the same, *Hard* about 12% more, *Ludicrous* about 20% more, with better bikes on the harder levels). In a race they hold a share of *your* FTP (as W/kg, at their own weight): about 50% on *Easy*, 60% on *Medium*, 70% on *Hard* and 80% on *Ludicrous* (plus the odd surge).
 * **Rival bikers**: how many ride against you, 1 to 7 (default 3).
 
 Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the handlebar D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.

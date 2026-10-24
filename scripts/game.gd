@@ -14,12 +14,12 @@ const SLOGAN := "Pizza pays the bills, cycling is life"
 const LB_PER_KG := 2.20462
 
 ## Rival strength relative to the player's own W/kg, how good their bikes are (offset on their usual bike tier),
-## and the share of their FTP they hold in a race ("race").
+## and the share of YOUR FTP (as W/kg, at their own weight) they hold in a race ("race").
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "race": 0.5, "blurb": "Rivals race at about 50% of their FTP. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "race": 0.6, "blurb": "Rivals race at about 60% of their FTP. Push a bit and you'll win."},
-	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "race": 0.7, "blurb": "Rivals race at about 70% of their FTP on better bikes. Good luck."},
-	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of their FTP on their best bikes. Bring snacks."},
+	"easy": {"label": "Easy", "wkg": 0.85, "tier": -1, "race": 0.5, "blurb": "Rivals race at about 50% of your FTP. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "wkg": 1.0, "tier": 0, "race": 0.6, "blurb": "Rivals race at about 60% of your FTP. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "wkg": 1.12, "tier": 1, "race": 0.7, "blurb": "Rivals race at about 70% of your FTP on better bikes. Good luck."},
+	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 const MAX_RIVALS := 7
@@ -162,11 +162,11 @@ func weight_text() -> String:
 	return "%d lbs" % roundi(weight_kg * LB_PER_KG) if units == "lbs" else "%d kg" % roundi(weight_kg)
 
 
-## A rival's FTP in watts: the player's W/kg, scaled by difficulty, with a small personal spread
-## (the stronger characters stay a little stronger) so the pack doesn't ride as one.
-func rival_ftp(info: Dictionary, rider_mass: float) -> float:
+## A rival's FTP in watts: the player's W/kg, scaled by difficulty (unless `scaled` is false), with a small personal
+## spread (the stronger characters stay a little stronger) so the pack doesn't ride as one.
+func rival_ftp(info: Dictionary, rider_mass: float, scaled := true) -> float:
 	var spread := 1.0 + (float(info["ftp"]) / 244.0 - 1.0) * 0.5
-	return wkg() * float(DIFFICULTIES[difficulty]["wkg"]) * spread * rider_mass
+	return wkg() * (float(DIFFICULTIES[difficulty]["wkg"]) if scaled else 1.0) * spread * rider_mass
 
 
 func rival_mass(i: int) -> float:

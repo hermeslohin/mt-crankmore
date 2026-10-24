@@ -422,7 +422,10 @@ func _on_interact(kind: String) -> void:
 
 func _bike_shop_menu() -> Dictionary:
 	var items: Array = []
-	for i in Game.bikes.size():
+	# cheapest first (the list itself stays in save order, so saved garages keep their bikes)
+	var order: Array = range(Game.bikes.size())
+	order.sort_custom(func(a, b): return int(Game.bikes[a]["price"]) < int(Game.bikes[b]["price"]))
+	for i in order:
 		var b: Dictionary = Game.bikes[i]
 		var owned := Game.owned.has(i)
 		var label := ""

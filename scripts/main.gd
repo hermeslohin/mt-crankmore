@@ -73,6 +73,8 @@ func _ready() -> void:
 			_debug_latch()
 		"shot":
 			_debug_shot()
+		"readme":
+			_debug_readme()
 		"gears":
 			_debug_gears()
 		"link":
@@ -538,6 +540,31 @@ func _debug_shot() -> void:
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/shot_%02d.png" % [out, k])
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=readme saves the README screenshots (title screen, then out on a delivery with the
+## pizza on the bike) to PIZZA_OUT (default docs/). The player's save file is put back afterwards.
+func _debug_readme() -> void:
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else ProjectSettings.globalize_path("res://docs")
+	DirAccess.make_dir_recursive_absolute(out)
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var save := func(file: String) -> void:
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	await get_tree().create_timer(2.0).timeout
+	await save.call("title.png")
+	_start_game()
+	Input.action_press("pedal")
+	while city.orders.is_empty():
+		await get_tree().process_frame
+	city.place_on(city.shops[city.orders[0]["shop"]])
+	while city.carry.is_empty():
+		await get_tree().process_frame
+	await get_tree().create_timer(5.0).timeout   # ride off with the box steaming on the bike, toasts faded
+	await save.call("delivery.png")
+	if backup != "":
+		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
 

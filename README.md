@@ -6,6 +6,10 @@ A colorful 16-bit-style isometric pizza-delivery racing game set in Crankmore Vi
 The game renders at 640x360 and scales up with crisp integer pixels (2x in the default 1280x720 window).
 Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
 
+![Title screen](docs/title.png)
+
+![Out on a delivery, pizza steaming on the bike](docs/delivery.png)
+
 ## Play
 
 ```
@@ -100,4 +104,4 @@ scripts/iso.gd, bike_draw.gd   drawing helpers
 bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
-Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots.
+Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`.

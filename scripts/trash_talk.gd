@@ -6,7 +6,7 @@ extends Node
 var roster: Array = [
 	{"name": "Dough Boy Dave", "short": "Dave", "color": Color(0.95, 0.4, 0.15), "ftp": 238.0, "tier": 2, "speed": 3.9,
 		"sig": ["I put the 'pro' in 'pepperoni'.", "Fastest knead in town, baby.", "Call me Dave. Or call me 'Champ'."]},
-	{"name": "Spoke-n Word Sam", "short": "Sam", "color": Color(0.6, 0.35, 0.85), "ftp": 222.0, "tier": 1, "speed": 3.6,
+	{"name": "Spoke-n Word Sam", "short": "Sam", "color": Color(0.78, 0.8, 0.85), "ftp": 222.0, "tier": 1, "speed": 3.6,
 		"sig": ["Roses are red, my tires are black, I'm up the road, and you're way back.", "A haiku: you / are very slow / goodbye now.", "Wheels turn, verses burn."]},
 	{"name": "Cadence Carla", "short": "Carla", "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "tier": 3, "speed": 4.1,
 		"sig": ["My cadence is 92. Yours is... a rumor.", "Statistically, you're losing.", "I've calculated your odds. Rounding error."]},

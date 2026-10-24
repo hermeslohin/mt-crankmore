@@ -58,6 +58,10 @@ DEFAULT_BITS = {
     0x00100: "LS1", 0x00200: "LS2", 0x00400: "POWERUP_L", 0x00800: "ONOFF_L",       # left shifter
     0x01000: "RS1", 0x02000: "RS2", 0x04000: "POWERUP_R", 0x08000: "ONOFF_R",       # right shifter (RS1 = 0x1000, checked on real hardware)
 }
+# The paddles behind the shifters are analog: each keypad message carries repeated (location, value) pairs in
+# field 2, value a zigzag sint32 from about -100 to 100. Pushed past PADDLE_ON they count as a held button.
+PADDLES = {0: "PADDLE_L", 1: "PADDLE_R"}
+PADDLE_ON = 25
 LEARN_ORDER = ["LEFT", "RIGHT", "UP", "DOWN", "A", "B", "Y", "Z", "LS1", "LS2", "RS1", "RS2",
                "POWERUP_L", "POWERUP_R"]
 BUTTONS_FILE = Path(__file__).with_name("buttons.json")
@@ -364,14 +368,28 @@ async def controller_session(client, state: State, addr: str, dump: bool):
             fields = parse_pb(data[1:])
         except Exception:
             return
+        pressed = None
         for fn, wt, v in fields:
             if fn == 1 and wt == 0:
                 state.mask = v
-                state.pressed = decode_mask(v, active_low, bits)
-                state.taps |= state.pressed
-                if dump:
-                    log("mask", hex(v), sorted(state.pressed))
-                break
+                pressed = decode_mask(v, active_low, bits)
+            elif fn == 2 and wt == 2:
+                try:
+                    sub = dict((f, x) for f, w, x in parse_pb(v) if w == 0)
+                except Exception:
+                    continue
+                loc = sub.get(1, 0)
+                raw = sub.get(2, 0)
+                val = (raw >> 1) ^ -(raw & 1)   # zigzag
+                if dump and val:
+                    log("paddle", loc, val)
+                if pressed is not None and loc in PADDLES and abs(val) >= PADDLE_ON:
+                    pressed.add(PADDLES[loc])
+        if pressed is not None:
+            state.pressed = pressed
+            state.taps |= pressed
+            if dump:
+                log("mask", hex(state.mask), sorted(pressed))
 
     def on_sync(_, data: bytearray):
         if dump:

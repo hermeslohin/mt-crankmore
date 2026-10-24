@@ -560,6 +560,7 @@ func _debug_shot() -> void:
 ## Dev helper: PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] [PIZZA_OUT=dir] saves race screenshots just before the first
 ## jump, log, creek and bear, and at the finish. The player's save file is put back afterwards.
 func _debug_race_shot() -> void:
+	Trainer._autostart_clock = 0.0   # leave a real trainer alone
 	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
@@ -567,6 +568,13 @@ func _debug_race_shot() -> void:
 	Game.money = maxi(Game.money, 1000)
 	_start_race(OS.get_environment("PIZZA_COURSE").to_int())
 	Input.action_press("pedal")
+	var gmin := 1.0
+	var gmax := -1.0
+	for g in race.grade_a:
+		gmin = minf(gmin, g)
+		gmax = maxf(gmax, g)
+	print("COURSE %s: %.0f m, gain %.0f m, grade %+.1f%% to %+.1f%%, %d obstacles" % [race.course["name"], race.course["length"],
+		race.gain, gmin * 100.0, gmax * 100.0, race.obstacles.size()])
 	var spots: Array = race.debug_spots()
 	for k in spots.size():
 		race.debug_place(spots[k])
@@ -654,12 +662,14 @@ func _debug_powerups() -> void:
 		r["s"] = float(me["s"]) + 2.5
 		r["lat"] = me["lat"]
 		r["down"] = 0.0
+		me["down"] = 0.0
 		me["pu"] = kind
 		race._use_powerup(0)
 		await get_tree().create_timer(0.7).timeout
 		cam.position = race.cam_target()
 		var downs: int = race.riders.filter(func(o): return float(o["down"]) > 0.0).size()
-		print("RACE %s: used=%s riders_down=%d socks=%.1f bread=%.1f" % [kind, me["pu"] == "", downs, me["socks"], me["bread"]])
+		print("RACE %s: used=%s riders_down=%d socks=%.1f bread=%.1f roller=%.1f draft=%d%%" % [kind, me["pu"] == "", downs,
+			me["socks"], me["bread"], me["roller"], roundi(float(me["draft"]) * 100.0)])
 		await save.call("pu_race_%s.png" % kind)
 	if backup != "":
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)

@@ -303,7 +303,7 @@ func _draw_city_hud(w: float, h: float) -> void:
 		func(r: Rect2): city.draw_minimap(self, r),
 		["MONEY", "$%d" % Game.money, Color(0.1, 0.45, 0.15) if Game.money >= 0 else Color(0.75, 0.1, 0.1)],
 		["HP", hp, Color(0.2, 0.7, 0.25) if hp > 0.5 else (Color(0.85, 0.6, 0.1) if hp > 0.25 else Color(0.85, 0.15, 0.1))],
-		_pu_slot(city.pu, city.socks_t, city.bread_t))
+		_pu_slot(city.pu, city.socks_t, city.bread_t, city.roller_t))
 	if not city.pending.is_empty():
 		_draw_junction(city.pending, w, h)
 	elif city.queued != "":
@@ -382,13 +382,15 @@ func _zone_col(frac: float) -> Color:
 ## The WEEHOO bike computer in the bottom-right corner: LED power strip, map page on top,
 ## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence.
 ## `map_fn` draws into the map window; `cell` is [label, text, colour]; bars are [label, frac, colour].
-## What the WEEHOO's power-up row shows: the item you're carrying, or a running Fire Socks / Breadsticks timer.
-func _pu_slot(kind: String, socks: float, bread: float) -> Dictionary:
+## What the WEEHOO's power-up row shows: the item you're carrying, or a running Fire Socks / Breadsticks / Dough Roller timer.
+func _pu_slot(kind: String, socks: float, bread: float, roller: float) -> Dictionary:
 	var fx: Array = []
 	if socks > 0.0:
 		fx = ["SOCKS", socks / PowerUps.SOCKS_TIME, PowerUps.col("socks")]
 	elif bread > 0.0:
 		fx = ["BREAD", bread / PowerUps.BREAD_TIME, PowerUps.col("breadsticks")]
+	elif roller > 0.0:
+		fx = ["ROLLER", roller / PowerUps.ROLLER_TIME, PowerUps.col("roller")]
 	return {"kind": kind, "fx": fx}
 
 
@@ -507,10 +509,12 @@ func _draw_race_hud(w: float, h: float) -> void:
 		_text(gtxt if not r["done"] else "FIN", Vector2(70, 25 + i * 10), 8, col, 40, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	var pos := order.find(me) + 1
+	if float(me["draft"]) > 0.0:
+		_text("DRAFTING  -%d%% watts" % roundi(float(me["draft"]) * 100.0), Vector2(0, h - 30), 10, Color(0.75, 0.95, 1.0), w, HORIZONTAL_ALIGNMENT_CENTER)
 	var legs: Array = ["LEGS", race.stamina, Color(0.2, 0.55, 0.9)] if not Trainer.trainer_live else ["HP", Game.hp_ratio(), Color(0.2, 0.7, 0.25)]
 	_draw_weehoo(w, h, me["v"] * 3.6, race._grade_at(me["s"]) * 100.0, _draw_race_profile,
 		["POS", "%d/%d" % [pos, order.size()], Color(0.12, 0.12, 0.15)],
-		legs, _pu_slot(me["pu"], me["socks"], me["bread"]))
+		legs, _pu_slot(me["pu"], me["socks"], me["bread"], me["roller"]))
 
 
 ## Race map page: the course elevation profile with every rider on it, distance left and clock.

@@ -2,7 +2,7 @@ class_name PowerUps
 extends RefCounted
 ## Power-ups: about 1 in 8 townsfolk (and spectators along the race course) hand them out as you ride past.
 ## A rider carries one at a time (shown on the WEEHOO) and uses it with Y. Rivals grab and use them too.
-## Town only: portal, wrench, walkie. Town and race: frisbee, socks, breadsticks.
+## Town only: portal, wrench, walkie. Town and race: frisbee, socks, breadsticks, roller.
 
 const DEFS := {
 	"portal": {"name": "Pepperoni Portal", "short": "PORTAL", "col": Color(0.9, 0.25, 0.2),
@@ -15,9 +15,10 @@ const DEFS := {
 	"socks": {"name": "Fire Socks", "short": "FIRE SOCKS", "col": Color(1.0, 0.4, 0.1), "blurb": "30% faster for 15 s"},
 	"breadsticks": {"name": "Breadsticks", "short": "BREADSTICKS", "col": Color(0.9, 0.7, 0.35),
 		"blurb": "grow huge and run over your rivals"},
+	"roller": {"name": "Dough Roller", "short": "ROLLER", "col": Color(0.85, 0.6, 0.35), "blurb": "hills feel flat for 15 s"},
 }
-const TOWN := ["portal", "wrench", "walkie", "frisbee", "socks", "breadsticks"]
-const RACE := ["frisbee", "socks", "breadsticks"]
+const TOWN := ["portal", "wrench", "walkie", "frisbee", "socks", "breadsticks", "roller"]
+const RACE := ["frisbee", "socks", "breadsticks", "roller"]
 
 const GIVER_ODDS := 8          # 1 in 8 people hand out power-ups
 const FRISBEE_RANGE_M := 5.0
@@ -28,6 +29,12 @@ const SOCKS_BOOST := 1.3
 const BREAD_TIME := 12.0
 const BREAD_SCALE := 1.7
 const MASCOT_TIME := 12.0
+const ROLLER_TIME := 15.0      # Dough Roller: climbs feel flat (descents still count)
+
+
+## The grade a rider feels: a Dough Roller flattens the climbs.
+static func felt_grade(g: float, roller: float) -> float:
+	return minf(g, 0.0) if roller > 0.0 else g
 
 
 ## How often each one turns up, relative to the others (1 = normal).
@@ -93,6 +100,14 @@ static func draw_icon(ci: CanvasItem, c: Vector2, kind: String, k := 1.0) -> voi
 			ci.draw_rect(Rect2(c + Vector2(-2, -1) * k, Vector2(3, 3) * k), flame)
 			ci.draw_rect(Rect2(c + Vector2(-3, 2) * k, Vector2(7, 3) * k), o)
 			ci.draw_rect(Rect2(c + Vector2(-2, 3) * k, Vector2(5, 1) * k), flame)
+		"roller":
+			var a := c + Vector2(-5, 2) * k
+			var b := c + Vector2(5, -2) * k
+			ci.draw_line(a, b, o, 5.0 * k)
+			ci.draw_line(a + (b - a) * 0.2, a + (b - a) * 0.8, Color(0.85, 0.6, 0.35), 3.4 * k)
+			ci.draw_line(a, a + (b - a) * 0.15, Color(0.55, 0.32, 0.18), 2.0 * k)
+			ci.draw_line(b, b - (b - a) * 0.15, Color(0.55, 0.32, 0.18), 2.0 * k)
+			ci.draw_line(a + (b - a) * 0.3 + Vector2(0, -1) * k, a + (b - a) * 0.6 + Vector2(0, -1) * k, Color(1, 0.9, 0.75), 1.0 * k)
 		"breadsticks":
 			for q in 3:
 				var x := (q - 1) * 2.6

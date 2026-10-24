@@ -117,6 +117,7 @@ var p_phase := 0.0
 var pu := ""                  # the power-up you're carrying (see PowerUps), "" = none
 var socks_t := 0.0            # Fire Socks seconds left
 var bread_t := 0.0            # Breadsticks seconds left
+var roller_t := 0.0           # Dough Roller seconds left (climbs feel flat)
 var p_down := 0.0             # seconds left lying on the road after a frisbee hit or being run over
 var p_blocked := false        # a pizza mascot is dancing in your way
 var mascots: Array = []       # {"victim": -1 player / rival index, "t", "pos", "phase"}
@@ -230,6 +231,7 @@ func reset_player() -> void:
 	pu = ""
 	socks_t = 0.0
 	bread_t = 0.0
+	roller_t = 0.0
 	p_down = 0.0
 	mascots.clear()
 	frisbees.clear()
@@ -1066,7 +1068,7 @@ func _spawn_rivals() -> void:
 			"stun": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
 			"bike": Game.rival_bike(Talk.rivals[i]), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
 			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35)),
-			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "blocked": false})
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "blocked": false})
 
 
 func _spawn_life() -> void:
@@ -1143,6 +1145,7 @@ func _update_player(delta: float) -> void:
 
 	socks_t = maxf(0.0, socks_t - delta)
 	bread_t = maxf(0.0, bread_t - delta)
+	roller_t = maxf(0.0, roller_t - delta)
 	if p_down > 0.0:
 		p_down = maxf(0.0, p_down - delta)
 		p_speed = 0.0
@@ -1153,8 +1156,9 @@ func _update_player(delta: float) -> void:
 
 	var bike := Game.bike()
 	grade = lerpf(grade, clampf(grade_at(p_pos, p_fwd), -0.1, 0.1), 1.0 - exp(-4.0 * delta))
-	Trainer.send_grade(grade * 100.0)
-	var mps := minf(Game.speed_from_power(Trainer.power(), bike["mass"], bike["cda"], bike["crr"], grade), MAX_TOWN_SPEED)
+	var felt := PowerUps.felt_grade(grade, roller_t)
+	Trainer.send_grade(felt * 100.0)
+	var mps := minf(Game.speed_from_power(Trainer.power(), bike["mass"], bike["cda"], bike["crr"], felt), MAX_TOWN_SPEED)
 	var target := mps * TILES_PER_MS * PACE
 	if Game.hp_ratio() < 0.3:
 		target *= 0.85
@@ -1534,6 +1538,7 @@ func _hit_by_car(c: Dictionary) -> void:
 	p_speed = 0.0
 	socks_t = 0.0
 	bread_t = 0.0
+	roller_t = 0.0
 	p_down = 0.0
 	if not carry.is_empty():
 		Game.toast.emit("The pizza went flying. Order #%d is lost." % carry["id"], Color.ORANGE)
@@ -1674,6 +1679,7 @@ func _update_rivals(delta: float) -> void:
 		r["phase"] += delta * 9.0 if r["state"] != "idle" else 0.0
 		r["socks"] = maxf(0.0, r["socks"] - delta)
 		r["bread"] = maxf(0.0, r["bread"] - delta)
+		r["roller"] = maxf(0.0, r["roller"] - delta)
 		if r["pu"] != "":
 			r["pu_hold"] += delta
 			if _rival_wants(i):
@@ -1735,7 +1741,7 @@ func _follow(r: Dictionary, delta: float) -> bool:
 	var path: Array = r["path"]
 	if not path.is_empty():
 		var bk: Dictionary = r["bike"]
-		var g := clampf(grade_at(r["pos"], path[0] - r["pos"]), -0.1, 0.1)
+		var g := PowerUps.felt_grade(clampf(grade_at(r["pos"], path[0] - r["pos"]), -0.1, 0.1), r["roller"])
 		var mps := minf(Game.speed_from_power(float(r["ftp"]) * 0.75, bk["mass"], bk["cda"], bk["crr"], g, r["mass"]), MAX_TOWN_SPEED)
 		if r["socks"] > 0.0:
 			mps *= PowerUps.SOCKS_BOOST
@@ -2057,6 +2063,12 @@ func _use_powerup(who: int) -> bool:
 				rival_state[who]["bread"] = PowerUps.BREAD_TIME
 				if active and p_pos.distance_to(me) < 25.0:
 					Game.feed.emit("%s ate the breadsticks and got HUGE!" % Talk.rivals[who]["short"], Talk.rivals[who]["color"])
+		"roller":
+			if who < 0:
+				roller_t = PowerUps.ROLLER_TIME
+				Game.toast.emit("DOUGH ROLLER! The hills are rolled flat for 15 s!", PowerUps.col(kind))
+			else:
+				rival_state[who]["roller"] = PowerUps.ROLLER_TIME
 	if who < 0:
 		pu = ""
 	else:
@@ -2086,6 +2098,9 @@ func _rival_wants(i: int) -> bool:
 			return r["state"] in ["to_shop", "to_dest"]
 		"breadsticks":
 			return (near_player and p_pos.distance_to(r["pos"]) < 6.0) or hold > 40.0
+		"roller":
+			var path: Array = r["path"]
+			return r["state"] in ["to_shop", "to_dest"] and not path.is_empty() and grade_at(r["pos"], path[0] - r["pos"]) > 0.03
 	return false
 
 

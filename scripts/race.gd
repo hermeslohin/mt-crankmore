@@ -11,6 +11,9 @@ const COURSES := [
 		"blurb": "6 km of rolling gravel switchbacks with jumps, creek crossings and fallen trees, about 20 minutes for the front of the pack. Full of squirrels. And deer. And a bear or two."},
 	{"name": "Summit Gravel Showdown", "length": 4400.0, "grade": 0.065, "roll": 1.2, "entry": 100, "prize": 1200, "seed": 21,
 		"blurb": "4.4 km of steep gravel to the top of Mt. Crankmore with ramps up to 12%, short plunges, logs and bears, about 20 minutes. Legends are made here. So are blisters."},
+	# "bump": gentle rollers on top of the base grade; "flowers": a valley of flower meadows instead of a mountain
+	{"name": "Flour Run", "length": 3000.0, "grade": 0.004, "roll": 0.0, "bump": 0.022, "flowers": true, "entry": 20, "prize": 250, "seed": 33,
+		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: mostly flat with a few gentle rollers, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.07
@@ -190,6 +193,7 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 		var s := i * ds_m
 		s_m[i] = s
 		var g := g0 * (1.0 + amp * sin(TAU * s / 650.0 + p0) + 0.45 * amp * sin(TAU * s / 230.0 + p1) + 0.25 * sin(TAU * s / 97.0 + p2))
+		g += float(course.get("bump", 0.0)) * (sin(TAU * s / 420.0 + p1) + 0.4 * sin(TAU * s / 160.0 + p2))
 		g = lerpf(0.01, clampf(g, MIN_GRADE, MAX_GRADE), smoothstep(0.0, 120.0, s))
 		grade_a[i] = g
 		if i > 0:
@@ -353,6 +357,9 @@ func _build_terrain() -> void:
 			var b := _biome(x, y)
 			var col: Color
 			var kind := 0
+			if course.get("flowers", false):
+				f = 0.0              # a valley: no snow or scree, and much less forest
+				b -= 1.5
 			if f > 0.975:
 				col = Color(0.96, 0.97, 1.0)
 			elif f > 0.93:
@@ -501,6 +508,9 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var f := z / peak
 			var forest := smoothstep(-0.3, 0.6, _biome(x, y))
 			var chance := 0.04 + 0.42 * forest
+			if course.get("flowers", false):
+				forest = smoothstep(-0.3, 0.6, _biome(x, y) - 1.5)
+				chance = 0.01 + 0.3 * forest
 			if f > 0.8:
 				chance *= 0.3
 			if f > 0.9:
@@ -644,7 +654,7 @@ func _build_riders() -> void:
 	riders.append({"name": Game.player_name, "color": Color(0.95, 0.95, 0.95), "frame": b["color"], "s": 0.0, "v": 0.0, "lat": 0.0,
 		"bike": b, "player": true, "phase": 0.0, "done": false, "time": 0.0, "mass": Game.weight_kg, "power": 0.0,
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
-		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "down": 0.0, "gv": 0})
+		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "gv": 0, "draft": 0.0})
 	var n := Talk.rivals.size()
 	for i in n:
 		var info: Dictionary = Talk.rivals[i]
@@ -655,7 +665,7 @@ func _build_riders() -> void:
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass, false), "idx": i,
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
-			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "down": 0.0, "gv": 0})
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "gv": 0, "draft": 0.0})
 
 
 # ---------------------------------------------------------------------
@@ -733,7 +743,7 @@ func _process(delta: float) -> void:
 			pops.remove_at(i)
 	kick_t = maxf(0.0, kick_t - delta)
 	var me: Dictionary = riders[0]
-	var g := _grade_at(me["s"]) + (0.06 if kick_t > 0.0 else 0.0) + (0.03 if me["wet"] else 0.0)
+	var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"]) + (0.06 if kick_t > 0.0 else 0.0) + (0.03 if me["wet"] else 0.0)
 	Trainer.send_grade(g * 100.0 if countdown <= 0.0 and not me["done"] else 0.0)
 	queue_redraw()
 
@@ -743,7 +753,8 @@ func _step_riders(delta: float) -> void:
 	# player
 	var me: Dictionary = riders[0]
 	if not me["done"]:
-		var g := _grade_at(me["s"])
+		_tick_powerups(0, delta)
+		var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"])
 		var p := Trainer.power()
 		if not Trainer.trainer_live:
 			if p > Game.ftp * 1.1:
@@ -755,10 +766,10 @@ func _step_riders(delta: float) -> void:
 		me["power"] = p
 		var b: Dictionary = me["bike"]
 		# in a slipstream the same speed takes fewer watts, so your watts go further
-		var vt := Game.speed_from_power(p / (1.0 - _draft(0)), b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
+		me["draft"] = _draft(0)
+		var vt := Game.speed_from_power(p / (1.0 - float(me["draft"])), b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
 		if Game.hp_ratio() < 0.3:
 			vt *= 0.92
-		_tick_powerups(0, delta)
 		if Input.is_action_just_pressed("powerup"):
 			_use_powerup(0)
 		if float(me["socks"]) > 0.0:
@@ -797,8 +808,10 @@ func _step_riders(delta: float) -> void:
 			pw *= 1.05
 		r["power"] = pw
 		var bk: Dictionary = r["bike"]
-		var vt := Game.speed_from_power(pw, bk["mass"], bk["cda"], _crr(bk) + (FORD_CRR if r["wet"] else 0.0), _grade_at(r["s"]), r["mass"])
 		_tick_powerups(k, delta)
+		r["draft"] = _draft(k)
+		var vt := Game.speed_from_power(pw / (1.0 - float(r["draft"])), bk["mass"], bk["cda"], _crr(bk) + (FORD_CRR if r["wet"] else 0.0),
+			PowerUps.felt_grade(_grade_at(r["s"]), r["roller"]), r["mass"])
 		if r["pu"] != "" and _rival_wants(k):
 			_use_powerup(k)
 		if float(r["socks"]) > 0.0:
@@ -878,12 +891,15 @@ func _crr(b: Dictionary) -> float:
 
 
 ## Share of the watts rider `i` saves in the slipstream of someone 1-9 m ahead in the same line (0 if none).
+## Everyone drafts: you, and the rivals off you and each other.
 func _draft(i: int) -> float:
 	var me: Dictionary = riders[i]
 	for k in riders.size():
 		if k == i:
 			continue
 		var o: Dictionary = riders[k]
+		if o["done"] or float(o["down"]) > 0.0:   # nobody to hide behind
+			continue
 		var d: float = o["s"] - me["s"]
 		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35:
 			return draft_saving(float(me["v"]) * 3.6)
@@ -907,6 +923,7 @@ func _tick_powerups(k: int, delta: float) -> void:
 	var r: Dictionary = riders[k]
 	r["socks"] = maxf(0.0, float(r["socks"]) - delta)
 	r["bread"] = maxf(0.0, float(r["bread"]) - delta)
+	r["roller"] = maxf(0.0, float(r["roller"]) - delta)
 	r["down"] = maxf(0.0, float(r["down"]) - delta)
 	if r["pu"] != "":
 		r["pu_hold"] = float(r["pu_hold"]) + delta
@@ -958,6 +975,9 @@ func _use_powerup(k: int) -> bool:
 		"breadsticks":
 			r["bread"] = PowerUps.BREAD_TIME
 			_pop(k, "BREADSTICKS!", PowerUps.col(kind))
+		"roller":
+			r["roller"] = PowerUps.ROLLER_TIME
+			_pop(k, "DOUGH ROLLER!", PowerUps.col(kind))
 	r["pu"] = ""
 	return true
 
@@ -974,6 +994,8 @@ func _rival_wants(k: int) -> bool:
 			return _grade_at(r["s"]) > 0.03 or hold > 12.0
 		"breadsticks":
 			return _nearest_opponent(k, 10.0) >= 0 or hold > 30.0
+		"roller":
+			return _grade_at(r["s"]) > 0.04 or hold > 40.0
 	return false
 
 
@@ -1437,7 +1459,9 @@ func _cell_detail(i: int, j: int, center: Vector2, kind: int, col: Color) -> voi
 				draw_line(p, p + Vector2(-2, -3), tc, 1.0)
 				draw_line(p, p + Vector2(0, -4), tc, 1.0)
 				draw_line(p, p + Vector2(2, -3), tc, 1.0)
-			if h % 4 == 0:
+			if course.get("flowers", false):
+				_flowers(center, h)
+			elif h % 4 == 0:
 				draw_rect(Rect2(center - o, Vector2(2, 2)), [Color(1.0, 0.5, 0.75), Color(1.0, 0.92, 0.3), Color(1, 1, 1), Color(0.6, 0.6, 1.0)][(h >> 3) % 4])
 				draw_rect(Rect2(center - o + Vector2(5, 2), Vector2(2, 2)), [Color(1.0, 0.92, 0.3), Color(1, 1, 1)][(h >> 4) % 2])
 		2:
@@ -1452,6 +1476,22 @@ func _cell_detail(i: int, j: int, center: Vector2, kind: int, col: Color) -> voi
 				draw_rect(Rect2(rp - Vector2(3, 2), Vector2(6, 4)), Iso.OUTLINE)
 				draw_rect(Rect2(rp - Vector2(2, 1), Vector2(4, 2)), Color(0.68, 0.65, 0.62))
 				draw_rect(Rect2(rp - Vector2(2, 1), Vector2(2, 1)), Color(0.85, 0.83, 0.8))
+
+
+const FLOWER_COLS := [Color(1.0, 0.45, 0.7), Color(1.0, 0.92, 0.3), Color(1, 1, 1), Color(0.6, 0.55, 1.0), Color(1.0, 0.35, 0.3),
+	Color(1.0, 0.65, 0.2), Color(0.85, 0.5, 1.0)]
+
+
+## Flour Run: every meadow cell is a little patch of flowers, each a stem and a four-petal head.
+func _flowers(center: Vector2, h: int) -> void:
+	for k in 6:
+		var hk := (h >> (k * 3)) ^ (h * (k + 7))
+		var p := center + Vector2(float(hk % 27) - 13.0, float((hk >> 6) % 13) - 6.0)
+		var c: Color = FLOWER_COLS[(hk >> 9) % FLOWER_COLS.size()]
+		draw_line(p, p + Vector2(0, 3), Color(0.2, 0.5, 0.22), 1.0)
+		draw_rect(Rect2(p + Vector2(-1, -1), Vector2(3, 1)), c)
+		draw_rect(Rect2(p + Vector2(0, -2), Vector2(1, 3)), c)
+		draw_rect(Rect2(p, Vector2(1, 1)), Color(1.0, 0.85, 0.2) if c != Color(1.0, 0.92, 0.3) else Color(0.6, 0.35, 0.15))
 
 
 func _draw_tree(t: Dictionary) -> void:
@@ -1783,6 +1823,13 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 	var down := float(r["down"]) > 0.0
 	if float(r["socks"]) > 0.0 and not down:
 		PowerUps.draw_flames(self, c, -ds.normalized(), t_ + k)
+	if r["player"] and float(r["draft"]) > 0.0 and not down:
+		# wind streaks sliding past: you're in the slipstream
+		for q in 4:
+			var u := fposmod(t_ * 2.2 + q * 0.25, 1.0)
+			var side := Vector2(-ds.y, ds.x).normalized() * (10.0 if q % 2 == 0 else -10.0)
+			var a := c + side + Vector2(0, -12 - q * 3) + ds.normalized() * (20.0 - u * 40.0)
+			draw_line(a, a - ds.normalized() * 10.0, Color(1, 1, 1, 0.7 * (1.0 - absf(u - 0.5) * 2.0)), 1.0)
 	var dsd := Iso.to_screen(Iso.to_world(ds).rotated(1.2)) if down else ds   # tipped over, turned in world space
 	var phase: float = 0.0 if down else r["phase"]
 	if kb != 1.0:

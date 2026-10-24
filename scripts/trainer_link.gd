@@ -84,8 +84,20 @@ func _exit_tree() -> void:
 
 # ---- the Bluetooth helper (bridge) ----------------------------------------
 
+## From the editor the helper runs in place; in an exported build res:// is packed, so its files are copied to user://bridge.
 func bridge_dir() -> String:
-	return ProjectSettings.globalize_path("res://bridge")
+	if not OS.has_feature("template"):
+		return ProjectSettings.globalize_path("res://bridge")
+	var dir := ProjectSettings.globalize_path("user://bridge")
+	DirAccess.make_dir_recursive_absolute(dir)
+	for f in ["trainer_bridge.py", "requirements.txt"]:
+		var src := FileAccess.get_file_as_bytes("res://bridge/" + f)
+		if src.is_empty():
+			continue
+		var dst := FileAccess.open(dir + "/" + f, FileAccess.WRITE)
+		if dst != null:
+			dst.store_buffer(src)
+	return dir
 
 
 func venv_python() -> String:

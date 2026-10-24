@@ -12,9 +12,27 @@ Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; riv
 
 ## Play
 
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.1**):
+
+| Platform | File | How to run |
+|---|---|---|
+| Windows | `MtCrankmore-windows-x86_64.zip` | unzip, run `MtCrankmore.exe` |
+| macOS | `MtCrankmore-macos.zip` (universal) | unzip, open the app; it's unsigned, so right-click > Open the first time |
+| Linux | `MtCrankmore-linux-x86_64.tar.gz` | extract, `chmod +x MtCrankmore-linux-x86_64`, run it |
+
+The game works with just a keyboard. A trainer needs Python 3 and internet once (see [Bicycle trainer](#bicycle-trainer)).
+
+Or run it from source:
+
 ```
 godot --path .          # or open this folder in the Godot 4 editor and press F5
 ```
+
+To build the release packages yourself, install the Godot 4.7 export templates and run
+`godot --headless --export-release Windows|Linux|macOS` (presets are in `export_presets.cfg`; output goes to `dist/`).
+
+### Continue / New game
+The title screen has **Continue game** (resumes your save, showing your money and deliveries; greyed out if there is no save) and **New game**, which **deletes your save** and starts you over with **$100**, one Rusty Trash Bike and zero deliveries. Your rider setup (FTP, weight, rivals) is kept.
 
 ### Rider setup
 The first time you start delivering (and any time from the title screen or the pause menu) the **Rider setup** screen asks for:
@@ -50,14 +68,14 @@ Pickups and deliveries happen automatically: the bike coasts up to the window an
 | | F11 or Alt+Enter | toggle fullscreen (the game starts fullscreen) |
 
 ### Virtual shifting
-The bike has 21 gears: 1 is the easiest, 21 the hardest, and you start in 11. There is no front/rear shifter juggling, just up and down. The current gear shows at the top of the WEEHOO bike computer.
+The bike has 21 gears: 1 is the easiest, 21 the hardest, and you start in 11. The range is wide: gear 1 pushes back about a third as hard as gear 11, and gear 21 about two and a half times as hard. There is no front/rear shifter juggling, just up and down. The current gear shows at the top of the WEEHOO bike computer.
 With a trainer connected, the gear changes the resistance the trainer sends to your pedals. An easier gear pushes back less, so at the same cadence you make fewer watts and go slower; a harder gear is the reverse. Speed in the game still comes from your real power. Keyboard riders get the same effect: W makes fewer watts and spins faster in low gears.
 Resistance needs a trainer that accepts FTMS simulation control.
 
 ### Bicycle trainer
 On the title screen choose **Connect Trainer**:
 
-1. **Install Bluetooth helper (one time)**: the game sets up a private Python environment in `bridge/.venv` with the Bluetooth library. Needs Python 3 (`brew install python` or python.org) and internet, about a minute.
+1. **Install Bluetooth helper (one time)**: the game sets up a private Python environment in `bridge/.venv` (in a packaged build, in a `bridge` folder in the game's user data folder) with the Bluetooth library. Needs Python 3 (`brew install python` or python.org) and internet, about a minute.
 2. The helper starts and scans. Pedal / press a button so your devices wake up; they appear as `TRAINER ...` and `CONTROLS ...`.
 3. Select your trainer and your handlebar controllers. The status lines show live power/cadence and the buttons you press, so you can check everything works.
 4. Done. Your choices are remembered (`bridge/devices.json`) and reconnect automatically every time you start the game; select a connected device to disconnect it.
@@ -89,12 +107,13 @@ The game shows connection status at the bottom of the screen ("Trainer + control
   * **Jumps** on the descents (hit one above ~30 km/h for BIG AIR and a turbo top-up), **fallen trees** you hop (they scrub some speed), and **creek fords** that drag you down while you splash through. Yellow warning signs come up before each one, and they're marked on the WEEHOO profile (blue creeks, orange jumps, brown logs).
   * **Wildlife**: deer, foxes and squirrels dash across the road in front of you, rabbits bolt, moose wade near the creeks, goats and marmots watch from the rocks, eagles circle overhead, and bears give chase. Keep pedalling or the bear takes a swipe at your bike.
 * **WEEHOO**: your bike computer in the bottom-right corner. It shows the town map (or the course profile in a race), speed, watts, money (race position in a race), grade, cadence, HP and turbo. The LED strip along the top lights up with your power, coloured by zone relative to your FTP.
-* Progress (money, bikes, HP) is saved automatically.
+* Progress (money, bikes, HP) is saved automatically. Start over any time with **New game** on the title screen.
 
 ## Layout
 
 ```
 project.godot
+export_presets.cfg        Windows / Linux / macOS export presets
 scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
 scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback

@@ -2,18 +2,20 @@ extends SceneTree
 ## Packs a PixelLab-style character export (one folder per look, each with rotations/<dir>.png and optionally
 ## animations/<name>/<dir>/frame_NNN.png) into the bike sheets Sprites reads (see scripts/sprites.gd).
 ##
-##   godot --headless -s tools/import_rider.gd -- <export dir> [down=<dir>] <folder>=<sheet> [<folder>=<sheet> ...]
-##   e.g. ... -- ~/Downloads/rookie down=south-west Idle=bike_you_pizza same_thing_but_witho=bike_you
+##   godot --headless -s tools/import_rider.gd -- <export dir> [rows=<dir>,...] <folder>=<sheet> [<folder>=<sheet> ...]
+##   e.g. ... -- ~/Downloads/rookie rows=south-east,south,west,north-west,north-west,north-east,east,east \
+##            Idle=bike_you_pizza same_thing_but_witho=bike_you
 ##
 ## A folder with an animation becomes one column per frame; without one, its still is a single column. Exports don't
-## agree on which of their direction names faces straight down the screen, so down=<dir> names it (look at the
-## rotations; default south-east) and the rest follow clockwise, each moved to its row.
+## agree on where their direction names point on screen, and their 8 poses needn't line up with the sheet's 8 rows
+## (the isometric road diagonals are shallow), so rows= picks the export direction to use for each row, in row
+## order; a pose can serve two rows. Look at the rotations to choose. The default suits the first rider export.
 ## Every frame is lined up so the bike's ground contact sits at the bottom centre, Sprites.ANCHOR_UP above the edge.
 
 const FRAME := 80             # output frame size (square)
 const ANCHOR_UP := 12         # keep in step with Sprites.ANCHOR_UP
-## Export direction names, clockwise. Sheet rows are clockwise too: down-right, down, down-left, left, up-left, up,
-## up-right, right.
+## Export direction for each sheet row: down-right, down, down-left, left, up-left, up, up-right, right.
+const ROW_DIRS := ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
 const COMPASS := ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
 ## Pixels from the lowest pixel up to the ground contact per row: the near wheel hangs below it when the bike
 ## points at or away from the camera, less on the diagonals, hardly at all side-on.
@@ -29,17 +31,15 @@ func _initialize() -> void:
 		quit(1)
 		return
 	var src := args[0].trim_suffix("/")
-	var down := "south-east"
+	row_dirs.assign(ROW_DIRS)
 	var pairs := args.slice(1)
-	if pairs.size() > 0 and pairs[0].begins_with("down="):
-		down = pairs[0].trim_prefix("down=")
+	if pairs.size() > 0 and pairs[0].begins_with("rows="):
+		row_dirs.assign(pairs[0].trim_prefix("rows=").split(","))
 		pairs = pairs.slice(1)
-	if not down in COMPASS:
-		printerr("down= must be one of ", COMPASS)
+	if row_dirs.size() != ROW_DIRS.size() or row_dirs.any(func(d): return not d in COMPASS):
+		printerr("rows= takes %d of %s, comma-separated" % [ROW_DIRS.size(), COMPASS])
 		quit(1)
 		return
-	for row in COMPASS.size():
-		row_dirs.append(COMPASS[(COMPASS.find(down) + row - 1 + 8) % 8])
 	var out_dir := ProjectSettings.globalize_path("res://art")
 	for pair in pairs:
 		var kv: PackedStringArray = pair.split("=")

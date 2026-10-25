@@ -1986,10 +1986,10 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 	var phase: float = 0.0 if down else r["phase"]
 	if kb != 1.0:
 		draw_set_transform(c, 0.0, Vector2(kb, kb))
-		BikeDraw.draw(self, Vector2.ZERO, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"])
+		BikeDraw.draw(self, Vector2.ZERO, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"], 1.0, false)
 		draw_set_transform(Vector2.ZERO)
 	else:
-		BikeDraw.draw(self, c, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"])
+		BikeDraw.draw(self, c, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"], 1.0, false)
 	if down:
 		for q in 3:
 			var a := t_ * 5.0 + q * TAU / 3.0

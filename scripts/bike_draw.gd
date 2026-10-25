@@ -53,7 +53,7 @@ static var _items: Array = []
 
 ## `c` is the screen position of the bike's ground contact, `ds` the screen-space travel direction.
 ## `heat` (0..1) sets how much steam rises from the pizza box: a fresh pie steams hard, a cold one not at all.
-static func draw(ci: CanvasItem, c: Vector2, ds: Vector2, frame_col: Color, shirt: Color, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0) -> void:
+static func draw(ci: CanvasItem, c: Vector2, ds: Vector2, frame_col: Color, shirt: Color, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0, boxed := true) -> void:
 	var st := style_for(who)
 	ds = ds.normalized()
 	if ds == Vector2.ZERO:
@@ -82,7 +82,7 @@ static func draw(ci: CanvasItem, c: Vector2, ds: Vector2, frame_col: Color, shir
 	if not Sprites.baking:   # sprite sheets leave the shadow to the game
 		ci.draw_colored_polygon(sh, Color(0, 0, 0, 0.22))
 	# pixel art, when there is a sheet for this rider (see Sprites)
-	if Sprites.draw_bike(ci, c, w, frame_col, shirt, phase, has_pizza, who):
+	if Sprites.draw_bike(ci, c, w, frame_col, shirt, phase, has_pizza, who, boxed):
 		if has_pizza and heat > 0.0:
 			_steam(ci, _proj(Vector3(-11, 0, 17.4)), heat)
 		return

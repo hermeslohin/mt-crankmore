@@ -759,9 +759,13 @@ func _debug_trainer() -> void:
 
 ## Dev helper: PIZZA_DEBUG=shot saves screenshots to PIZZA_OUT (default user://shots). With PIZZA_AT="x,y;x,y"
 ## the camera visits those world points; otherwise it follows the rider for PIZZA_SHOTS frames, one every second.
+## PIZZA_CARRY=1 rides with a pizza on board.
 func _debug_shot() -> void:
 	_start_game()
 	Input.action_press("pedal")
+	if OS.has_environment("PIZZA_CARRY"):
+		city._post_order()
+		city._take_order(city.orders[-1])
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	var spots: Array = []

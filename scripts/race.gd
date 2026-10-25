@@ -110,6 +110,7 @@ func setup(course_id: int) -> void:
 	_build_road_geometry()
 	_build_animals(rng)
 	_build_givers(rng)
+	_build_season()
 	_build_riders()
 	clock = 0.0
 	countdown = 4.0
@@ -376,6 +377,10 @@ func _build_terrain() -> void:
 				if _stream_d(x, y) < 1.8:
 					col = col.lerp(Color(0.24, 0.56, 0.36), 0.5)
 			var sh := 1.0 + clampf(((z10 - z00) + (z11 - z01) + (z01 - z00) + (z11 - z10)) * 0.004, -0.35, 0.35)
+			if kind == 3:
+				col = col.lerp(Season.SNOW, 0.65) if Season.bare() else col
+			else:
+				col = Season.ground(col)
 			cell_col[j * gw + i] = Iso.shade(col, sh)
 			cell_kind[j * gw + i] = kind
 
@@ -646,6 +651,32 @@ func _build_givers(rng: RandomNumberGenerator) -> void:
 			s += rng.randf_range(300.0, 420.0)
 		else:
 			s += 20.0
+
+
+## Seasonal scenery beside the course: snowmen and skiers in winter, pumpkins, leaf piles and hay bales in fall,
+## tulip beds and butterflies in spring, picnics and kites in summer.
+func _build_season() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(course["seed"]) * 7 + Season.ORDER.find(Season.current)
+	var kinds: Array = {"winter": ["snowman", "snowman", "skier", "skier"], "fall": ["pumpkins", "leafpile", "hay"],
+		"spring": ["flowers", "flowers", "butterfly"], "summer": ["picnic", "kite"]}[Season.current]
+	var cols := [Color(0.95, 0.25, 0.25), Color(0.2, 0.55, 0.95), Color(1.0, 0.8, 0.15), Color(0.3, 0.8, 0.45), Color(0.85, 0.35, 0.85)]
+	var length: float = course["length"]
+	var s := 40.0
+	while s < length - 40.0:
+		s += rng.randf_range(35.0, 80.0)
+		var side := 1.0 if rng.randf() < 0.5 else -1.0
+		var p: Vector2 = _pose(s, side * rng.randf_range(2.2, 4.0))["pos"]
+		if _rd(p) < 1.8 or _stream_d(p.x, p.y) < 1.2 or not _clear_of(s, 6.0):
+			continue
+		var kind: String = kinds[rng.randi() % kinds.size()]
+		if kind == "skier":
+			for k in 7:
+				var q := p + Vector2(0.8 if k % 2 == 0 else -0.8, k * 0.5)
+				if _rd(q) < 1.5 or _stream_d(q.x, q.y) < 0.8:
+					kind = "snowman"   # the run would cross the course or a creek
+		_put_static(2, {"kind": kind, "s": s, "pos": p, "z": _tz(p), "sd": rng.randi() % 100, "ph": rng.randf() * TAU,
+			"col": cols[rng.randi() % cols.size()]}, [p + Vector2(0, 3)] if kind == "skier" else [])
 
 
 func _build_riders() -> void:
@@ -1355,8 +1386,8 @@ func _draw() -> void:
 				var a: Vector2 = sg["a"]
 				if not big.has_point(a):
 					continue
-				draw_colored_polygon(sg["poly"], WATER)
-				if (int(sg["k"]) + int(t_ * 5.0)) % 4 == 0:
+				draw_colored_polygon(sg["poly"], Season.water(WATER))
+				if not Season.bare() and (int(sg["k"]) + int(t_ * 5.0)) % 4 == 0:
 					draw_line(a, sg["b"], Color(0.85, 0.95, 1.0), 1.0)
 	for d in range(d0, d1 + 1):
 		if road_buckets.has(d):
@@ -1366,12 +1397,12 @@ func _draw() -> void:
 				if not big.has_point(e[0]):
 					continue
 				draw_colored_polygon(e, Color(0.5, 0.42, 0.33))
-				draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52), seg["shade"]))
+				draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52).lerp(Season.SNOW, 0.3 if Season.bare() else 0.0), seg["shade"]))
 				for rut in seg["ruts"]:
 					draw_colored_polygon(rut, Color(0.6, 0.52, 0.42))
 				var pi_ := 0
 				for pb in seg["pebbles"]:
-					draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else Color(0.86, 0.8, 0.68))
+					draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
 					pi_ += 1
 	for d in range(d0, d1 + 1):
 		if statics.has(d):
@@ -1435,8 +1466,8 @@ func _diag(p: Vector2) -> int:
 
 func _draw_sky(vr: Rect2) -> void:
 	var c := vr.get_center()
-	var top := Color(0.4, 0.68, 0.95)
-	var bottom := Color(0.8, 0.92, 1.0)
+	var top := Season.sky(Color(0.4, 0.68, 0.95))
+	var bottom := Season.sky(Color(0.8, 0.92, 1.0))
 	draw_polygon(PackedVector2Array([vr.position - Vector2(50, 50), vr.position + Vector2(vr.size.x + 50, -50), vr.end + Vector2(50, 50), vr.position + Vector2(-50, vr.size.y + 50)]),
 		PackedColorArray([top, top, bottom, bottom]))
 	draw_circle(c + Vector2(vr.size.x * 0.32, -vr.size.y * 0.32), 70.0, Color(1.0, 0.96, 0.7))
@@ -1452,17 +1483,24 @@ func _draw_sky(vr: Rect2) -> void:
 func _cell_detail(i: int, j: int, center: Vector2, kind: int, col: Color) -> void:
 	var h := ((i * 73856093) ^ (j * 19349663)) & 0x7fffffff
 	var o := Vector2(float(h % 17) - 8.0, float((h >> 5) % 9) - 4.0)
+	if Season.bare():
+		if kind != 3 and h % 3 == 0:   # sparkles on the snow
+			draw_rect(Rect2(center + o, Vector2(1, 1)), Color(1, 1, 1))
+		if kind != 3:
+			return
 	match kind:
 		1:
+			if Season.is_("fall") and h % 2 == 0:
+				draw_rect(Rect2(center - o, Vector2(2, 1)), Season.FALL_LEAVES[(h >> 3) % 4])
 			for k in 3:
 				var p := center + o + Vector2((k - 1) * 9.0, float((h >> (k + 2)) % 5) - 2.0)
 				var tc := Iso.shade(col, 0.72)
 				draw_line(p, p + Vector2(-2, -3), tc, 1.0)
 				draw_line(p, p + Vector2(0, -4), tc, 1.0)
 				draw_line(p, p + Vector2(2, -3), tc, 1.0)
-			if course.get("flowers", false):
+			if course.get("flowers", false) and (not Season.is_("fall") or h % 4 == 0):
 				_flowers(center, h)
-			elif h % 4 == 0:
+			elif h % (2 if Season.is_("spring") else 4 if Season.is_("summer") else 16) == 0:
 				draw_rect(Rect2(center - o, Vector2(2, 2)), [Color(1.0, 0.5, 0.75), Color(1.0, 0.92, 0.3), Color(1, 1, 1), Color(0.6, 0.6, 1.0)][(h >> 3) % 4])
 				draw_rect(Rect2(center - o + Vector2(5, 2), Vector2(2, 2)), [Color(1.0, 0.92, 0.3), Color(1, 1, 1)][(h >> 4) % 2])
 		2:
@@ -1498,18 +1536,28 @@ func _flowers(center: Vector2, h: int) -> void:
 func _draw_tree(t: Dictionary) -> void:
 	var base := Iso.to_screen(t["pos"], t["z"])
 	var s: float = t["s"]
+	var sd := int(t["pos"].x * 7.0 + t["pos"].y * 13.0)
 	match int(t["kind"]):
 		3:
+			if Season.bare():
+				Season.bare_tree(self, base, s, sd)
+				return
 			draw_rect(Rect2(base + Vector2(-2, -9) * s, Vector2(4, 9) * s), Color(0.4, 0.25, 0.15))
 			draw_circle(base + Vector2(0, -20) * s, 11.0 * s, Iso.OUTLINE)
-			draw_circle(base + Vector2(0, -20) * s, 10.0 * s, Color(0.4, 0.68, 0.25))
-			draw_circle(base + Vector2(-3, -23) * s, 5.0 * s, Color(0.55, 0.8, 0.32))
+			draw_circle(base + Vector2(0, -20) * s, 10.0 * s, Season.leaves(Color(0.4, 0.68, 0.25), sd))
+			draw_circle(base + Vector2(-3, -23) * s, 5.0 * s, Season.leaves(Color(0.55, 0.8, 0.32), sd))
 			return
 		4:   # birch
 			draw_rect(Rect2(base + Vector2(-1.5, -16) * s, Vector2(3, 16) * s), Color(0.92, 0.92, 0.88))
 			draw_rect(Rect2(base + Vector2(-1.5, -10) * s, Vector2(3, 1) * s), Iso.OUTLINE)
+			if Season.bare():
+				for k in 3:
+					var from := base + Vector2(0, -14.0 - k * 3.0) * s
+					draw_line(from, from + Vector2((6.0 - k) * (1.0 if k % 2 == 0 else -1.0), -5.0) * s, Color(0.8, 0.8, 0.78), 1.0)
+				draw_rect(Rect2(base + Vector2(-2, -17) * s, Vector2(4, 1)), Season.SNOW)
+				return
 			draw_circle(base + Vector2(0, -22) * s, 8.0 * s, Iso.OUTLINE)
-			draw_circle(base + Vector2(0, -22) * s, 7.0 * s, Color(0.75, 0.88, 0.3))
+			draw_circle(base + Vector2(0, -22) * s, 7.0 * s, Season.leaves(Color(0.75, 0.88, 0.3), sd + 1))
 			return
 		5:   # dead snag
 			var gc := Color(0.55, 0.5, 0.45)
@@ -1519,13 +1567,15 @@ func _draw_tree(t: Dictionary) -> void:
 			draw_line(base + Vector2(0, -12) * s, base + Vector2(-5, -17) * s, gc, 1.0)
 			return
 	draw_rect(Rect2(base + Vector2(-2, -9) * s, Vector2(4, 9) * s), Color(0.4, 0.25, 0.15))
-	var g := Color(0.1, 0.45, 0.28)
+	var g := Season.pine(Color(0.1, 0.45, 0.28), int(t["kind"]) == 1)
 	for i in 3:
 		var y := -9.0 - i * 10.0
 		var w := (13.0 - i * 3.5) * s
 		var tri := PackedVector2Array([base + Vector2(-w, y * s), base + Vector2(w, y * s), base + Vector2(0, (y - 18.0) * s)])
 		draw_colored_polygon(tri, Iso.shade(g, 1.0 + i * 0.15))
 		draw_colored_polygon(PackedVector2Array([tri[0], base + Vector2(-w * 0.1, y * s), tri[2]]), Iso.shade(g, 1.35 + i * 0.15))
+		if Season.bare():
+			Season.snow_tier(self, tri[0], tri[1], tri[2])
 		tri.append(tri[0])
 		draw_polyline(tri, Iso.OUTLINE, 1.0)
 
@@ -1592,6 +1642,70 @@ func _draw_deco(e: Dictionary) -> void:
 			var wave := sin(t_ * 8.0 + (e["pos"] as Vector2).x * 3.0) * 5.0
 			draw_line(b + Vector2(0, -13), b + Vector2(7, -24 + wave), col, 2.0)
 			draw_line(b + Vector2(0, -13), b + Vector2(-7, -22 - wave), col, 2.0)
+			if Season.bare():   # a bobble hat
+				draw_rect(Rect2(b + Vector2(-3, -24), Vector2(6, 3)), col)
+				draw_circle(b + Vector2(0, -25), 1.2, Color.WHITE)
+		"snowman":
+			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
+		"skier":
+			# skis down the meadow beside the course (towards the camera), then rides the lift back up
+			var u := fposmod(t_ * 0.18 + float(e["ph"]), 1.0)
+			if u < 0.94:
+				var p0: Vector2 = e["pos"]
+				var p := p0 + Vector2(sin(u * TAU * 2.0) * 0.8, u * 3.0)
+				var b := Iso.to_screen(p, _tz(p))
+				var nxt := p0 + Vector2(sin((u + 0.01) * TAU * 2.0) * 0.8, (u + 0.01) * 3.0)
+				Season.skier(self, b, Iso.to_screen(nxt, _tz(nxt)) - b, e["col"], t_ * 6.0 + float(e["ph"]))
+		"pumpkins":
+			var b := Iso.to_screen(e["pos"], e["z"])
+			for k in 1 + int(e["sd"]) % 3:
+				Season.pumpkin(self, b + Vector2(k * 7.0 - 4.0, (k % 2) * 3.0), 1.3 if k == 0 else 0.9, int(e["sd"]) + k)
+		"leafpile":
+			Season.leaf_pile(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
+		"hay":
+			var b := Iso.to_screen(e["pos"], e["z"])
+			draw_rect(Rect2(b + Vector2(-9, -9), Vector2(18, 10)), Iso.OUTLINE)
+			draw_rect(Rect2(b + Vector2(-8, -8), Vector2(16, 8)), Color(0.9, 0.76, 0.38))
+			draw_rect(Rect2(b + Vector2(-8, -8), Vector2(16, 2)), Color(0.98, 0.88, 0.52))
+			draw_line(b + Vector2(-3, -8), b + Vector2(-3, 0), Color(0.6, 0.35, 0.15), 1.0)
+			draw_line(b + Vector2(3, -8), b + Vector2(3, 0), Color(0.6, 0.35, 0.15), 1.0)
+			Season.pumpkin(self, b + Vector2(0, -9), 0.8, 1)
+		"flowers":
+			Season.flower_bed(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
+		"butterfly":
+			var ph: float = e["ph"]
+			var b := Iso.to_screen(e["pos"], e["z"]) + Vector2(cos(t_ * 0.8 + ph) * 18.0, -14.0 + sin(t_ * 1.3 + ph) * 6.0)
+			Season.butterfly(self, b, e["col"], t_ * 14.0 + ph)
+		"picnic":
+			var b := Iso.to_screen(e["pos"], e["z"])
+			draw_colored_polygon(PackedVector2Array([b + Vector2(-16, 0), b + Vector2(0, -8), b + Vector2(16, 0), b + Vector2(0, 8)]), Color(0.95, 0.95, 0.92))
+			draw_colored_polygon(PackedVector2Array([b + Vector2(-8, -4), b + Vector2(0, -8), b + Vector2(8, -4), b + Vector2(0, 0)]), e["col"])
+			draw_colored_polygon(PackedVector2Array([b + Vector2(-8, 4), b + Vector2(0, 0), b + Vector2(8, 4), b + Vector2(0, 8)]), e["col"])
+			draw_rect(Rect2(b + Vector2(-4, -2), Vector2(8, 3)), Color(0.95, 0.9, 0.8))
+			draw_circle(b + Vector2(0, -1), 2.5, Color(0.95, 0.65, 0.25))
+			for side in [-1.0, 1.0]:   # two spectators sitting on the blanket, waving
+				var c: Vector2 = b + Vector2(side * 10.0, -2)
+				draw_rect(Rect2(c + Vector2(-3, -8), Vector2(6, 7)), Iso.OUTLINE)
+				draw_rect(Rect2(c + Vector2(-2, -7), Vector2(4, 5)), e["col"].lerp(Color.WHITE, 0.4) if side > 0 else Color(0.3, 0.6, 0.95))
+				draw_circle(c + Vector2(0, -11), 2.8, Iso.OUTLINE)
+				draw_circle(c + Vector2(0, -11), 2.2, Color(0.96, 0.8, 0.65))
+				draw_line(c + Vector2(side * 3.0, -7), c + Vector2(side * 6.0, -14 + sin(t_ * 8.0 + side) * 2.0), Iso.OUTLINE, 1.0)
+		"kite":
+			var b := Iso.to_screen(e["pos"], e["z"])
+			var ph: float = e["ph"]
+			draw_rect(Rect2(b + Vector2(-3, -13), Vector2(6, 7)), Iso.OUTLINE)
+			draw_rect(Rect2(b + Vector2(-2, -12), Vector2(4, 5)), e["col"])
+			draw_line(b + Vector2(-1, -6), b + Vector2(-1, 0), Color(0.2, 0.25, 0.45), 2.0)
+			draw_line(b + Vector2(1, -6), b + Vector2(1, 0), Color(0.2, 0.25, 0.45), 2.0)
+			draw_circle(b + Vector2(0, -16), 3.0, Iso.OUTLINE)
+			draw_circle(b + Vector2(0, -16), 2.4, Color(0.96, 0.8, 0.65))
+			var hand := b + Vector2(4, -14)
+			draw_line(b + Vector2(2, -11), hand, Iso.OUTLINE, 1.0)
+			var k := b + Vector2(30 + sin(t_ * 0.7 + ph) * 8.0, -72 + cos(t_ * 1.1 + ph) * 6.0)
+			draw_polyline(PackedVector2Array([hand, hand.lerp(k, 0.5) + Vector2(0, 8), k]), Color(1, 1, 1, 0.7), 1.0)
+			Iso.poly(self, PackedVector2Array([k + Vector2(0, -8), k + Vector2(6, 0), k + Vector2(0, 9), k + Vector2(-6, 0)]), e["col"])
+			for m in 4:
+				draw_rect(Rect2(k + Vector2(-2 - m * 3, 11 + m * 4 + sin(t_ * 4.0 + m) * 2.0), Vector2(3, 2)), [Color(1, 1, 1), e["col"]][m % 2])
 
 
 func _sp(p: Dictionary, lift: float = 0.0) -> Vector2:
@@ -1652,7 +1766,7 @@ func _draw_obstacle(ob: Dictionary) -> void:
 				right.append(_sp(_pose(ss, 1.0), 0.2))
 			right.reverse()
 			var poly := left + right
-			draw_colored_polygon(poly, Iso.fa(WATER, 0.9))
+			draw_colored_polygon(poly, Iso.fa(Season.water(WATER), 0.9))
 			for q in 3:
 				var u := fposmod(t_ * 0.5 + q / 3.0, 1.0)
 				var ss := s - FORD_HALF + FORD_HALF * 2.0 * u

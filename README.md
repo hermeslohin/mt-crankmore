@@ -12,7 +12,7 @@ Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; riv
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.3**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.4**):
 
 | Platform | File | How to run |
 |---|---|---|

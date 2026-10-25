@@ -6,7 +6,8 @@ extends SceneTree
 ##   e.g. ... -- ~/Downloads/rookie rows=south-east,south,west,north-west,north-west,north-east,east,east \
 ##            Idle=bike_you_pizza same_thing_but_witho=bike_you
 ##
-## A folder with an animation becomes one column per frame; without one, its still is a single column. Exports don't
+## A folder with an animation becomes one column per frame (the "pedaling" animation if there is one, else the first);
+## without one, its still is a single column. Exports don't
 ## agree on where their direction names point on screen, and their 8 poses needn't line up with the sheet's 8 rows
 ## (the isometric road diagonals are shallow), so rows= picks the export direction to use for each row, in row
 ## order; a pose can serve two rows. Look at the rotations to choose. The default suits the first rider export.
@@ -55,7 +56,7 @@ func _pack(folder: String, out_path: String) -> String:
 	var anim := ""
 	var anims := DirAccess.get_directories_at(folder + "/animations") if DirAccess.dir_exists_absolute(folder + "/animations") else PackedStringArray()
 	if anims.size() > 0:
-		anim = "%s/animations/%s" % [folder, anims[0]]
+		anim = "%s/animations/%s" % [folder, "pedaling" if anims.has("pedaling") else anims[0]]
 	var frames_n := 1
 	if anim != "":
 		frames_n = DirAccess.get_files_at("%s/%s" % [anim, row_dirs[0]]).size()

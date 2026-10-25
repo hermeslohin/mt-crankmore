@@ -1,0 +1,709 @@
+{
+  "group_id": "1044b8f7-7bd2-411d-a9c3-26d16c81e81b",
+  "states": [
+    {
+      "character": {
+        "id": "c20ee589-1930-43be-b9ce-90e04013ded7",
+        "name": "Idle",
+        "prompt": "A cool young pizza delivery cyclist riding a red road bike, wearing a red baseball cap and a yellow scarf blowing behind him, light blue shirt and dark blue shorts. A pizza is strapped on a rack on the back of his bike. Seated on the bike with hands on the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T18:07:05.325491+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "pedaling": {
+            "south-west": [
+              "Idle/animations/pedaling/south-west/frame_000.png",
+              "Idle/animations/pedaling/south-west/frame_001.png",
+              "Idle/animations/pedaling/south-west/frame_002.png",
+              "Idle/animations/pedaling/south-west/frame_003.png",
+              "Idle/animations/pedaling/south-west/frame_004.png",
+              "Idle/animations/pedaling/south-west/frame_005.png",
+              "Idle/animations/pedaling/south-west/frame_006.png",
+              "Idle/animations/pedaling/south-west/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/pedaling/north-west/frame_000.png",
+              "Idle/animations/pedaling/north-west/frame_001.png",
+              "Idle/animations/pedaling/north-west/frame_002.png",
+              "Idle/animations/pedaling/north-west/frame_003.png",
+              "Idle/animations/pedaling/north-west/frame_004.png",
+              "Idle/animations/pedaling/north-west/frame_005.png",
+              "Idle/animations/pedaling/north-west/frame_006.png",
+              "Idle/animations/pedaling/north-west/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/pedaling/north/frame_000.png",
+              "Idle/animations/pedaling/north/frame_001.png",
+              "Idle/animations/pedaling/north/frame_002.png",
+              "Idle/animations/pedaling/north/frame_003.png",
+              "Idle/animations/pedaling/north/frame_004.png",
+              "Idle/animations/pedaling/north/frame_005.png",
+              "Idle/animations/pedaling/north/frame_006.png",
+              "Idle/animations/pedaling/north/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/pedaling/south-east/frame_000.png",
+              "Idle/animations/pedaling/south-east/frame_001.png",
+              "Idle/animations/pedaling/south-east/frame_002.png",
+              "Idle/animations/pedaling/south-east/frame_003.png",
+              "Idle/animations/pedaling/south-east/frame_004.png",
+              "Idle/animations/pedaling/south-east/frame_005.png",
+              "Idle/animations/pedaling/south-east/frame_006.png",
+              "Idle/animations/pedaling/south-east/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/pedaling/south/frame_000.png",
+              "Idle/animations/pedaling/south/frame_001.png",
+              "Idle/animations/pedaling/south/frame_002.png",
+              "Idle/animations/pedaling/south/frame_003.png",
+              "Idle/animations/pedaling/south/frame_004.png",
+              "Idle/animations/pedaling/south/frame_005.png",
+              "Idle/animations/pedaling/south/frame_006.png",
+              "Idle/animations/pedaling/south/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/pedaling/east/frame_000.png",
+              "Idle/animations/pedaling/east/frame_001.png",
+              "Idle/animations/pedaling/east/frame_002.png",
+              "Idle/animations/pedaling/east/frame_003.png",
+              "Idle/animations/pedaling/east/frame_004.png",
+              "Idle/animations/pedaling/east/frame_005.png",
+              "Idle/animations/pedaling/east/frame_006.png",
+              "Idle/animations/pedaling/east/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/pedaling/west/frame_000.png",
+              "Idle/animations/pedaling/west/frame_001.png",
+              "Idle/animations/pedaling/west/frame_002.png",
+              "Idle/animations/pedaling/west/frame_003.png",
+              "Idle/animations/pedaling/west/frame_004.png",
+              "Idle/animations/pedaling/west/frame_005.png",
+              "Idle/animations/pedaling/west/frame_006.png",
+              "Idle/animations/pedaling/west/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/pedaling/north-east/frame_000.png",
+              "Idle/animations/pedaling/north-east/frame_001.png",
+              "Idle/animations/pedaling/north-east/frame_002.png",
+              "Idle/animations/pedaling/north-east/frame_003.png",
+              "Idle/animations/pedaling/north-east/frame_004.png",
+              "Idle/animations/pedaling/north-east/frame_005.png",
+              "Idle/animations/pedaling/north-east/frame_006.png",
+              "Idle/animations/pedaling/north-east/frame_007.png"
+            ]
+          },
+          "fall": {
+            "north-east": [
+              "Idle/animations/fall/north-east/frame_000.png",
+              "Idle/animations/fall/north-east/frame_001.png",
+              "Idle/animations/fall/north-east/frame_002.png",
+              "Idle/animations/fall/north-east/frame_003.png",
+              "Idle/animations/fall/north-east/frame_004.png",
+              "Idle/animations/fall/north-east/frame_005.png",
+              "Idle/animations/fall/north-east/frame_006.png",
+              "Idle/animations/fall/north-east/frame_007.png",
+              "Idle/animations/fall/north-east/frame_008.png",
+              "Idle/animations/fall/north-east/frame_009.png",
+              "Idle/animations/fall/north-east/frame_010.png",
+              "Idle/animations/fall/north-east/frame_011.png",
+              "Idle/animations/fall/north-east/frame_012.png"
+            ],
+            "north-west": [
+              "Idle/animations/fall/north-west/frame_000.png",
+              "Idle/animations/fall/north-west/frame_001.png",
+              "Idle/animations/fall/north-west/frame_002.png",
+              "Idle/animations/fall/north-west/frame_003.png",
+              "Idle/animations/fall/north-west/frame_004.png",
+              "Idle/animations/fall/north-west/frame_005.png",
+              "Idle/animations/fall/north-west/frame_006.png",
+              "Idle/animations/fall/north-west/frame_007.png",
+              "Idle/animations/fall/north-west/frame_008.png",
+              "Idle/animations/fall/north-west/frame_009.png",
+              "Idle/animations/fall/north-west/frame_010.png",
+              "Idle/animations/fall/north-west/frame_011.png",
+              "Idle/animations/fall/north-west/frame_012.png"
+            ],
+            "south": [
+              "Idle/animations/fall/south/frame_000.png",
+              "Idle/animations/fall/south/frame_001.png",
+              "Idle/animations/fall/south/frame_002.png",
+              "Idle/animations/fall/south/frame_003.png",
+              "Idle/animations/fall/south/frame_004.png",
+              "Idle/animations/fall/south/frame_005.png",
+              "Idle/animations/fall/south/frame_006.png",
+              "Idle/animations/fall/south/frame_007.png",
+              "Idle/animations/fall/south/frame_008.png",
+              "Idle/animations/fall/south/frame_009.png",
+              "Idle/animations/fall/south/frame_010.png",
+              "Idle/animations/fall/south/frame_011.png",
+              "Idle/animations/fall/south/frame_012.png"
+            ],
+            "east": [
+              "Idle/animations/fall/east/frame_000.png",
+              "Idle/animations/fall/east/frame_001.png",
+              "Idle/animations/fall/east/frame_002.png",
+              "Idle/animations/fall/east/frame_003.png",
+              "Idle/animations/fall/east/frame_004.png",
+              "Idle/animations/fall/east/frame_005.png",
+              "Idle/animations/fall/east/frame_006.png",
+              "Idle/animations/fall/east/frame_007.png",
+              "Idle/animations/fall/east/frame_008.png",
+              "Idle/animations/fall/east/frame_009.png",
+              "Idle/animations/fall/east/frame_010.png",
+              "Idle/animations/fall/east/frame_011.png",
+              "Idle/animations/fall/east/frame_012.png"
+            ],
+            "south-east": [
+              "Idle/animations/fall/south-east/frame_000.png",
+              "Idle/animations/fall/south-east/frame_001.png",
+              "Idle/animations/fall/south-east/frame_002.png",
+              "Idle/animations/fall/south-east/frame_003.png",
+              "Idle/animations/fall/south-east/frame_004.png",
+              "Idle/animations/fall/south-east/frame_005.png",
+              "Idle/animations/fall/south-east/frame_006.png",
+              "Idle/animations/fall/south-east/frame_007.png",
+              "Idle/animations/fall/south-east/frame_008.png",
+              "Idle/animations/fall/south-east/frame_009.png",
+              "Idle/animations/fall/south-east/frame_010.png",
+              "Idle/animations/fall/south-east/frame_011.png",
+              "Idle/animations/fall/south-east/frame_012.png"
+            ],
+            "north": [
+              "Idle/animations/fall/north/frame_000.png",
+              "Idle/animations/fall/north/frame_001.png",
+              "Idle/animations/fall/north/frame_002.png",
+              "Idle/animations/fall/north/frame_003.png",
+              "Idle/animations/fall/north/frame_004.png",
+              "Idle/animations/fall/north/frame_005.png",
+              "Idle/animations/fall/north/frame_006.png",
+              "Idle/animations/fall/north/frame_007.png",
+              "Idle/animations/fall/north/frame_008.png",
+              "Idle/animations/fall/north/frame_009.png",
+              "Idle/animations/fall/north/frame_010.png",
+              "Idle/animations/fall/north/frame_011.png",
+              "Idle/animations/fall/north/frame_012.png"
+            ],
+            "west": [
+              "Idle/animations/fall/west/frame_000.png",
+              "Idle/animations/fall/west/frame_001.png",
+              "Idle/animations/fall/west/frame_002.png",
+              "Idle/animations/fall/west/frame_003.png",
+              "Idle/animations/fall/west/frame_004.png",
+              "Idle/animations/fall/west/frame_005.png",
+              "Idle/animations/fall/west/frame_006.png",
+              "Idle/animations/fall/west/frame_007.png",
+              "Idle/animations/fall/west/frame_008.png",
+              "Idle/animations/fall/west/frame_009.png",
+              "Idle/animations/fall/west/frame_010.png",
+              "Idle/animations/fall/west/frame_011.png",
+              "Idle/animations/fall/west/frame_012.png"
+            ],
+            "south-west": [
+              "Idle/animations/fall/south-west/frame_000.png",
+              "Idle/animations/fall/south-west/frame_001.png",
+              "Idle/animations/fall/south-west/frame_002.png",
+              "Idle/animations/fall/south-west/frame_003.png",
+              "Idle/animations/fall/south-west/frame_004.png",
+              "Idle/animations/fall/south-west/frame_005.png",
+              "Idle/animations/fall/south-west/frame_006.png",
+              "Idle/animations/fall/south-west/frame_007.png",
+              "Idle/animations/fall/south-west/frame_008.png",
+              "Idle/animations/fall/south-west/frame_009.png",
+              "Idle/animations/fall/south-west/frame_010.png",
+              "Idle/animations/fall/south-west/frame_011.png",
+              "Idle/animations/fall/south-west/frame_012.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "de5fe38f-eca3-49cb-a844-ba1148804e95",
+        "name": "No pizza",
+        "prompt": "A cool young pizza delivery cyclist riding a red road bike, wearing a red baseball cap and a yellow scarf blowing behind him, light blue shirt and dark blue shorts. A pizza is strapped on a rack on the back of his bike. Seated on the bike with hands on the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T18:10:22.936024+00:00"
+      },
+      "folder": "No_pizza",
+      "frames": {
+        "rotations": {
+          "south": "No_pizza/rotations/south.png",
+          "south-east": "No_pizza/rotations/south-east.png",
+          "east": "No_pizza/rotations/east.png",
+          "north-east": "No_pizza/rotations/north-east.png",
+          "north": "No_pizza/rotations/north.png",
+          "north-west": "No_pizza/rotations/north-west.png",
+          "west": "No_pizza/rotations/west.png",
+          "south-west": "No_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "fall": {
+            "south": [
+              "No_pizza/animations/fall/south/frame_000.png",
+              "No_pizza/animations/fall/south/frame_001.png",
+              "No_pizza/animations/fall/south/frame_002.png",
+              "No_pizza/animations/fall/south/frame_003.png",
+              "No_pizza/animations/fall/south/frame_004.png",
+              "No_pizza/animations/fall/south/frame_005.png",
+              "No_pizza/animations/fall/south/frame_006.png",
+              "No_pizza/animations/fall/south/frame_007.png",
+              "No_pizza/animations/fall/south/frame_008.png",
+              "No_pizza/animations/fall/south/frame_009.png",
+              "No_pizza/animations/fall/south/frame_010.png",
+              "No_pizza/animations/fall/south/frame_011.png",
+              "No_pizza/animations/fall/south/frame_012.png"
+            ],
+            "north": [
+              "No_pizza/animations/fall/north/frame_000.png",
+              "No_pizza/animations/fall/north/frame_001.png",
+              "No_pizza/animations/fall/north/frame_002.png",
+              "No_pizza/animations/fall/north/frame_003.png",
+              "No_pizza/animations/fall/north/frame_004.png",
+              "No_pizza/animations/fall/north/frame_005.png",
+              "No_pizza/animations/fall/north/frame_006.png",
+              "No_pizza/animations/fall/north/frame_007.png",
+              "No_pizza/animations/fall/north/frame_008.png",
+              "No_pizza/animations/fall/north/frame_009.png",
+              "No_pizza/animations/fall/north/frame_010.png",
+              "No_pizza/animations/fall/north/frame_011.png",
+              "No_pizza/animations/fall/north/frame_012.png"
+            ],
+            "east": [
+              "No_pizza/animations/fall/east/frame_000.png",
+              "No_pizza/animations/fall/east/frame_001.png",
+              "No_pizza/animations/fall/east/frame_002.png",
+              "No_pizza/animations/fall/east/frame_003.png",
+              "No_pizza/animations/fall/east/frame_004.png",
+              "No_pizza/animations/fall/east/frame_005.png",
+              "No_pizza/animations/fall/east/frame_006.png",
+              "No_pizza/animations/fall/east/frame_007.png",
+              "No_pizza/animations/fall/east/frame_008.png",
+              "No_pizza/animations/fall/east/frame_009.png",
+              "No_pizza/animations/fall/east/frame_010.png",
+              "No_pizza/animations/fall/east/frame_011.png",
+              "No_pizza/animations/fall/east/frame_012.png"
+            ],
+            "south-west": [
+              "No_pizza/animations/fall/south-west/frame_000.png",
+              "No_pizza/animations/fall/south-west/frame_001.png",
+              "No_pizza/animations/fall/south-west/frame_002.png",
+              "No_pizza/animations/fall/south-west/frame_003.png",
+              "No_pizza/animations/fall/south-west/frame_004.png",
+              "No_pizza/animations/fall/south-west/frame_005.png",
+              "No_pizza/animations/fall/south-west/frame_006.png",
+              "No_pizza/animations/fall/south-west/frame_007.png",
+              "No_pizza/animations/fall/south-west/frame_008.png",
+              "No_pizza/animations/fall/south-west/frame_009.png",
+              "No_pizza/animations/fall/south-west/frame_010.png",
+              "No_pizza/animations/fall/south-west/frame_011.png",
+              "No_pizza/animations/fall/south-west/frame_012.png"
+            ],
+            "south-east": [
+              "No_pizza/animations/fall/south-east/frame_000.png",
+              "No_pizza/animations/fall/south-east/frame_001.png",
+              "No_pizza/animations/fall/south-east/frame_002.png",
+              "No_pizza/animations/fall/south-east/frame_003.png",
+              "No_pizza/animations/fall/south-east/frame_004.png",
+              "No_pizza/animations/fall/south-east/frame_005.png",
+              "No_pizza/animations/fall/south-east/frame_006.png",
+              "No_pizza/animations/fall/south-east/frame_007.png",
+              "No_pizza/animations/fall/south-east/frame_008.png",
+              "No_pizza/animations/fall/south-east/frame_009.png",
+              "No_pizza/animations/fall/south-east/frame_010.png",
+              "No_pizza/animations/fall/south-east/frame_011.png",
+              "No_pizza/animations/fall/south-east/frame_012.png"
+            ],
+            "north-east": [
+              "No_pizza/animations/fall/north-east/frame_000.png",
+              "No_pizza/animations/fall/north-east/frame_001.png",
+              "No_pizza/animations/fall/north-east/frame_002.png",
+              "No_pizza/animations/fall/north-east/frame_003.png",
+              "No_pizza/animations/fall/north-east/frame_004.png",
+              "No_pizza/animations/fall/north-east/frame_005.png",
+              "No_pizza/animations/fall/north-east/frame_006.png",
+              "No_pizza/animations/fall/north-east/frame_007.png",
+              "No_pizza/animations/fall/north-east/frame_008.png",
+              "No_pizza/animations/fall/north-east/frame_009.png",
+              "No_pizza/animations/fall/north-east/frame_010.png",
+              "No_pizza/animations/fall/north-east/frame_011.png",
+              "No_pizza/animations/fall/north-east/frame_012.png"
+            ],
+            "west": [
+              "No_pizza/animations/fall/west/frame_000.png",
+              "No_pizza/animations/fall/west/frame_001.png",
+              "No_pizza/animations/fall/west/frame_002.png",
+              "No_pizza/animations/fall/west/frame_003.png",
+              "No_pizza/animations/fall/west/frame_004.png",
+              "No_pizza/animations/fall/west/frame_005.png",
+              "No_pizza/animations/fall/west/frame_006.png",
+              "No_pizza/animations/fall/west/frame_007.png",
+              "No_pizza/animations/fall/west/frame_008.png",
+              "No_pizza/animations/fall/west/frame_009.png",
+              "No_pizza/animations/fall/west/frame_010.png",
+              "No_pizza/animations/fall/west/frame_011.png",
+              "No_pizza/animations/fall/west/frame_012.png"
+            ],
+            "north-west": [
+              "No_pizza/animations/fall/north-west/frame_000.png",
+              "No_pizza/animations/fall/north-west/frame_001.png",
+              "No_pizza/animations/fall/north-west/frame_002.png",
+              "No_pizza/animations/fall/north-west/frame_003.png",
+              "No_pizza/animations/fall/north-west/frame_004.png",
+              "No_pizza/animations/fall/north-west/frame_005.png",
+              "No_pizza/animations/fall/north-west/frame_006.png",
+              "No_pizza/animations/fall/north-west/frame_007.png",
+              "No_pizza/animations/fall/north-west/frame_008.png",
+              "No_pizza/animations/fall/north-west/frame_009.png",
+              "No_pizza/animations/fall/north-west/frame_010.png",
+              "No_pizza/animations/fall/north-west/frame_011.png",
+              "No_pizza/animations/fall/north-west/frame_012.png"
+            ]
+          },
+          "pedaling": {
+            "south": [
+              "No_pizza/animations/pedaling/south/frame_000.png",
+              "No_pizza/animations/pedaling/south/frame_001.png",
+              "No_pizza/animations/pedaling/south/frame_002.png",
+              "No_pizza/animations/pedaling/south/frame_003.png",
+              "No_pizza/animations/pedaling/south/frame_004.png",
+              "No_pizza/animations/pedaling/south/frame_005.png",
+              "No_pizza/animations/pedaling/south/frame_006.png",
+              "No_pizza/animations/pedaling/south/frame_007.png"
+            ],
+            "north-west": [
+              "No_pizza/animations/pedaling/north-west/frame_000.png",
+              "No_pizza/animations/pedaling/north-west/frame_001.png",
+              "No_pizza/animations/pedaling/north-west/frame_002.png",
+              "No_pizza/animations/pedaling/north-west/frame_003.png",
+              "No_pizza/animations/pedaling/north-west/frame_004.png",
+              "No_pizza/animations/pedaling/north-west/frame_005.png",
+              "No_pizza/animations/pedaling/north-west/frame_006.png",
+              "No_pizza/animations/pedaling/north-west/frame_007.png"
+            ],
+            "west": [
+              "No_pizza/animations/pedaling/west/frame_000.png",
+              "No_pizza/animations/pedaling/west/frame_001.png",
+              "No_pizza/animations/pedaling/west/frame_002.png",
+              "No_pizza/animations/pedaling/west/frame_003.png",
+              "No_pizza/animations/pedaling/west/frame_004.png",
+              "No_pizza/animations/pedaling/west/frame_005.png",
+              "No_pizza/animations/pedaling/west/frame_006.png",
+              "No_pizza/animations/pedaling/west/frame_007.png"
+            ],
+            "south-east": [
+              "No_pizza/animations/pedaling/south-east/frame_000.png",
+              "No_pizza/animations/pedaling/south-east/frame_001.png",
+              "No_pizza/animations/pedaling/south-east/frame_002.png",
+              "No_pizza/animations/pedaling/south-east/frame_003.png",
+              "No_pizza/animations/pedaling/south-east/frame_004.png",
+              "No_pizza/animations/pedaling/south-east/frame_005.png",
+              "No_pizza/animations/pedaling/south-east/frame_006.png",
+              "No_pizza/animations/pedaling/south-east/frame_007.png"
+            ],
+            "east": [
+              "No_pizza/animations/pedaling/east/frame_000.png",
+              "No_pizza/animations/pedaling/east/frame_001.png",
+              "No_pizza/animations/pedaling/east/frame_002.png",
+              "No_pizza/animations/pedaling/east/frame_003.png",
+              "No_pizza/animations/pedaling/east/frame_004.png",
+              "No_pizza/animations/pedaling/east/frame_005.png",
+              "No_pizza/animations/pedaling/east/frame_006.png",
+              "No_pizza/animations/pedaling/east/frame_007.png"
+            ],
+            "south-west": [
+              "No_pizza/animations/pedaling/south-west/frame_000.png",
+              "No_pizza/animations/pedaling/south-west/frame_001.png",
+              "No_pizza/animations/pedaling/south-west/frame_002.png",
+              "No_pizza/animations/pedaling/south-west/frame_003.png",
+              "No_pizza/animations/pedaling/south-west/frame_004.png",
+              "No_pizza/animations/pedaling/south-west/frame_005.png",
+              "No_pizza/animations/pedaling/south-west/frame_006.png",
+              "No_pizza/animations/pedaling/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "No_pizza/animations/pedaling/north-east/frame_000.png",
+              "No_pizza/animations/pedaling/north-east/frame_001.png",
+              "No_pizza/animations/pedaling/north-east/frame_002.png",
+              "No_pizza/animations/pedaling/north-east/frame_003.png",
+              "No_pizza/animations/pedaling/north-east/frame_004.png",
+              "No_pizza/animations/pedaling/north-east/frame_005.png",
+              "No_pizza/animations/pedaling/north-east/frame_006.png",
+              "No_pizza/animations/pedaling/north-east/frame_007.png"
+            ],
+            "north": [
+              "No_pizza/animations/pedaling/north/frame_000.png",
+              "No_pizza/animations/pedaling/north/frame_001.png",
+              "No_pizza/animations/pedaling/north/frame_002.png",
+              "No_pizza/animations/pedaling/north/frame_003.png",
+              "No_pizza/animations/pedaling/north/frame_004.png",
+              "No_pizza/animations/pedaling/north/frame_005.png",
+              "No_pizza/animations/pedaling/north/frame_006.png",
+              "No_pizza/animations/pedaling/north/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "1117cd0c-19a1-4b7d-8212-004b2916bdaf",
+        "name": "With pizza",
+        "prompt": "A cool young pizza delivery cyclist riding a red road bike, wearing a red baseball cap and a yellow scarf blowing behind him, light blue shirt and dark blue shorts. A pizza is strapped on a rack on the back of his bike. Seated on the bike with hands on the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T19:17:10.180056+00:00"
+      },
+      "folder": "With_pizza",
+      "frames": {
+        "rotations": {
+          "south": "With_pizza/rotations/south.png",
+          "south-east": "With_pizza/rotations/south-east.png",
+          "east": "With_pizza/rotations/east.png",
+          "north-east": "With_pizza/rotations/north-east.png",
+          "north": "With_pizza/rotations/north.png",
+          "north-west": "With_pizza/rotations/north-west.png",
+          "west": "With_pizza/rotations/west.png",
+          "south-west": "With_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "fall": {
+            "north-west": [
+              "With_pizza/animations/fall/north-west/frame_000.png",
+              "With_pizza/animations/fall/north-west/frame_001.png",
+              "With_pizza/animations/fall/north-west/frame_002.png",
+              "With_pizza/animations/fall/north-west/frame_003.png",
+              "With_pizza/animations/fall/north-west/frame_004.png",
+              "With_pizza/animations/fall/north-west/frame_005.png",
+              "With_pizza/animations/fall/north-west/frame_006.png",
+              "With_pizza/animations/fall/north-west/frame_007.png",
+              "With_pizza/animations/fall/north-west/frame_008.png",
+              "With_pizza/animations/fall/north-west/frame_009.png",
+              "With_pizza/animations/fall/north-west/frame_010.png",
+              "With_pizza/animations/fall/north-west/frame_011.png",
+              "With_pizza/animations/fall/north-west/frame_012.png"
+            ],
+            "south": [
+              "With_pizza/animations/fall/south/frame_000.png",
+              "With_pizza/animations/fall/south/frame_001.png",
+              "With_pizza/animations/fall/south/frame_002.png",
+              "With_pizza/animations/fall/south/frame_003.png",
+              "With_pizza/animations/fall/south/frame_004.png",
+              "With_pizza/animations/fall/south/frame_005.png",
+              "With_pizza/animations/fall/south/frame_006.png",
+              "With_pizza/animations/fall/south/frame_007.png",
+              "With_pizza/animations/fall/south/frame_008.png",
+              "With_pizza/animations/fall/south/frame_009.png",
+              "With_pizza/animations/fall/south/frame_010.png",
+              "With_pizza/animations/fall/south/frame_011.png",
+              "With_pizza/animations/fall/south/frame_012.png"
+            ],
+            "south-east": [
+              "With_pizza/animations/fall/south-east/frame_000.png",
+              "With_pizza/animations/fall/south-east/frame_001.png",
+              "With_pizza/animations/fall/south-east/frame_002.png",
+              "With_pizza/animations/fall/south-east/frame_003.png",
+              "With_pizza/animations/fall/south-east/frame_004.png",
+              "With_pizza/animations/fall/south-east/frame_005.png",
+              "With_pizza/animations/fall/south-east/frame_006.png",
+              "With_pizza/animations/fall/south-east/frame_007.png",
+              "With_pizza/animations/fall/south-east/frame_008.png",
+              "With_pizza/animations/fall/south-east/frame_009.png",
+              "With_pizza/animations/fall/south-east/frame_010.png",
+              "With_pizza/animations/fall/south-east/frame_011.png",
+              "With_pizza/animations/fall/south-east/frame_012.png"
+            ],
+            "north-east": [
+              "With_pizza/animations/fall/north-east/frame_000.png",
+              "With_pizza/animations/fall/north-east/frame_001.png",
+              "With_pizza/animations/fall/north-east/frame_002.png",
+              "With_pizza/animations/fall/north-east/frame_003.png",
+              "With_pizza/animations/fall/north-east/frame_004.png",
+              "With_pizza/animations/fall/north-east/frame_005.png",
+              "With_pizza/animations/fall/north-east/frame_006.png",
+              "With_pizza/animations/fall/north-east/frame_007.png",
+              "With_pizza/animations/fall/north-east/frame_008.png",
+              "With_pizza/animations/fall/north-east/frame_009.png",
+              "With_pizza/animations/fall/north-east/frame_010.png",
+              "With_pizza/animations/fall/north-east/frame_011.png",
+              "With_pizza/animations/fall/north-east/frame_012.png"
+            ],
+            "east": [
+              "With_pizza/animations/fall/east/frame_000.png",
+              "With_pizza/animations/fall/east/frame_001.png",
+              "With_pizza/animations/fall/east/frame_002.png",
+              "With_pizza/animations/fall/east/frame_003.png",
+              "With_pizza/animations/fall/east/frame_004.png",
+              "With_pizza/animations/fall/east/frame_005.png",
+              "With_pizza/animations/fall/east/frame_006.png",
+              "With_pizza/animations/fall/east/frame_007.png",
+              "With_pizza/animations/fall/east/frame_008.png",
+              "With_pizza/animations/fall/east/frame_009.png",
+              "With_pizza/animations/fall/east/frame_010.png",
+              "With_pizza/animations/fall/east/frame_011.png",
+              "With_pizza/animations/fall/east/frame_012.png"
+            ],
+            "west": [
+              "With_pizza/animations/fall/west/frame_000.png",
+              "With_pizza/animations/fall/west/frame_001.png",
+              "With_pizza/animations/fall/west/frame_002.png",
+              "With_pizza/animations/fall/west/frame_003.png",
+              "With_pizza/animations/fall/west/frame_004.png",
+              "With_pizza/animations/fall/west/frame_005.png",
+              "With_pizza/animations/fall/west/frame_006.png",
+              "With_pizza/animations/fall/west/frame_007.png",
+              "With_pizza/animations/fall/west/frame_008.png",
+              "With_pizza/animations/fall/west/frame_009.png",
+              "With_pizza/animations/fall/west/frame_010.png",
+              "With_pizza/animations/fall/west/frame_011.png",
+              "With_pizza/animations/fall/west/frame_012.png"
+            ],
+            "north": [
+              "With_pizza/animations/fall/north/frame_000.png",
+              "With_pizza/animations/fall/north/frame_001.png",
+              "With_pizza/animations/fall/north/frame_002.png",
+              "With_pizza/animations/fall/north/frame_003.png",
+              "With_pizza/animations/fall/north/frame_004.png",
+              "With_pizza/animations/fall/north/frame_005.png",
+              "With_pizza/animations/fall/north/frame_006.png",
+              "With_pizza/animations/fall/north/frame_007.png",
+              "With_pizza/animations/fall/north/frame_008.png",
+              "With_pizza/animations/fall/north/frame_009.png",
+              "With_pizza/animations/fall/north/frame_010.png",
+              "With_pizza/animations/fall/north/frame_011.png",
+              "With_pizza/animations/fall/north/frame_012.png"
+            ],
+            "south-west": [
+              "With_pizza/animations/fall/south-west/frame_000.png",
+              "With_pizza/animations/fall/south-west/frame_001.png",
+              "With_pizza/animations/fall/south-west/frame_002.png",
+              "With_pizza/animations/fall/south-west/frame_003.png",
+              "With_pizza/animations/fall/south-west/frame_004.png",
+              "With_pizza/animations/fall/south-west/frame_005.png",
+              "With_pizza/animations/fall/south-west/frame_006.png",
+              "With_pizza/animations/fall/south-west/frame_007.png",
+              "With_pizza/animations/fall/south-west/frame_008.png",
+              "With_pizza/animations/fall/south-west/frame_009.png",
+              "With_pizza/animations/fall/south-west/frame_010.png",
+              "With_pizza/animations/fall/south-west/frame_011.png",
+              "With_pizza/animations/fall/south-west/frame_012.png"
+            ]
+          },
+          "pedaling": {
+            "north-east": [
+              "With_pizza/animations/pedaling/north-east/frame_000.png",
+              "With_pizza/animations/pedaling/north-east/frame_001.png",
+              "With_pizza/animations/pedaling/north-east/frame_002.png",
+              "With_pizza/animations/pedaling/north-east/frame_003.png",
+              "With_pizza/animations/pedaling/north-east/frame_004.png",
+              "With_pizza/animations/pedaling/north-east/frame_005.png",
+              "With_pizza/animations/pedaling/north-east/frame_006.png",
+              "With_pizza/animations/pedaling/north-east/frame_007.png"
+            ],
+            "north": [
+              "With_pizza/animations/pedaling/north/frame_000.png",
+              "With_pizza/animations/pedaling/north/frame_001.png",
+              "With_pizza/animations/pedaling/north/frame_002.png",
+              "With_pizza/animations/pedaling/north/frame_003.png",
+              "With_pizza/animations/pedaling/north/frame_004.png",
+              "With_pizza/animations/pedaling/north/frame_005.png",
+              "With_pizza/animations/pedaling/north/frame_006.png",
+              "With_pizza/animations/pedaling/north/frame_007.png"
+            ],
+            "south": [
+              "With_pizza/animations/pedaling/south/frame_000.png",
+              "With_pizza/animations/pedaling/south/frame_001.png",
+              "With_pizza/animations/pedaling/south/frame_002.png",
+              "With_pizza/animations/pedaling/south/frame_003.png",
+              "With_pizza/animations/pedaling/south/frame_004.png",
+              "With_pizza/animations/pedaling/south/frame_005.png",
+              "With_pizza/animations/pedaling/south/frame_006.png",
+              "With_pizza/animations/pedaling/south/frame_007.png"
+            ],
+            "west": [
+              "With_pizza/animations/pedaling/west/frame_000.png",
+              "With_pizza/animations/pedaling/west/frame_001.png",
+              "With_pizza/animations/pedaling/west/frame_002.png",
+              "With_pizza/animations/pedaling/west/frame_003.png",
+              "With_pizza/animations/pedaling/west/frame_004.png",
+              "With_pizza/animations/pedaling/west/frame_005.png",
+              "With_pizza/animations/pedaling/west/frame_006.png",
+              "With_pizza/animations/pedaling/west/frame_007.png"
+            ],
+            "north-west": [
+              "With_pizza/animations/pedaling/north-west/frame_000.png",
+              "With_pizza/animations/pedaling/north-west/frame_001.png",
+              "With_pizza/animations/pedaling/north-west/frame_002.png",
+              "With_pizza/animations/pedaling/north-west/frame_003.png",
+              "With_pizza/animations/pedaling/north-west/frame_004.png",
+              "With_pizza/animations/pedaling/north-west/frame_005.png",
+              "With_pizza/animations/pedaling/north-west/frame_006.png",
+              "With_pizza/animations/pedaling/north-west/frame_007.png"
+            ],
+            "east": [
+              "With_pizza/animations/pedaling/east/frame_000.png",
+              "With_pizza/animations/pedaling/east/frame_001.png",
+              "With_pizza/animations/pedaling/east/frame_002.png",
+              "With_pizza/animations/pedaling/east/frame_003.png",
+              "With_pizza/animations/pedaling/east/frame_004.png",
+              "With_pizza/animations/pedaling/east/frame_005.png",
+              "With_pizza/animations/pedaling/east/frame_006.png",
+              "With_pizza/animations/pedaling/east/frame_007.png"
+            ],
+            "south-west": [
+              "With_pizza/animations/pedaling/south-west/frame_000.png",
+              "With_pizza/animations/pedaling/south-west/frame_001.png",
+              "With_pizza/animations/pedaling/south-west/frame_002.png",
+              "With_pizza/animations/pedaling/south-west/frame_003.png",
+              "With_pizza/animations/pedaling/south-west/frame_004.png",
+              "With_pizza/animations/pedaling/south-west/frame_005.png",
+              "With_pizza/animations/pedaling/south-west/frame_006.png",
+              "With_pizza/animations/pedaling/south-west/frame_007.png"
+            ],
+            "south-east": [
+              "With_pizza/animations/pedaling/south-east/frame_000.png",
+              "With_pizza/animations/pedaling/south-east/frame_001.png",
+              "With_pizza/animations/pedaling/south-east/frame_002.png",
+              "With_pizza/animations/pedaling/south-east/frame_003.png",
+              "With_pizza/animations/pedaling/south-east/frame_004.png",
+              "With_pizza/animations/pedaling/south-east/frame_005.png",
+              "With_pizza/animations/pedaling/south-east/frame_006.png",
+              "With_pizza/animations/pedaling/south-east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-25T22:59:29.767926"
+}

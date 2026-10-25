@@ -3,7 +3,7 @@ extends SceneTree
 ## animations/<name>/<dir>/frame_NNN.png) into the bike sheets Sprites reads (see scripts/sprites.gd).
 ##
 ##   godot --headless -s tools/import_rider.gd -- <export dir> <folder>=<sheet> [<folder>=<sheet> ...]
-##   e.g. ... -- ~/Downloads/rider Idle=bike_you_pizza Same_thing_but_witho=bike_you_boxed Same_thing_but_no_pi=bike_you
+##   e.g. ... -- ~/Downloads/rookie Idle=bike_you_pizza same_thing_but_witho=bike_you
 ##
 ## A folder with an animation becomes one column per frame; without one, its still is a single column. The export
 ## names directions isometric-style (its "south-east" is straight down the screen), so each is moved to its row.

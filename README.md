@@ -119,7 +119,7 @@ https://github.com/hermeslohin/mt-crankmore/releases
 2. Copy the **Client ID**, then pick **Paste Client ID**. Click **Show** next to the Client Secret, copy it, then pick **Paste Client Secret**. They're kept only on your computer (`strava.json` in the game's user data folder).
 3. Pick **Link Strava account**, approve Mt. Crankmore in your browser (leave *Upload your activities* ticked) and come back to the game.
 
-**Posting.** Once you're linked, the ride is posted automatically when you quit the game (title screen > **Quit**, or closing the window); a *Posting to Strava* screen shows while it uploads, and if it fails the ride is kept and posted next time. You can also post any time: Pause (Esc / B) > **Post ride to Strava**, or title screen > **Strava** > **Post this ride to Strava**. Rides need to be at least a minute long. **Discard this ride** starts a new one.
+**Posting.** Once you're linked, post the ride whenever you like: Pause (Esc / B) > **Post ride to Strava**, or title screen > **Strava** > **Post this ride to Strava**. Quitting doesn't post it; the ride is kept until you do. Rides need to be at least a minute long. **Discard this ride** starts a new one.
 
 **Screenshots.** Strava's API doesn't let apps add photos to an activity, so after posting, pick **Add screenshots to the last ride**: it opens the activity in your browser and the folder with that ride's screenshots, ready to drag in.
 

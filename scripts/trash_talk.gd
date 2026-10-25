@@ -1,13 +1,13 @@
 extends Node
-## The rival pizza bikers and their (family-friendly) trash talk. `roster` holds all seven; `rivals` is the
+## The rival pizza bikers and their (family-friendly) trash talk. `roster` holds all eight; `rivals` is the
 ## first Game.rival_count of them, the ones actually riding (set_count changes it).
 ## Placeholders: {n} = the player, {o} = another rival, {r} = the speaker.
 
 var roster: Array = [
-	{"name": "Dough Boy Dave", "short": "Dave", "color": Color(0.95, 0.4, 0.15), "ftp": 238.0, "tier": 2, "speed": 3.9,
-		"sig": ["I put the 'pro' in 'pepperoni'.", "Fastest knead in town, baby.", "Call me Dave. Or call me 'Champ'."]},
-	{"name": "Spoke-n Word Sam", "short": "Sam", "color": Color(0.78, 0.8, 0.85), "ftp": 222.0, "tier": 1, "speed": 3.6,
-		"sig": ["Roses are red, my tires are black, I'm up the road, and you're way back.", "A haiku: you / are very slow / goodbye now.", "Wheels turn, verses burn."]},
+	{"name": "Cryptic Carl", "short": "Carl", "color": Color(0.6, 0.35, 0.9), "ftp": 238.0, "tier": 2, "speed": 3.9,
+		"sig": ["Mothman delivers faster than you. Just saying.", "They don't want you to know this, but I'm winning.", "That was no pothole. That was a cover-up."]},
+	{"name": "Super Sarah", "short": "Sarah", "color": Color(0.9, 0.2, 0.25), "ftp": 222.0, "tier": 1, "speed": 3.6,
+		"sig": ["Have no fear, Super Sarah is here!", "My cape makes me 12% faster. Scientifically.", "I can't be late. I have to save the city. And deliver pizza."]},
 	{"name": "Cadence Carla", "short": "Carla", "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "tier": 3, "speed": 4.1,
 		"sig": ["My cadence is 92. Yours is... a rumor.", "Statistically, you're losing.", "I've calculated your odds. Rounding error."]},
 	{"name": "Wheelie Wanda", "short": "Wanda", "color": Color(1.0, 0.4, 0.7), "ftp": 246.0, "tier": 2, "speed": 4.0,
@@ -18,6 +18,8 @@ var roster: Array = [
 		"sig": ["Aw, sweetie, bless your little pedals.", "I'd say good luck, but I'd be lying. Nicely.", "Don't worry, there's always second place! (It's mine, though.)"]},
 	{"name": "Tubeless Tony", "short": "Tony", "color": Color(0.95, 0.85, 0.2), "ftp": 215.0, "tier": 1, "speed": 3.5,
 		"sig": ["Dude. Chill. I'm winning, but, like, chill.", "Nap time after this one, bro.", "Is it already over? I was vibing."]},
+	{"name": "Karate Kim", "short": "Kim", "color": Color(0.85, 0.85, 0.9), "ftp": 258.0, "tier": 3, "speed": 4.1,
+		"sig": ["I'm a black belt. In pedaling, too.", "Hi-YAH! That was me passing you.", "Focus. Breathe. Win."]},
 ]
 
 var _lines := {

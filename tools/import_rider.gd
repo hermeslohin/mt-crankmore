@@ -2,12 +2,12 @@ extends SceneTree
 ## Packs a PixelLab-style character export (one folder per look, each with rotations/<dir>.png and optionally
 ## animations/<name>/<dir>/frame_NNN.png) into the bike sheets Sprites reads (see scripts/sprites.gd).
 ##
-##   godot --headless -s tools/import_rider.gd -- <export dir> [rows=<dir>,...] <folder>=<sheet> [<folder>=<sheet> ...]
+##   godot --headless -s tools/import_rider.gd -- <export dir> [rows=<dir>,...] [anim=<name>] <folder>=<sheet> [<folder>=<sheet> ...]
 ##   e.g. ... -- ~/Downloads/rookie rows=south-east,south,west,north-west,north-west,north-east,east,east \
 ##            Idle=bike_you_pizza same_thing_but_witho=bike_you
 ##
-## A folder with an animation becomes one column per frame (the "pedaling" animation if there is one, else the first);
-## without one, its still is a single column. Exports don't
+## A folder with an animation becomes one column per frame (the animation named by anim=, "pedaling" by default; if
+## the folder has no such animation, its first one); without one, its still is a single column. Exports don't
 ## agree on where their direction names point on screen, and their 8 poses needn't line up with the sheet's 8 rows
 ## (the isometric road diagonals are shallow), so rows= picks the export direction to use for each row, in row
 ## order; a pose can serve two rows. Look at the rotations to choose. The default suits the first rider export.
@@ -23,6 +23,7 @@ const COMPASS := ["north", "north-east", "east", "south-east", "south", "south-w
 const CONTACT_UP := [5, 9, 5, 1, 5, 9, 5, 1]
 
 var row_dirs: Array[String] = []   # export direction for each sheet row
+var anim_name := "pedaling"        # which animation to pack
 
 
 func _initialize() -> void:
@@ -34,8 +35,11 @@ func _initialize() -> void:
 	var src := args[0].trim_suffix("/")
 	row_dirs.assign(ROW_DIRS)
 	var pairs := args.slice(1)
-	if pairs.size() > 0 and pairs[0].begins_with("rows="):
-		row_dirs.assign(pairs[0].trim_prefix("rows=").split(","))
+	while pairs.size() > 0 and (pairs[0].begins_with("rows=") or pairs[0].begins_with("anim=")):
+		if pairs[0].begins_with("rows="):
+			row_dirs.assign(pairs[0].trim_prefix("rows=").split(","))
+		else:
+			anim_name = pairs[0].trim_prefix("anim=")
 		pairs = pairs.slice(1)
 	if row_dirs.size() != ROW_DIRS.size() or row_dirs.any(func(d): return not d in COMPASS):
 		printerr("rows= takes %d of %s, comma-separated" % [ROW_DIRS.size(), COMPASS])
@@ -56,7 +60,7 @@ func _pack(folder: String, out_path: String) -> String:
 	var anim := ""
 	var anims := DirAccess.get_directories_at(folder + "/animations") if DirAccess.dir_exists_absolute(folder + "/animations") else PackedStringArray()
 	if anims.size() > 0:
-		anim = "%s/animations/%s" % [folder, "pedaling" if anims.has("pedaling") else anims[0]]
+		anim = "%s/animations/%s" % [folder, anim_name if anims.has(anim_name) else anims[0]]
 	var frames_n := 1
 	if anim != "":
 		frames_n = DirAccess.get_files_at("%s/%s" % [anim, row_dirs[0]]).size()

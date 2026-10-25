@@ -92,10 +92,10 @@ func _ready() -> void:
 			_debug_gears()
 		"ride":
 			_debug_ride()
+		"wipeout":
+			_debug_wipeout()
 		"seasons":
 			_debug_seasons()
-		"bake_bike":
-			_debug_bake_bike()
 		"link":
 			await get_tree().create_timer(3.0).timeout
 			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
@@ -364,7 +364,7 @@ func _start_or_setup() -> void:
 
 # ---- rider setup ---------------------------------------------------------
 
-## FTP, weight (kg or lbs), difficulty and how many rivals ride. Everything is changed with LEFT / RIGHT,
+## Rider (boy or girl), FTP, weight (kg or lbs), difficulty and how many rivals ride. Everything is changed with LEFT / RIGHT,
 ## so it works from the handlebar D-pad as well as the keyboard. `done` runs when the rider confirms.
 func _open_setup(done: Callable) -> void:
 	var before := {"n": Game.rival_count}
@@ -384,6 +384,9 @@ func _setup_menu(finish: Callable) -> Dictionary:
 	var diff: Dictionary = Game.DIFFICULTIES[Game.difficulty]
 	var names: Array = Talk.roster.slice(0, Game.rival_count).map(func(r): return r["short"])
 	var items: Array = [
+		{"label": "Rider: %s" % Game.RIDERS[Game.rider]["label"], "fn": func(): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
+			"adjust": func(_d: int): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
+			"detail": "Who you ride as: Rookie Boy or Rookie Girl."},
 		{"label": "FTP: %d W" % int(Game.ftp), "fn": func(): pass,
 			"adjust": func(d: int): Game.ftp = clampf(Game.ftp + d * 5.0, 50.0, 600.0),
 			"detail": "Your Functional Threshold Power: roughly the best power you can hold for an hour. Hold LEFT / RIGHT to change it faster. Your W/kg sets how strong the rivals are."},
@@ -602,69 +605,43 @@ func _debug_seasons() -> void:
 	get_tree().quit()
 
 
-## Dev helper: PIZZA_DEBUG=bake_bike [PIZZA_WHO=YOU|Dave|...] [PIZZA_OUT=dir] draws the procedural bike into the sprite
-## sheet format Sprites reads (default output: art/templates/), as a template to paint over: bike.png plus the
-## greyscale _jersey and _frame layers and the _box layer. The layers come from drawing the sheet four times (jersey /
-## frame white or black, box on or off) and keeping the pixels that change. Needs a window (no --headless).
-func _debug_bake_bike() -> void:
-	const FW := 64
-	const FH := 64
-	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else ProjectSettings.globalize_path("res://art/templates")
-	var who := OS.get_environment("PIZZA_WHO") if OS.has_environment("PIZZA_WHO") else "YOU"
+## Dev helper: PIZZA_DEBUG=wipeout [PIZZA_OUT=dir] knocks the player and the first rival down (a frisbee-style hit), then
+## runs the player over with a car, saving a screenshot at several moments of each wipe-out animation.
+func _debug_wipeout() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
-	var vp := SubViewport.new()
-	vp.size = Vector2i(FW * Sprites.FRAMES, FH * Sprites.DIRS)
-	vp.transparent_bg = true
-	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	add_child(vp)
-	var canvas := Node2D.new()
-	vp.add_child(canvas)
-	var cfg := {"frame": Color.WHITE, "shirt": Color.WHITE, "box": false}
-	canvas.draw.connect(func():
-		for row in Sprites.DIRS:
-			var w := Vector2.from_angle(row * PI / 4.0)
-			for col in Sprites.FRAMES:
-				var c := Vector2(col * FW + FW / 2, row * FH + FH - Sprites.ANCHOR_UP)
-				BikeDraw.draw(canvas, c, Vector2(w.x - w.y, (w.x + w.y) * 0.5), cfg["frame"], cfg["shirt"], (col + 0.5) * TAU / Sprites.FRAMES, cfg["box"], who, 0.0))
-	var grab := func(frame: Color, shirt: Color, box: bool) -> Image:
-		cfg["frame"] = frame
-		cfg["shirt"] = shirt
-		cfg["box"] = box
-		canvas.queue_redraw()
-		for k in 3:
-			await RenderingServer.frame_post_draw
-		return vp.get_texture().get_image()
-	Sprites.baking = true
-	var p0: Image = await grab.call(Color.WHITE, Color.WHITE, false)
-	var p_shirt: Image = await grab.call(Color.WHITE, Color.BLACK, false)
-	var p_frame: Image = await grab.call(Color.BLACK, Color.WHITE, false)
-	var p_box: Image = await grab.call(Color.WHITE, Color.WHITE, true)
-	Sprites.baking = false
-	var differs := func(a: Color, b: Color) -> bool:
-		return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a) > 0.04
-	var layers := {}
-	for key in ["", "_jersey", "_frame", "_box"]:
-		layers[key] = Image.create(vp.size.x, vp.size.y, false, Image.FORMAT_RGBA8)
-	var lo := Vector2i(FW, FH)
-	var hi := Vector2i(0, 0)
-	for y in vp.size.y:
-		for x in vp.size.x:
-			var c0 := p0.get_pixel(x, y)
-			if differs.call(c0, p_box.get_pixel(x, y)):
-				layers["_box"].set_pixel(x, y, p_box.get_pixel(x, y))
-			if c0.a == 0.0:
-				continue
-			lo = lo.min(Vector2i(x % FW, y % FH))
-			hi = hi.max(Vector2i(x % FW, y % FH))
-			if differs.call(c0, p_shirt.get_pixel(x, y)):
-				layers["_jersey"].set_pixel(x, y, c0)
-			elif differs.call(c0, p_frame.get_pixel(x, y)):
-				layers["_frame"].set_pixel(x, y, c0)
-			else:
-				layers[""].set_pixel(x, y, c0)
-	for key in layers:
-		layers[key].save_png("%s/bike%s.png" % [out, key])
-	print("BAKE %s: %dx%d frames, art spans x %d..%d, y %d..%d -> %s" % [who, FW, FH, lo.x, hi.x, lo.y, hi.y, out])
+	Trainer._autostart_clock = 0.0
+	_start_game()
+	Input.action_press("pedal")
+	await get_tree().create_timer(1.5).timeout
+	Input.action_release("pedal")
+	var r: Dictionary = city.rival_state[0]
+	r["pos"] = city.p_pos + city.p_fwd * 3.0
+	r["path"] = []
+	r["state"] = "idle"
+	r["idle"] = 99.0
+	city._knock_down(0, 5.0, -1, "")
+	city._knock_down(-1, 5.0, 0, "beaned you")
+	var shot := func(file: String) -> void:
+		cam.position = city.cam_target()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	var at := 0.0
+	for t in [0.05, 0.3, 0.6, 1.0, 2.0]:
+		await get_tree().create_timer(t - at).timeout
+		at = t
+		await shot.call("wipe_pu_%.2f.png" % t)
+	city.p_down = 0.0
+	city._hit_by_car({"speed": 0.0})
+	at = 0.0
+	for t in [0.05, 0.5, 1.2, 2.5]:
+		await get_tree().create_timer(t - at).timeout
+		at = t
+		await shot.call("wipe_car_%.2f.png" % t)
+	print("WIPEOUT: p_fall=%.2f er_timer=%.2f" % [city.p_fall, city.er_timer])
+	if backup != "":
+		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
 

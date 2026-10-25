@@ -65,7 +65,7 @@ const ER_JOKES := [
 	"Billing: \"We accept cash, card, or a large pepperoni.\"",
 ]
 const CHEERS := ["Go {n}!", "Pizza hero!", "Woo-hoo!", "Pedal faster!", "Extra cheese!", "Allez allez!", "You got this!",
-	"Hot pizza!", "Beat Dave!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
+	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
 const HONKS := ["Pizza coming through!", "Hot pizza, comin' atcha!", "On your left!", "Beep beep! Delivery!", "Move it or lose it!", "Ding ding!"]
 
 var active := false
@@ -120,6 +120,8 @@ var socks_t := 0.0            # Fire Socks seconds left
 var bread_t := 0.0            # Breadsticks seconds left
 var roller_t := 0.0           # Dough Roller seconds left (climbs feel flat)
 var p_down := 0.0             # seconds left lying on the road after a frisbee hit or being run over
+var p_fall := 0.0             # seconds since the player went down: the wipe-out animation's clock
+var p_fall_pizza := false     # was the player carrying a pizza when they went down
 var p_blocked := false        # a pizza mascot is dancing in your way
 var mascots: Array = []       # {"victim": -1 player / rival index, "t", "pos", "phase"}
 var frisbees: Array = []      # pizzas in flight {"from", "to", "u"}
@@ -129,6 +131,7 @@ var handoff := 0.0
 var handoff_shop := -1
 var prompt := ""
 var er_timer := 0.0
+const ER_LIE_TIME := 3.0      # seconds the rider lies in the road, after a car hit, before they vanish into the ER
 var er_text := ""
 var er_bill := 0
 var bubbles: Dictionary = {}
@@ -229,6 +232,7 @@ func reset_player() -> void:
 	rdir = 1.0
 	carry = {}
 	er_timer = 0.0
+	p_fall = 0.0
 	invuln = 1.0
 	pu = ""
 	socks_t = 0.0
@@ -1341,7 +1345,7 @@ func _spawn_rivals() -> void:
 	for i in Talk.rivals.size():
 		var p := astar.get_point_position(randi() % astar.get_point_count())
 		rival_state.append({"pos": p, "head": 0.0, "path": [], "state": "idle", "idle": randf_range(1.0, 5.0), "order": 0,
-			"stun": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
+			"stun": 0.0, "fall": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
 			"bike": Game.rival_bike(Talk.rivals[i]), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
 			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35)),
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "blocked": false})
@@ -1414,6 +1418,7 @@ func _update_player(delta: float) -> void:
 	prompt = ""
 	if er_timer > 0.0:
 		er_timer -= delta
+		p_fall += delta
 		p_speed = 0.0
 		if er_timer <= 0.0:
 			_leave_er()
@@ -1424,6 +1429,7 @@ func _update_player(delta: float) -> void:
 	roller_t = maxf(0.0, roller_t - delta)
 	if p_down > 0.0:
 		p_down = maxf(0.0, p_down - delta)
+		p_fall += delta
 		p_speed = 0.0
 		Trainer.send_grade(0.0)
 		if p_down <= 0.0:
@@ -1808,6 +1814,8 @@ func _update_uturn_hint() -> void:
 
 
 func _hit_by_car(c: Dictionary) -> void:
+	p_fall = 0.0
+	p_fall_pizza = not carry.is_empty()
 	er_bill = 120 + int(p_speed * 35.0) + randi() % 60
 	Game.add_money(-er_bill)
 	er_timer = 6.0
@@ -1964,6 +1972,7 @@ func _update_rivals(delta: float) -> void:
 				_use_powerup(i)
 		if r["stun"] > 0.0:
 			r["stun"] -= delta
+			r["fall"] += delta
 			continue
 		match r["state"]:
 			"idle":
@@ -2001,6 +2010,7 @@ func _update_rivals(delta: float) -> void:
 			"to_dest":
 				if randf() < 0.0035 * delta * 6.0:
 					r["stun"] = 3.0
+					r["fall"] = 0.0
 					Talk.say(i, "rival_crash")
 				elif _follow(r, delta):
 					var o := _order_by_id(r["order"])
@@ -2234,6 +2244,8 @@ func _nearest_order_shop(p: Vector2) -> int:
 func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 	if who < 0:
 		p_down = secs
+		p_fall = 0.0
+		p_fall_pizza = not carry.is_empty()
 		p_speed = 0.0
 		Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
 		if by >= 0:
@@ -2241,6 +2253,7 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 	else:
 		var r: Dictionary = rival_state[who]
 		r["stun"] = secs
+		r["fall"] = 0.0
 		r["speed"] = 0.0
 		if by < 0:
 			Game.feed.emit("Got %s! Down for %d s." % [Talk.rivals[who]["short"], int(secs)], Color(0.5, 1.0, 0.5))
@@ -3285,19 +3298,21 @@ func _draw_car(c: Dictionary) -> void:
 
 func _draw_player() -> void:
 	if er_timer > 0.0:
+		# hit by a car: the rider goes down in the road for a moment before the ambulance takes them away
+		if p_fall < ER_LIE_TIME:
+			_draw_bike(p_pos, p_head, 0.0, p_fall_pizza, "YOU", 0.0, 1.0, p_fall)
 		return
 	if invuln > 0.0 and invuln < 50.0 and int(t_ * 14.0) % 2 == 0:
 		return
-	var bike := Game.bike()
 	var heat := 0.0 if carry.is_empty() else clampf(float(carry["t_left"]) / float(carry["t_total"]), 0.0, 1.0)
 	var k := _bread_k(bread_t)
 	if socks_t > 0.0 and p_down <= 0.0:
 		PowerUps.draw_flames(self, Iso.to_screen(p_pos), -BikeDraw.world_dir(p_head).normalized(), t_)
 	if p_down > 0.0:
-		_draw_bike(p_pos, p_head + 1.2, bike["color"], Color(0.95, 0.95, 0.95), 0.0, not carry.is_empty(), "YOU", heat, k)
+		_draw_bike(p_pos, p_head, 0.0, p_fall_pizza, "YOU", heat, k, p_fall)
 		_dizzy(Iso.to_screen(p_pos) + Vector2(0, -30))
 	else:
-		_draw_bike(p_pos, p_head, bike["color"], Color(0.95, 0.95, 0.95), p_phase, not carry.is_empty(), "YOU", heat, k)
+		_draw_bike(p_pos, p_head, p_phase, not carry.is_empty(), "YOU", heat, k)
 	_label(Game.player_name, Iso.to_screen(p_pos) + Vector2(0, -46 * k), 8, Color(1, 1, 1))
 	if handoff > 0.0 and handoff_shop >= 0:
 		# the pizza slides out of the window into your hands
@@ -3312,26 +3327,25 @@ func _draw_player() -> void:
 func _draw_rival(i: int) -> void:
 	var r: Dictionary = rival_state[i]
 	var info: Dictionary = Talk.rivals[i]
-	var frame_col: Color = Color(info["color"]).lerp(Color.WHITE, 0.15)
 	var k := _bread_k(r["bread"])
 	if r["socks"] > 0.0 and r["stun"] <= 0.0:
 		PowerUps.draw_flames(self, Iso.to_screen(r["pos"]), -BikeDraw.world_dir(r["head"]).normalized(), t_ + i)
 	if r["stun"] > 0.0:
 		_label("*ouch*", Iso.to_screen(r["pos"]) + Vector2(0, -38), 8, Color(1, 0.8, 0.3))
-		_draw_bike(r["pos"], r["head"] + 1.2, frame_col, info["color"], 0.0, false, info["short"], 1.0, k)
+		_draw_bike(r["pos"], r["head"], 0.0, r["state"] == "to_dest", info["short"], 1.0, k, r["fall"])
 		_dizzy(Iso.to_screen(r["pos"]) + Vector2(0, -28))
 	else:
-		_draw_bike(r["pos"], r["head"], frame_col, info["color"], r["phase"], r["state"] == "to_dest", info["short"], 1.0, k)
+		_draw_bike(r["pos"], r["head"], r["phase"], r["state"] == "to_dest", info["short"], 1.0, k)
 	_label(info["short"], Iso.to_screen(r["pos"]) + Vector2(0, -46 * k), 8, info["color"])
 
 
-## `k` scales the whole rider up (breadsticks).
-func _draw_bike(pos: Vector2, head: float, frame_col: Color, shirt: Color, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0, k := 1.0) -> void:
+## `k` scales the whole rider up (breadsticks). `fall_t` >= 0 plays the wipe-out, that many seconds in.
+func _draw_bike(pos: Vector2, head: float, phase: float, has_pizza: bool, who: String = "YOU", heat := 1.0, k := 1.0, fall_t := -1.0) -> void:
 	if k == 1.0:
-		BikeDraw.draw(self, Iso.to_screen(pos), BikeDraw.world_dir(head), frame_col, shirt, phase, has_pizza, who, heat)
+		BikeDraw.draw(self, Iso.to_screen(pos), BikeDraw.world_dir(head), phase, has_pizza, who, heat, true, fall_t)
 		return
 	draw_set_transform(Iso.to_screen(pos), 0.0, Vector2(k, k))
-	BikeDraw.draw(self, Vector2.ZERO, BikeDraw.world_dir(head), frame_col, shirt, phase, has_pizza, who, heat)
+	BikeDraw.draw(self, Vector2.ZERO, BikeDraw.world_dir(head), phase, has_pizza, who, heat, true, fall_t)
 	draw_set_transform(Vector2.ZERO)
 
 

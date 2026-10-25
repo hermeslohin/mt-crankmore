@@ -22,7 +22,7 @@ const DIFFICULTIES := {
 	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
-const MAX_RIVALS := 7
+const MAX_RIVALS := 8
 
 var bikes: Array = [
 	{"name": "Rusty Trash Bike", "price": 0, "mass": 18.0, "cda": 0.52, "crr": 0.013, "hp": 60.0, "gravel": 1.0, "turn": 0.85,
@@ -51,6 +51,8 @@ var equipped := 0
 var deliveries := 0
 var race_wins := 0
 var player_name := "Rookie"
+const RIDERS := {"boy": {"label": "Rookie Boy", "sheet": "rookie_boy"}, "girl": {"label": "Rookie Girl", "sheet": "rookie_girl"}}
+var rider := "boy"            # which Rookie you ride as: "boy" or "girl" (picked in the rider setup)
 
 # rider settings
 var ftp := 200.0              # watts
@@ -189,6 +191,11 @@ func fixed_gear() -> bool:
 	return bike().get("fixed", false)
 
 
+func set_rider(r: String) -> void:
+	rider = r if RIDERS.has(r) else "boy"
+	Sprites.player_sheet = RIDERS[rider]["sheet"]
+
+
 func set_rival_count(n: int) -> void:
 	rival_count = clampi(n, 1, MAX_RIVALS)
 	Talk.set_count(rival_count)
@@ -243,7 +250,7 @@ func save_game() -> void:
 		hp_out[str(k)] = hp[k]
 	f.store_string(JSON.stringify({"money": money, "owned": owned, "hp": hp_out, "equipped": equipped,
 		"deliveries": deliveries, "race_wins": race_wins,
-		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done,
+		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done, "rider": rider,
 		"season": Season.choice}))
 
 
@@ -277,6 +284,7 @@ func load_game() -> void:
 	difficulty = d.get("difficulty", difficulty) if DIFFICULTIES.has(d.get("difficulty", "")) else "medium"
 	rival_count = clampi(int(d.get("rival_count", rival_count)), 1, MAX_RIVALS)
 	setup_done = bool(d.get("setup_done", false))
+	set_rider(str(d.get("rider", "boy")))
 	Season.set_choice(str(d.get("season", "auto")))
 	if not owned.has(equipped):
 		equipped = 0

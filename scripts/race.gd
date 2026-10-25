@@ -715,7 +715,7 @@ func _build_riders() -> void:
 	riders.append({"name": Game.player_name, "color": Color(0.95, 0.95, 0.95), "frame": b["color"], "s": 0.0, "v": 0.0, "lat": 0.0,
 		"bike": b, "player": true, "phase": 0.0, "done": false, "time": 0.0, "mass": Game.weight_kg, "power": 0.0,
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
-		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "gv": 0, "draft": 0.0})
+		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 	var n := Talk.rivals.size()
 	for i in n:
 		var info: Dictionary = Talk.rivals[i]
@@ -726,7 +726,7 @@ func _build_riders() -> void:
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass, false), "idx": i,
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
-			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "gv": 0, "draft": 0.0})
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 
 
 # ---------------------------------------------------------------------
@@ -992,6 +992,8 @@ func _tick_powerups(k: int, delta: float) -> void:
 	r["socks"] = maxf(0.0, float(r["socks"]) - delta)
 	r["bread"] = maxf(0.0, float(r["bread"]) - delta)
 	r["roller"] = maxf(0.0, float(r["roller"]) - delta)
+	if float(r["down"]) > 0.0:
+		r["fall"] = float(r["fall"]) + delta
 	r["down"] = maxf(0.0, float(r["down"]) - delta)
 	if r["pu"] != "":
 		r["pu_hold"] = float(r["pu_hold"]) + delta
@@ -1070,6 +1072,7 @@ func _rival_wants(k: int) -> bool:
 func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 	var r: Dictionary = riders[k]
 	r["down"] = secs
+	r["fall"] = 0.0
 	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
 	if r["player"]:
 		Game.toast.emit("%s %s! Down for %d s." % [riders[by]["short"], how, int(secs)], Color(1.0, 0.45, 0.35))
@@ -1982,14 +1985,14 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 			var side := Vector2(-ds.y, ds.x).normalized() * (10.0 if q % 2 == 0 else -10.0)
 			var a := c + side + Vector2(0, -12 - q * 3) + ds.normalized() * (20.0 - u * 40.0)
 			draw_line(a, a - ds.normalized() * 10.0, Color(1, 1, 1, 0.7 * (1.0 - absf(u - 0.5) * 2.0)), 1.0)
-	var dsd := Iso.to_screen(Iso.to_world(ds).rotated(1.2)) if down else ds   # tipped over, turned in world space
-	var phase: float = 0.0 if down else r["phase"]
+	var phase: float = r["phase"]
+	var fall_t := float(r["fall"]) if down else -1.0   # the wipe-out animation, then lying there until they get up
 	if kb != 1.0:
 		draw_set_transform(c, 0.0, Vector2(kb, kb))
-		BikeDraw.draw(self, Vector2.ZERO, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"], 1.0, false)
+		BikeDraw.draw(self, Vector2.ZERO, ds, phase, false, "YOU" if r["player"] else r["short"], 1.0, false, fall_t)
 		draw_set_transform(Vector2.ZERO)
 	else:
-		BikeDraw.draw(self, c, dsd, r["frame"], r["color"], phase, false, "YOU" if r["player"] else r["short"], 1.0, false)
+		BikeDraw.draw(self, c, ds, phase, false, "YOU" if r["player"] else r["short"], 1.0, false, fall_t)
 	if down:
 		for q in 3:
 			var a := t_ * 5.0 + q * TAU / 3.0

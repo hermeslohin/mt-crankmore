@@ -65,5 +65,5 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
   diagonal riders look a little steeper than the road.
 - Not every animation has been checked frame by frame. A few directions have a blank or off-colour frame in some
   falls (for example Cryptic Carl's bag fall and bike-only fall); regenerate those in PixelLab if they show in game.
-- The game packs these into its 8-row bike sheets with `tools/import_rider.gd` (see the mt-crankmore README); the
-  `rows=` option picks which export direction goes on each sheet row.
+- The game packs these into its 8-row bike sheets with `tools/import_rider.gd` (see the top-level README); `rows=`
+  picks which export direction goes on each sheet row and `anim=` which animation (`pedaling` or `fall`).

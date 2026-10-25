@@ -12,7 +12,7 @@ Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; riv
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.2**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.3**):
 
 | Platform | File | How to run |
 |---|---|---|
@@ -101,6 +101,28 @@ Godot itself can't use Bluetooth, which is why the helper (`bridge/trainer_bridg
 
 The game shows connection status at the bottom of the screen ("Trainer + controllers connected").
 
+### Strava
+Every ride is recorded: distance, speed, power, cadence and altitude (built up from the road grade, in town and on Mt. Crankmore), plus the pizzas you deliver, the races you win and up to 4 screenshots (deliveries, race finishes and the odd bit of scenery; the best moments are kept). Power and cadence only come from a trainer: on the keyboard only speed and distance are logged, so Strava never gets made-up watts.
+The ride is kept until you post it, even if you quit the game, and is posted as a **Virtual Ride**. Its notes look like this:
+
+```
+Pizza delivered: 5
+Races won: 1
+
+Mt Crankmore - Pizza pays the bills, Cycling is life
+https://github.com/hermeslohin/mt-crankmore/releases
+```
+
+**Linking (one time).** Strava doesn't give games shared app keys, so you make your own free API app:
+
+1. Title screen > **Strava** > **Open Strava API settings** (or go to <https://www.strava.com/settings/api>) and create an app. Any name, category and website will do; set **Authorization Callback Domain** to `localhost`.
+2. Copy the **Client ID**, then pick **Paste Client ID**. Click **Show** next to the Client Secret, copy it, then pick **Paste Client Secret**. They're kept only on your computer (`strava.json` in the game's user data folder).
+3. Pick **Link Strava account**, approve Mt. Crankmore in your browser (leave *Upload your activities* ticked) and come back to the game.
+
+**Posting.** Once you're linked, the ride is posted automatically when you quit the game (title screen > **Quit**, or closing the window); a *Posting to Strava* screen shows while it uploads, and if it fails the ride is kept and posted next time. You can also post any time: Pause (Esc / B) > **Post ride to Strava**, or title screen > **Strava** > **Post this ride to Strava**. Rides need to be at least a minute long. **Discard this ride** starts a new one.
+
+**Screenshots.** Strava's API doesn't let apps add photos to an activity, so after posting, pick **Add screenshots to the last ride**: it opens the activity in your browser and the folder with that ride's screenshots, ready to drag in.
+
 ## The game
 
 * **Orders**: pizza shops ring you with orders. A pizza man dances outside the shop holding the steaming box over his head; ride up, slow down, and he hands it to you. The steam on your bike shows how hot the pizza still is: deliver before the timer runs out or the customer won't pay at all. Faster means bigger tips, crashes hurt the pizza.
@@ -110,7 +132,7 @@ The game shows connection status at the bottom of the screen ("Trainer + control
 * **Cars**: get hit and you wake up at **St. Pedro's ER** with a medical bill (money can go negative) and a banged-up bike.
 * **The village**: winding roads around a cobbled plaza full of shops and market stalls, a lake with a beach and dock, hotels by the water and the gondola, chalet neighbourhoods in the woods, and only light traffic.
 * **Hills**: the plaza and the lakeshore are flat; the chalet neighbourhoods, Summit Road, Ridge Road and the climb up to the gondola roll up to about 7% (Gondola Way pitches to 9%). The grade is shown on your WEEHOO, slows you down uphill and speeds you up downhill (rivals too), and is sent to your trainer.
-* **Mt. Crankmore**: enter races at the Race HQ (the checkered building by the gondola). Three gravel races against your rivals (Foothill Gravel Grind, 6 km averaging 4%; Summit Gravel Showdown, 4.4 km averaging 6.5% with ramps up to 12%; and **Flour Run**, a 3 km, mostly flat ride through the flower meadows with a few gentle rollers, about 10 minutes) using a real power/weight/aero/grade model with extra gravel rolling resistance, drafting, power-ups, and prize money. The Gravel Grinder bike shines here.
+* **Mt. Crankmore**: enter races at the Race HQ (the checkered building by the gondola). Three gravel races against your rivals (Foothill Gravel Grind, 6 km averaging 4%; Summit Gravel Showdown, 4.4 km averaging 6.5% with ramps up to 12%; and **Flour Run**, a 3 km, mostly flat ride through the flower meadows with a few gentle rollers, about 10 minutes) using a real power/weight/aero/grade model with extra gravel rolling resistance, drafting, power-ups, and prize money. The Gravel Grinder ($8000, the priciest bike in the shop) shines here.
   * **Drafting**: sit 1 to 9 m behind another rider in the same line (steer with LEFT / RIGHT or the paddles) and the same speed takes fewer watts: about 18% less at 13 km/h, 24% at 17 km/h and 30% at 40 km/h and above. **DRAFTING -n% watts** shows at the bottom of the screen, with wind streaks around your bike. The rivals draft too, off you and off each other.
   * The mountain is built at the same scale as the town (about 3.3 m per tile), so race speeds look like town speeds. Long switchbacks with hairpins zig-zag up a hillside of meadows, pine forest, rock and snow, and the profile rolls: long climbs broken up by short plunges and steep kickers.
   * **Jumps** on the descents (hit one above ~30 km/h for BIG AIR), **fallen trees** you hop (they scrub some speed), and **creek fords** that drag you down while you splash through. Yellow warning signs come up before each one, and they're marked on the WEEHOO profile (blue creeks, orange jumps, brown logs).
@@ -130,6 +152,8 @@ scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
 scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
+scripts/ride_log.gd       autoload: records the ride (samples, screenshots) and writes it as TCX
+scripts/strava.gd         autoload: Strava linking (OAuth via localhost) and ride upload
 scripts/main.gd           mode switching and menus
 scripts/city.gd           isometric city, traffic, rivals, orders
 scripts/race.gd           Mt. Crankmore switchbacks, terrain, obstacles, wildlife + race sim
@@ -139,4 +163,4 @@ scripts/iso.gd, bike_draw.gd   drawing helpers
 bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
-Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`.
+Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`; `PIZZA_DEBUG=ride [PIZZA_OUT=dir]` rides for a few seconds and writes the Strava TCX file and screenshots.

@@ -29,7 +29,7 @@ var bikes: Array = [
 		"color": Color(0.6, 0.45, 0.3), "blurb": "Found behind a dumpster. Squeaks in three keys."},
 	{"name": "Garage Sale Commuter", "price": 250, "mass": 13.5, "cda": 0.45, "crr": 0.009, "hp": 85.0, "gravel": 1.0, "turn": 0.95,
 		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain."},
-	{"name": "Gravel Grinder", "price": 900, "mass": 10.5, "cda": 0.38, "crr": 0.007, "hp": 110.0, "gravel": 0.35, "turn": 1.05,
+	{"name": "Gravel Grinder", "price": 8000, "mass": 10.5, "cda": 0.38, "crr": 0.007, "hp": 110.0, "gravel": 0.35, "turn": 1.05,
 		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast."},
 	{"name": "Carbon Crit Machine", "price": 2600, "mass": 8.0, "cda": 0.32, "crr": 0.005, "hp": 130.0, "gravel": 0.9, "turn": 1.15,
 		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one."},

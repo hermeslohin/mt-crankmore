@@ -35,6 +35,9 @@ var bikes: Array = [
 		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one."},
 	{"name": "Golden Pepperoni Pro", "price": 7500, "mass": 6.8, "cda": 0.28, "crr": 0.004, "hp": 150.0, "gravel": 0.6, "turn": 1.25,
 		"color": Color(1.0, 0.8, 0.15), "blurb": "Legendary. Smells faintly of mozzarella."},
+	# "fixed": one gear (Trainer.FIXED_GEAR), no shifting and no brakes
+	{"name": "Fixie", "price": 2000, "mass": 8.6, "cda": 0.36, "crr": 0.006, "hp": 95.0, "gravel": 1.1, "turn": 1.1, "fixed": true,
+		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome."},
 ]
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
@@ -175,8 +178,15 @@ func rival_mass(i: int) -> float:
 	return 68.0 + (i % 3) * 3.0
 
 
+## Rivals stick to geared bikes.
 func rival_bike(info: Dictionary) -> Dictionary:
-	return bikes[clampi(int(info["tier"]) + int(DIFFICULTIES[difficulty]["tier"]), 0, bikes.size() - 1)]
+	var geared := bikes.filter(func(b): return not b.get("fixed", false))
+	return geared[clampi(int(info["tier"]) + int(DIFFICULTIES[difficulty]["tier"]), 0, geared.size() - 1)]
+
+
+## True while riding a fixed-gear bike: no shifting, no brakes.
+func fixed_gear() -> bool:
+	return bike().get("fixed", false)
 
 
 func set_rival_count(n: int) -> void:

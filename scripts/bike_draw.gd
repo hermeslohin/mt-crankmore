@@ -79,7 +79,13 @@ static func draw(ci: CanvasItem, c: Vector2, ds: Vector2, frame_col: Color, shir
 	for k in 16:
 		var a := TAU * k / 16.0
 		sh.append(_proj(Vector3(cos(a) * 15.0, sin(a) * 6.5, 0.0)))
-	ci.draw_colored_polygon(sh, Color(0, 0, 0, 0.22))
+	if not Sprites.baking:   # sprite sheets leave the shadow to the game
+		ci.draw_colored_polygon(sh, Color(0, 0, 0, 0.22))
+	# pixel art, when there is a sheet for this rider (see Sprites)
+	if Sprites.draw_bike(ci, c, w, frame_col, shirt, phase, has_pizza, who):
+		if has_pizza and heat > 0.0:
+			_steam(ci, _proj(Vector3(-11, 0, 17.4)), heat)
+		return
 
 	var bob := Vector3(0, 0, sin(phase * 2.0) * 0.7)
 	# both cranks and wheels turn clockwise seen from the drive side (the top moves forward), like a real bike

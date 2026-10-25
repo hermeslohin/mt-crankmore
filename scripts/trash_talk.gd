@@ -197,9 +197,34 @@ var _lines := {
 		"Anyone want to trade a bike for a really good pizza joke?",
 		"Another day, another dozen deliveries!",
 		"I could ride this town blindfolded. (I won't. Safety first.)",
-		"Whistler's got nothing on Crankmore in summer!",
+		"Whistler's got nothing on Crankmore!",
 		"Pro tip: pedal faster. You're welcome.",
 		"Is that a bear? ...Oh, just a very hairy cyclist.",
+	],
+	"idle_spring": [
+		"Achoo! Who planted all these tulips?",
+		"Spring cleaning: I'm sweeping you off the podium, {n}.",
+		"Watch out for the ducklings! ...And for me, passing you.",
+		"Fresh legs, fresh blossoms, fresh pizza. Spring rules.",
+	],
+	"idle_summer": [
+		"Summer in Crankmore: kites up, pizzas out!",
+		"Somebody tell those kids I don't do frisbee. I do victory.",
+		"Too hot for a jacket, perfect for a jersey.",
+		"Beach volleyball later? You can be the net, {n}.",
+	],
+	"idle_fall": [
+		"Pumpkin spice pizza. Don't knock it till you've tried it.",
+		"Leaves are falling, and so are your standings, {n}.",
+		"Careful, wet leaves on the corners! (I hope you slide.)",
+		"Sweater weather! Still beat you in shorts.",
+	],
+	"idle_winter": [
+		"Snow tires? Never heard of 'em.",
+		"Did that snowman just pass you, {n}?",
+		"Skiers on the slopes, pizza on my bike, and you behind me. Perfect winter.",
+		"Hot cocoa and a hot pizza. What a day.",
+		"My fingers are frozen but my legs are on fire!",
 	],
 }
 
@@ -259,7 +284,7 @@ func tick_banter(delta: float) -> void:
 	var r := randi() % rivals.size()
 	var cat := "banter"
 	if randf() < 0.3:
-		cat = "idle"
+		cat = "idle" if randf() < 0.5 else "idle_" + Season.current
 	elif randf() < 0.3 and Game.equipped == 0:
 		cat = "trash_bike"
 	say(r, cat)

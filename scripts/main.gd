@@ -25,6 +25,14 @@ func _ready() -> void:
 	race = preload("res://scripts/race.gd").new()
 	race.visible = false
 	add_child(race)
+	var sky := CanvasLayer.new()   # falling snow, leaves and petals, under the HUD
+	sky.layer = 5
+	add_child(sky)
+	var weather := preload("res://scripts/weather.gd").new()
+	weather.cam = cam
+	sky.add_child(weather)
+	if OS.has_environment("PIZZA_SEASON"):   # dev helper: PIZZA_SEASON=spring|summer|fall|winter
+		Season.set_choice(OS.get_environment("PIZZA_SEASON"))
 	var layer := CanvasLayer.new()
 	layer.layer = 10
 	add_child(layer)
@@ -85,6 +93,8 @@ func _ready() -> void:
 			_debug_gears()
 		"ride":
 			_debug_ride()
+		"seasons":
+			_debug_seasons()
 		"link":
 			await get_tree().create_timer(3.0).timeout
 			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
@@ -199,7 +209,7 @@ func _show_title() -> void:
 	city.visible = true
 	race.visible = false
 	hud.open_menu(func():
-		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\nSummer in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Y use power-up, H shout, E select." % [Game.SLOGAN, _cap(_rivals_text())],
+		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\n%s in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Y use power-up, H shout, E select." % [Game.SLOGAN, Season.NAMES[Season.current], _cap(_rivals_text())],
 			"items": [
 				{"label": "Continue game", "fn": _start_or_setup, "enabled": Game.has_save(),
 					"detail": "$%d  |  %d deliveries" % [Game.money, Game.deliveries] if Game.has_save() else "No saved game yet"},
@@ -207,6 +217,7 @@ func _show_title() -> void:
 				{"label": "Rider setup", "fn": _open_setup.bind(_show_title),
 					"detail": "FTP %d W  |  %s  |  %.1f W/kg  |  %s  |  %d rival%s" % [int(Game.ftp), Game.weight_text(), Game.wkg(),
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
+				_season_item(),
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
 				{"label": "Quit", "fn": _quit},
@@ -422,9 +433,19 @@ func _open_pause() -> void:
 			"items": [
 				{"label": "Resume", "fn": func(): hud.close_menu(); on_menu_closed()},
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
+				_season_item(),
 				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
 				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
 			]})
+
+
+## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
+func _season_item() -> Dictionary:
+	var change := func(d: int):
+		Season.step(d)
+		Game.save_game()
+	return {"label": "Season: %s" % Season.label(), "fn": change.bind(1), "adjust": change,
+		"detail": "Snow, snowmen and skiers in winter; blossom, tulips and butterflies in spring; kites, frisbees and beach volleyball in summer; orange trees, pumpkins and falling leaves in fall. \"Today\" follows the date (it's %s)." % Season.NAMES[Season.today()].to_lower()}
 
 
 func _open_race_pause() -> void:
@@ -561,6 +582,36 @@ func _debug_ride() -> void:
 	if backup != "":
 		FileAccess.open(path, FileAccess.WRITE).store_string(backup)
 		Ride._load()
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=seasons [PIZZA_OUT=dir] saves, for each season, the title view and a close-up of each
+## kind of that season's scenery in town. The player's save file is put back afterwards.
+func _debug_seasons() -> void:
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	for se in Season.ORDER:
+		Season.set_choice(se)
+		_show_title()
+		await get_tree().create_timer(1.5).timeout
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/%s_title.png" % [out, se])
+		_start_game()
+		var seen := {}
+		for e in city.season_props:
+			if e["season"] != se or seen.has(e["kind"]):
+				continue
+			seen[e["kind"]] = true
+			shot_at = city._sprop_pos(e)
+			cam.position = Iso.to_screen(shot_at, 12.0 + Iso.ground_z(shot_at))
+			await get_tree().create_timer(0.8).timeout
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s/%s_%s.png" % [out, se, e["kind"]])
+		shot_at = Vector2.INF
+		print("SEASON %s: %s" % [se, seen.keys()])
+	if backup != "":
+		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
 

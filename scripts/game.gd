@@ -233,7 +233,8 @@ func save_game() -> void:
 		hp_out[str(k)] = hp[k]
 	f.store_string(JSON.stringify({"money": money, "owned": owned, "hp": hp_out, "equipped": equipped,
 		"deliveries": deliveries, "race_wins": race_wins,
-		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done}))
+		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done,
+		"season": Season.choice}))
 
 
 func load_game() -> void:
@@ -266,6 +267,7 @@ func load_game() -> void:
 	difficulty = d.get("difficulty", difficulty) if DIFFICULTIES.has(d.get("difficulty", "")) else "medium"
 	rival_count = clampi(int(d.get("rival_count", rival_count)), 1, MAX_RIVALS)
 	setup_done = bool(d.get("setup_done", false))
+	Season.set_choice(str(d.get("season", "auto")))
 	if not owned.has(equipped):
 		equipped = 0
 	if not hp.has(equipped):

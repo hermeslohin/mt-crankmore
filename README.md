@@ -2,7 +2,7 @@
 
 > *Pizza pays the bills, cycling is life.*
 
-A colorful 16-bit-style isometric pizza-delivery racing game set in Crankmore Village, an isolated mountain resort town in summer, built in **Godot 4**.
+A colorful 16-bit-style isometric pizza-delivery racing game set in Crankmore Village, an isolated mountain resort town, through all four seasons, built in **Godot 4**.
 The game renders at 640x360 and scales up with crisp integer pixels (2x in the default 1280x720 window).
 Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
 
@@ -126,6 +126,11 @@ https://github.com/hermeslohin/mt-crankmore/releases
 ## The game
 
 * **Orders**: pizza shops ring you with orders. A pizza man dances outside the shop holding the steaming box over his head; ride up, slow down, and he hands it to you. The steam on your bike shows how hot the pizza still is: deliver before the timer runs out or the customer won't pay at all. Faster means bigger tips, crashes hurt the pizza.
+* **Seasons**: the village and the mountain change with the season. It follows today's date (northern hemisphere) unless you pick one with **Season** on the title screen or in the pause menu (LEFT / RIGHT).
+  * *Spring*: fresh grass full of flowers, trees in pink and white blossom, tulip beds, butterflies, duck families on the lake, flower baskets on the lamp posts and drifting petals.
+  * *Summer*: the village as it always was, plus people playing catch and frisbee, flying kites, picnicking (with pizza) and playing beach volleyball; kites and picnics along the race courses too.
+  * *Fall*: golden-orange grass, orange, red and yellow trees, golden larches, falling leaves, pumpkins and jack-o'-lanterns, leaf piles with kids jumping in, scarecrows, hay bales and corn stalks on the lamp posts.
+  * *Winter*: snow everywhere, snow on the roofs and pines, bare trees, falling snow, a frozen lake with skaters, a frozen fountain, snowmen, skiers on the hills, townsfolk in bobble hats carrying their skis, and wreaths on the lamp posts. The rivals have something to say about every season.
 * **Townsfolk**: people stroll the pavements all over the village and cheer you on as you ride past.
 * **Rivals**: up to seven AI bikers (Dough Boy Dave, Spoke-n Word Sam, Cadence Carla, Wheelie Wanda, Gear Grinder Gus, Margherita Maya, Tubeless Tony; the first three ride by default) chase the same orders and will snag them if they reach the window first. They talk trash constantly (family-friendly).
 * **Bikes**: you start on a Rusty Trash Bike. **Spokes & Stuff** sells better ones (lighter, more aero, tougher, handle better) and repairs. Bikes have HP; walls and cars damage them, and at 0 HP a bike is destroyed.
@@ -152,6 +157,8 @@ scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
 scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
+scripts/season.gd         autoload: the current season, its colours and seasonal drawing helpers
+scripts/weather.gd        falling snow, leaves and petals
 scripts/ride_log.gd       autoload: records the ride (samples, screenshots) and writes it as TCX
 scripts/strava.gd         autoload: Strava linking (OAuth via localhost) and ride upload
 scripts/main.gd           mode switching and menus
@@ -163,4 +170,4 @@ scripts/iso.gd, bike_draw.gd   drawing helpers
 bridge/trainer_bridge.py    BLE <-> UDP bridge (Python, bleak)
 ```
 
-Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`; `PIZZA_DEBUG=ride [PIZZA_OUT=dir]` rides for a few seconds and writes the Strava TCX file and screenshots.
+Everything is drawn procedurally; there are no art assets yet. Dev helpers: `PIZZA_DEBUG=city|race|shop|er|flow|rails|roads|overview godot --path .`; `PIZZA_DEBUG=shot PIZZA_OUT=dir [PIZZA_AT=x,y;...|junctions|shops]` saves screenshots; `PIZZA_DEBUG=race_shot [PIZZA_COURSE=0|1] PIZZA_OUT=dir` saves race screenshots at the first jump, log, creek and wildlife; `PIZZA_DEBUG=powerups PIZZA_OUT=dir` tries every power-up in town and in a race and saves a screenshot of each; `PIZZA_DEBUG=readme godot --path .` regenerates the README screenshots in `docs/`; `PIZZA_SEASON=spring|summer|fall|winter` forces a season; `PIZZA_DEBUG=seasons [PIZZA_OUT=dir]` saves the title view and each kind of seasonal scenery in every season; `PIZZA_DEBUG=ride [PIZZA_OUT=dir]` rides for a few seconds and writes the Strava TCX file and screenshots.

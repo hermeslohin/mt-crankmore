@@ -5,12 +5,13 @@ config_version=5
 
 config/name="Mt. Crankmore"
 config/version="0.3.0"
-config/description="Isometric pizza-delivery racing in a ski town in summer. Pedal a bicycle trainer to play."
+config/description="Isometric pizza-delivery racing in a ski town, through all four seasons. Pedal a bicycle trainer to play."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.3")
 
 [autoload]
 
+Season="*res://scripts/season.gd"
 Game="*res://scripts/game.gd"
 Trainer="*res://scripts/trainer_link.gd"
 Talk="*res://scripts/trash_talk.gd"

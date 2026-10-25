@@ -94,6 +94,14 @@ func _ready() -> void:
 			_debug_ride()
 		"wipeout":
 			_debug_wipeout()
+		"buildings":
+			_start_game()
+			var count := {}
+			for b in city.buildings:
+				var key := "%s %dx%d" % [b["kind"], int(b["size"].x), int(b["size"].y)]
+				count[key] = int(count.get(key, 0)) + 1
+			print("BUILDINGS total=%d %s" % [city.buildings.size(), count])
+			get_tree().quit()
 		"seasons":
 			_debug_seasons()
 		"link":

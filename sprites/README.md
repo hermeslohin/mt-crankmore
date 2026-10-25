@@ -75,5 +75,10 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 | `bakers/<shop>/` | one baker per pizza shop (`Idle` state with a `tap` animation, `Holding_pizza` state with a `dance` animation, south view) | `art/chef_<shop>_tap.png`, `art/chef_<shop>_dance.png` |
 | `mascot/pizza-mascot/` | the Walkie Talkie's dancing pizza-slice mascot (`dance` animation, south view) | `art/mascot_dance.png` |
 | `props/pizza-spin/` | the thrown pizza, spinning (8 frames) | `art/pizza_spin.png` |
-| `vehicles/{car,truck,motorcycle}/` | the traffic, white vehicles in 8 directions (`rotations/`) | `art/vehicle_<kind>.png` |
+| `vehicles/<kind>/` | the traffic in 8 directions (`rotations/`): `car` and `truck` (white, painted in game), `motorcycle`, and coloured `sedan_*`, `truck_*` and `van_*` | `art/vehicle_<kind>.png` |
 | `buildings/hospital.png` | St. Pedro's Hospital with a helicopter pad on the roof (a 192x176 image) | `art/hospital.png` |
+| `buildings/landmarks/` | the 7 pizza shops, 2 bike shops, race HQ and gondola base (192x176) | `art/building_<name>.png` |
+| `buildings/shops/` | one themed shop per shop name (128x128) | `art/building_<name>.png` |
+| `buildings/hotels/` | one themed hotel per hotel name (192x208) | `art/building_<name>.png` |
+| `buildings/condos/` | the six condo blocks (160x160) | `art/building_<name>.png` |
+| `buildings/chalets/` | 16 chalet designs (128x112) | `art/building_chalet_NN.png` |

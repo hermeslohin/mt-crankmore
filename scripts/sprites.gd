@@ -85,17 +85,18 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 
 
 ## An animation row (art/<name>.png, square frames side by side) drawn at the screen point `at`: standing on it with
-## their feet there (`feet`, people) or centred on it (a spinning pizza). `t` is in seconds. Returns false when there
-## is no such art.
-static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps := 10.0, feet := true) -> bool:
+## their feet there (`feet`, people and animals) or centred on it (a spinning pizza), mirrored left to right when `flip`,
+## multiplied by `tint`. `t` is in seconds. Returns false when there is no such art.
+static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps := 10.0, feet := true, flip := false, tint := Color.WHITE) -> bool:
 	var tex := sheet(name)
 	if tex == null:
 		return false
 	var fh := tex.get_height()
 	var frames := maxi(1, tex.get_width() / fh)
 	var src := Rect2(posmod(int(t * fps), frames) * fh, 0, fh, fh)
-	var dst := Rect2((at - Vector2(fh * 0.5, fh - STRIP_FEET_MARGIN if feet else fh * 0.5)).round(), Vector2(fh, fh))
-	ci.draw_texture_rect_region(tex, dst, src)
+	var tl := (at - Vector2(fh * 0.5, fh - STRIP_FEET_MARGIN if feet else fh * 0.5)).round()
+	var dst := Rect2(tl + Vector2(fh, 0), Vector2(-fh, fh)) if flip else Rect2(tl, Vector2(fh, fh))
+	ci.draw_texture_rect_region(tex, dst, src, tint)
 	return true
 
 
@@ -112,10 +113,15 @@ static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, 
 	return true
 
 
-## A single picture (art/<name>.png) with the middle of its bottom edge on `at`. Returns false when there is none.
-static func draw_image(ci: CanvasItem, name: String, at: Vector2) -> bool:
+## A single picture (art/<name>.png) with the middle of its bottom edge on `at`, optionally mirrored left to right and
+## faded to `alpha`. Returns false when there is none.
+static func draw_image(ci: CanvasItem, name: String, at: Vector2, flip := false, alpha := 1.0) -> bool:
 	var tex := sheet(name)
 	if tex == null:
 		return false
-	ci.draw_texture(tex, (at - Vector2(tex.get_width() * 0.5, tex.get_height())).round())
+	var w := float(tex.get_width())
+	var h := float(tex.get_height())
+	var top_left := (at - Vector2(w * 0.5, h)).round()
+	var rect := Rect2(top_left + Vector2(w, 0.0), Vector2(-w, h)) if flip else Rect2(top_left, Vector2(w, h))
+	ci.draw_texture_rect(tex, rect, false, Color(1, 1, 1, alpha))
 	return true

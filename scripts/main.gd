@@ -95,6 +95,8 @@ func _ready() -> void:
 			_debug_ride()
 		"seasons":
 			_debug_seasons()
+		"bake_bike":
+			_debug_bake_bike()
 		"link":
 			await get_tree().create_timer(3.0).timeout
 			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
@@ -612,6 +614,72 @@ func _debug_seasons() -> void:
 		print("SEASON %s: %s" % [se, seen.keys()])
 	if backup != "":
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=bake_bike [PIZZA_WHO=YOU|Dave|...] [PIZZA_OUT=dir] draws the procedural bike into the sprite
+## sheet format Sprites reads (default output: art/templates/), as a template to paint over: bike.png plus the
+## greyscale _jersey and _frame layers and the _box layer. The layers come from drawing the sheet four times (jersey /
+## frame white or black, box on or off) and keeping the pixels that change. Needs a window (no --headless).
+func _debug_bake_bike() -> void:
+	const FW := 64
+	const FH := 64
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else ProjectSettings.globalize_path("res://art/templates")
+	var who := OS.get_environment("PIZZA_WHO") if OS.has_environment("PIZZA_WHO") else "YOU"
+	DirAccess.make_dir_recursive_absolute(out)
+	var vp := SubViewport.new()
+	vp.size = Vector2i(FW * Sprites.FRAMES, FH * Sprites.DIRS)
+	vp.transparent_bg = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(vp)
+	var canvas := Node2D.new()
+	vp.add_child(canvas)
+	var cfg := {"frame": Color.WHITE, "shirt": Color.WHITE, "box": false}
+	canvas.draw.connect(func():
+		for row in Sprites.DIRS:
+			var w := Vector2.from_angle(row * PI / 4.0)
+			for col in Sprites.FRAMES:
+				var c := Vector2(col * FW + FW / 2, row * FH + FH - Sprites.ANCHOR_UP)
+				BikeDraw.draw(canvas, c, Vector2(w.x - w.y, (w.x + w.y) * 0.5), cfg["frame"], cfg["shirt"], (col + 0.5) * TAU / Sprites.FRAMES, cfg["box"], who, 0.0))
+	var grab := func(frame: Color, shirt: Color, box: bool) -> Image:
+		cfg["frame"] = frame
+		cfg["shirt"] = shirt
+		cfg["box"] = box
+		canvas.queue_redraw()
+		for k in 3:
+			await RenderingServer.frame_post_draw
+		return vp.get_texture().get_image()
+	Sprites.baking = true
+	var p0: Image = await grab.call(Color.WHITE, Color.WHITE, false)
+	var p_shirt: Image = await grab.call(Color.WHITE, Color.BLACK, false)
+	var p_frame: Image = await grab.call(Color.BLACK, Color.WHITE, false)
+	var p_box: Image = await grab.call(Color.WHITE, Color.WHITE, true)
+	Sprites.baking = false
+	var differs := func(a: Color, b: Color) -> bool:
+		return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a) > 0.04
+	var layers := {}
+	for key in ["", "_jersey", "_frame", "_box"]:
+		layers[key] = Image.create(vp.size.x, vp.size.y, false, Image.FORMAT_RGBA8)
+	var lo := Vector2i(FW, FH)
+	var hi := Vector2i(0, 0)
+	for y in vp.size.y:
+		for x in vp.size.x:
+			var c0 := p0.get_pixel(x, y)
+			if differs.call(c0, p_box.get_pixel(x, y)):
+				layers["_box"].set_pixel(x, y, p_box.get_pixel(x, y))
+			if c0.a == 0.0:
+				continue
+			lo = lo.min(Vector2i(x % FW, y % FH))
+			hi = hi.max(Vector2i(x % FW, y % FH))
+			if differs.call(c0, p_shirt.get_pixel(x, y)):
+				layers["_jersey"].set_pixel(x, y, c0)
+			elif differs.call(c0, p_frame.get_pixel(x, y)):
+				layers["_frame"].set_pixel(x, y, c0)
+			else:
+				layers[""].set_pixel(x, y, c0)
+	for key in layers:
+		layers[key].save_png("%s/bike%s.png" % [out, key])
+	print("BAKE %s: %dx%d frames, art spans x %d..%d, y %d..%d -> %s" % [who, FW, FH, lo.x, hi.x, lo.y, hi.y, out])
 	get_tree().quit()
 
 

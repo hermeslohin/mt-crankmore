@@ -10,9 +10,11 @@ var race: Node2D
 var hud: Control
 var title_t := 0.0
 var shot_at := Vector2.INF   # dev helper: camera pinned on a world point for screenshots
+var quitting := false
 
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false   # closing the window goes through _quit, so the ride gets posted first
 	# fill the screen (the dev helpers keep the plain window so screenshots stay predictable)
 	if not OS.has_environment("PIZZA_DEBUG") and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -113,6 +115,32 @@ func _debug_gears() -> void:
 	get_tree().quit()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_quit()
+
+
+## Quitting (the title screen's Quit or closing the window) posts the ride to Strava first when you're linked.
+## If posting fails the ride stays saved and can be posted next time.
+func _quit() -> void:
+	if quitting:
+		return
+	quitting = true
+	Game.save_game()
+	if not Strava.linked() or not Ride.can_post() or Strava.busy():
+		get_tree().quit()
+		return
+	city.active = false
+	race.active = false
+	hud.open_menu(func():
+		return {"title": "Posting to Strava", "sub": "%s\n%s" % [Ride.summary(), Strava.msg],
+			"items": [{"label": "Quit without waiting", "fn": get_tree().quit,
+				"detail": "The ride stays saved and is posted next time you quit."}], "live": true}, true)
+	await Strava.post_ride()
+	await get_tree().create_timer(1.5 if Strava.state == "done" else 5.0).timeout
+	get_tree().quit()
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k != null and k.pressed and not k.echo and (k.keycode == KEY_F11 or (k.keycode == KEY_ENTER and k.alt_pressed)):
@@ -181,7 +209,7 @@ func _show_title() -> void:
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
-				{"label": "Quit", "fn": get_tree().quit},
+				{"label": "Quit", "fn": _quit},
 			], "live": true}, true)
 	if not Game.has_save():
 		hud.menu_index = 1  # nothing to continue: start on "New game"
@@ -295,7 +323,7 @@ func _strava_menu(back: Callable) -> Dictionary:
 			Strava.client_secret = ""
 			Strava._save(), "detail": "Clears the Client Secret so you can paste new app details."})
 	else:
-		lines.append(Strava.status_text() + ".")
+		lines.append(Strava.status_text() + ". Your ride is posted automatically when you quit the game.")
 		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
 		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
 			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})

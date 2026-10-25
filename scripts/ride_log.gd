@@ -84,6 +84,8 @@ func summary() -> String:
 
 
 func title() -> String:
+	if races_won > 0 and pizzas == 0:
+		return "Mt. Crankmore: %d race win%s" % [races_won, "" if races_won == 1 else "s"]
 	if races_won > 0:
 		return "Mt. Crankmore: %d pizza%s and %d race win%s" % [pizzas, "" if pizzas == 1 else "s", races_won, "" if races_won == 1 else "s"]
 	return "Mt. Crankmore: %d pizza%s delivered" % [pizzas, "" if pizzas == 1 else "s"] if pizzas > 0 else "Mt. Crankmore pizza ride"

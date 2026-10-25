@@ -247,16 +247,24 @@ func post_ride() -> void:
 	if activity_id == "":
 		_fail("Strava is taking a long time. The ride may still show up; check your Strava feed before posting it again.")
 		return
+	# a TCX file can only say "Biking", so set the sport afterwards (the new activity can take a moment to accept edits)
 	msg = "Marking it as a Virtual Ride..."
-	r = await _http(HTTPClient.METHOD_PUT, API + "/activities/" + activity_id,
-		JSON.stringify({"sport_type": "VirtualRide", "trainer": true, "name": Ride.title(), "description": Ride.description()}), "application/json")
+	var typed := false
+	for i in 4:
+		r = await _http(HTTPClient.METHOD_PUT, API + "/activities/" + activity_id, "sport_type=VirtualRide&trainer=1")
+		if r["code"] == 200:
+			typed = true
+			break
+		push_warning("Strava: setting Virtual Ride failed (%s)" % _err_text(r))
+		await get_tree().create_timer(2.0).timeout
 	var dir := "user://rides/" + activity_id
 	var had_shots := not Ride.shots.is_empty()
 	Ride.reset(dir if had_shots else "")
 	last_activity = {"id": activity_id, "shots_dir": dir if had_shots else ""}
 	_save()
 	state = "done"
-	msg = "Posted to Strava!" + (" Pick \"Add screenshots\" to put them on the activity." if had_shots else "")
+	msg = "Posted to Strava!" + ("" if typed else " (as a Ride: Strava wouldn't make it a Virtual Ride: %s)" % _err_text(r)) + \
+		(" Pick \"Add screenshots\" to put them on the activity." if had_shots else "")
 
 
 func _fail(text: String) -> void:

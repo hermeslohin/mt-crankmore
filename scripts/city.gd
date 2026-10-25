@@ -1449,7 +1449,7 @@ func _update_player(delta: float) -> void:
 	if obj["has"] and p_pos.distance_to(obj["pos"]) < 4.0:
 		target = minf(target, 1.5 * PACE)
 	var accel := 2.4
-	if Input.is_action_pressed("brake"):
+	if Input.is_action_pressed("brake") and not Game.fixed_gear():   # a fixie has no brakes
 		target = 0.0
 		accel = 7.0
 	elif target < p_speed:

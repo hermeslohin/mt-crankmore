@@ -498,7 +498,7 @@ func _bike_shop_menu() -> Dictionary:
 					Game.toast.emit("New ride: %s!" % b["name"], Color(0.5, 1.0, 0.6))
 					Talk.say_random("new_bike", true)
 		var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
-		var detail := "%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
+		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
 		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail})
 	var rc := Game.repair_cost()
 	items.append({"label": ("Repair bike   $%d" % rc) if rc > 0 else "Repair bike   (already perfect)",

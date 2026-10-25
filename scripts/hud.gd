@@ -353,7 +353,7 @@ func _draw_junction(pd: Dictionary, w: float, h: float) -> void:
 	_text(name, Vector2(r.position.x, r.end.y - 12), 8, Color(1, 1, 1), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_bar(Rect2(r.position.x + 8, r.end.y - 6, r.size.x - 16, 2), float(pd["dist"]) / float(pd["look"]), Color(1.0, 0.85, 0.3))
 	if pd.get("car", false) and int(Time.get_ticks_msec() / 250) % 2 == 0:
-		_text("CAR COMING!  brake to wait", Vector2(0, r.position.y - 6), 12, Color(1.0, 0.35, 0.3), w, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("CAR COMING!  no brakes, good luck" if Game.fixed_gear() else "CAR COMING!  brake to wait", Vector2(0, r.position.y - 6), 12, Color(1.0, 0.35, 0.3), w, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _arrow_icon(c: Vector2, kind: String, col: Color) -> void:
@@ -394,6 +394,10 @@ func _pu_slot(kind: String, socks: float, bread: float, roller: float) -> Dictio
 	return {"kind": kind, "fx": fx}
 
 
+func _gear_text() -> String:
+	return "FIXED" if Game.fixed_gear() else "GEAR %d" % Trainer.gear
+
+
 func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn: Callable, cell: Array, bar1: Array, pu: Dictionary) -> void:
 	var d := Rect2(w - 134, h - 198, 128, 194)
 	draw_style_box(weehoo_shadow, Rect2(d.position + Vector2(3, 3), d.size))
@@ -405,7 +409,7 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 		var gr := Rect2(d.position.x + 24, d.position.y - 30, 80, 26)
 		draw_rect(gr, Color(0.08, 0.08, 0.1, 0.85 * fa))
 		var lo := Trainer.gear == 1 or Trainer.gear == Trainer.GEARS
-		draw_string(font, Vector2(gr.position.x, gr.position.y + 19), "GEAR %d" % Trainer.gear, HORIZONTAL_ALIGNMENT_CENTER, gr.size.x, 16,
+		draw_string(font, Vector2(gr.position.x, gr.position.y + 19), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, gr.size.x, 16,
 			Color(1.0, 0.55, 0.3, fa) if lo else Color(1.0, 0.85, 0.3, fa))
 		for i in Trainer.GEARS:   # a little cassette of 21 ticks, the current one lit
 			var tx := gr.position.x + 5 + i * 3.4
@@ -438,7 +442,7 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	draw_rect(Rect2(x + sc.size.x - 21, y + 2, 15, 6), Color(0.9, 0.9, 0.9), false, 1.0)
 	draw_rect(Rect2(x + sc.size.x - 6, y + 4, 2, 2), Color(0.9, 0.9, 0.9))
 	draw_rect(Rect2(x + sc.size.x - 19, y + 4, 9, 2), Color(0.4, 1.0, 0.5))
-	draw_string(font, Vector2(x, y + 8), "GEAR %d" % Trainer.gear, HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
+	draw_string(font, Vector2(x, y + 8), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
 	# map page
 	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, 56)
 	map_fn.call(mr)
@@ -525,6 +529,8 @@ func _draw_race_profile(mr: Rect2) -> void:
 	var pr := Rect2(mr.position + Vector2(0, 12), mr.size - Vector2(0, 12))
 	var pts := PackedVector2Array([pr.position + Vector2(0, pr.size.y)])
 	for i in range(0, race.M, 5):
+		if race.s_m[i] > length:   # the run-out past the finish stays off the map
+			break
 		pts.append(pr.position + Vector2(race.s_m[i] / length * pr.size.x, pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0)))
 	pts.append(pr.position + pr.size)
 	draw_colored_polygon(pts, Color(0.72, 0.62, 0.45))

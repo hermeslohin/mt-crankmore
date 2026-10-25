@@ -11,9 +11,12 @@ const COURSES := [
 		"blurb": "6 km of rolling gravel switchbacks with jumps, creek crossings and fallen trees, about 20 minutes for the front of the pack. Full of squirrels. And deer. And a bear or two."},
 	{"name": "Summit Gravel Showdown", "length": 4400.0, "grade": 0.065, "roll": 1.2, "entry": 100, "prize": 1200, "seed": 21,
 		"blurb": "4.4 km of steep gravel to the top of Mt. Crankmore with ramps up to 12%, short plunges, logs and bears, about 20 minutes. Legends are made here. So are blisters."},
-	# "bump": gentle rollers on top of the base grade; "flowers": a valley of flower meadows instead of a mountain
-	{"name": "Flour Run", "length": 3000.0, "grade": 0.004, "roll": 0.0, "bump": 0.022, "flowers": true, "entry": 20, "prize": 250, "seed": 33,
-		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: mostly flat with a few gentle rollers, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
+	# "bump": gentle rollers on top of the base grade; "flowers": a valley of flower meadows instead of a mountain;
+	# "profile": [metres, grade] stretches replacing the base grade, levelled so the finish is as high as the start
+	{"name": "Flour Run", "length": 3000.0, "grade": 0.0, "roll": 0.0, "bump": 0.006, "flowers": true, "entry": 20, "prize": 250, "seed": 33,
+		"profile": [[150, 0.0], [400, 0.03], [150, -0.02], [250, 0.0], [200, -0.025], [350, 0.035], [200, 0.0],
+			[300, -0.03], [150, 0.02], [250, 0.0], [450, -0.023], [150, 0.0]],
+		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: gentle climbs, easy dips and flat stretches, finishing back where you started, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.07
@@ -24,6 +27,9 @@ const HAIRPIN_R := 8.0
 const STEP := 0.5             # road sample spacing (tiles)
 const VIEW_R := 17            # terrain cells drawn around the player
 const MAX_SPEED := 16.0       # m/s cap on the descents
+const RUNOUT := 400.0         # metres of cool-down road past the finish arch
+const COOL_SPEED := 5.0       # m/s finished rivals soft-pedal at
+const IDLE_END := 15.0        # seconds stopped past the finish before the results come up anyway
 const FORD_HALF := 2.5        # metres of water either side of a ford's centre
 const FORD_CRR := 0.05        # extra rolling resistance while wading
 const WATER := Color(0.3, 0.62, 0.92)
@@ -76,6 +82,8 @@ var kick_t := 0.0
 var bubbles: Dictionary = {}
 var font: Font
 var player_finish_time := 0.0
+var road_len := 0.0                   # course length plus the run-out (m)
+var idle_t := 0.0                     # seconds the finished player has been stopped
 var last_swap := {}
 var lead_clock := 0.0
 var t_ := 0.0
@@ -125,6 +133,7 @@ func setup(course_id: int) -> void:
 	bubbles.clear()
 	pops.clear()
 	player_finish_time = 0.0
+	idle_t = 0.0
 	# pre-race jabber
 	var ids := range(Talk.rivals.size())
 	ids.shuffle()
@@ -136,7 +145,8 @@ func setup(course_id: int) -> void:
 ## camera, so the slope never hides you), joined by hairpins. Leg 0 is at the bottom.
 func _build_road(rng: RandomNumberGenerator) -> void:
 	var length: float = course["length"]
-	var target := length / M_PER_TILE
+	road_len = length + RUNOUT
+	var target := road_len / M_PER_TILE
 	legs_n = maxi(3, roundi(target / 185.0))
 	leg_len = (target - (legs_n - 1) * PI * HAIRPIN_R) / (legs_n * 1.04)
 	leg_wob.clear()
@@ -182,7 +192,7 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 		var tng := (pts[mini(i + 1, M - 1)] - pts[maxi(i - 1, 0)]).normalized()
 		nrm[i] = Vector2(-tng.y, tng.x)
 	# rolling profile: long climbs broken up by short plunges and steep kickers
-	ds_m = length / float(M - 1)
+	ds_m = road_len / float(M - 1)
 	var g0: float = course["grade"]
 	var amp: float = course["roll"]
 	var p0 := rng.randf() * TAU
@@ -194,11 +204,21 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 		var s := i * ds_m
 		s_m[i] = s
 		var g := g0 * (1.0 + amp * sin(TAU * s / 650.0 + p0) + 0.45 * amp * sin(TAU * s / 230.0 + p1) + 0.25 * sin(TAU * s / 97.0 + p2))
+		if course.has("profile"):
+			g = _profile_grade(course["profile"], s)
 		g += float(course.get("bump", 0.0)) * (sin(TAU * s / 420.0 + p1) + 0.4 * sin(TAU * s / 160.0 + p2))
 		g = lerpf(0.01, clampf(g, MIN_GRADE, MAX_GRADE), smoothstep(0.0, 120.0, s))
 		grade_a[i] = g
-		if i > 0:
+		if i > 0 and s <= length:
 			e += g * ds_m
+	# a profiled course finishes level with the start: spread the leftover climb evenly over the course
+	var drift := e / length if course.has("profile") else 0.0
+	e = 0.0
+	for i in M:
+		# past the arch the road eases out flat for the cool-down
+		grade_a[i] = lerpf(grade_a[i] - drift, 0.0, smoothstep(length, length + 80.0, s_m[i]))
+		if i > 0:
+			e += grade_a[i] * ds_m
 		elev[i] = e
 		lo = minf(lo, e)
 	gain = 1.0
@@ -229,6 +249,16 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 			elif a[c] < -1.0e8:
 				a[c] = a[c - 1]
 		leg_elev.append(a)
+
+
+## Grade (fraction) at `s` metres along a [metres, grade] profile, eased over 40 m either side of each change.
+func _profile_grade(profile: Array, s: float) -> float:
+	var g: float = profile[0][1]
+	var at := 0.0
+	for k in range(1, profile.size()):
+		at += float(profile[k - 1][0])
+		g += (float(profile[k][1]) - float(profile[k - 1][1])) * smoothstep(at - 40.0, at + 40.0, s)
+	return g
 
 
 func _leg_base(k: int) -> float:
@@ -775,7 +805,7 @@ func _process(delta: float) -> void:
 	kick_t = maxf(0.0, kick_t - delta)
 	var me: Dictionary = riders[0]
 	var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"]) + (0.06 if kick_t > 0.0 else 0.0) + (0.03 if me["wet"] else 0.0)
-	Trainer.send_grade(g * 100.0 if countdown <= 0.0 and not me["done"] else 0.0)
+	Trainer.send_grade(g * 100.0 if countdown <= 0.0 and not over else 0.0)
 	queue_redraw()
 
 
@@ -783,46 +813,51 @@ func _step_riders(delta: float) -> void:
 	var length: float = course["length"]
 	# player
 	var me: Dictionary = riders[0]
-	if not me["done"]:
-		_tick_powerups(0, delta)
-		var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"])
-		var p := Trainer.power()
-		if not Trainer.trainer_live:
-			if p > Game.ftp * 1.1:
-				stamina = maxf(0.0, stamina - delta * 0.1)
-				if stamina <= 0.0:
-					p = Game.ftp
-			else:
-				stamina = minf(1.0, stamina + delta * 0.06)
-		me["power"] = p
-		var b: Dictionary = me["bike"]
-		# in a slipstream the same speed takes fewer watts, so your watts go further
-		me["draft"] = _draft(0)
-		var vt := Game.speed_from_power(p / (1.0 - float(me["draft"])), b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
-		if Game.hp_ratio() < 0.3:
-			vt *= 0.92
-		if Input.is_action_just_pressed("powerup"):
-			_use_powerup(0)
-		if float(me["socks"]) > 0.0:
-			vt *= PowerUps.SOCKS_BOOST
-		if float(me["down"]) > 0.0:
-			vt = 0.0
-			me["v"] = move_toward(me["v"], 0.0, 14.0 * delta)
-		if float(me["air"]) <= 0.0:   # no traction in the air
-			me["v"] += (minf(vt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
-		var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
-		me["lat"] = clampf(me["lat"] + steer * 1.1 * delta, -0.4, 0.4)
-		me["s"] += me["v"] * delta
-		me["phase"] += (Trainer.cadence() if Trainer.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
-		_terrain_events(0, delta)
-		if me["s"] >= length:
-			_finish(0)
+	# the player keeps riding past the finish, down the run-out
+	_tick_powerups(0, delta)
+	var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"])
+	var p := Trainer.power()
+	if not Trainer.trainer_live:
+		if p > Game.ftp * 1.1:
+			stamina = maxf(0.0, stamina - delta * 0.1)
+			if stamina <= 0.0:
+				p = Game.ftp
+		else:
+			stamina = minf(1.0, stamina + delta * 0.06)
+	me["power"] = p
+	var b: Dictionary = me["bike"]
+	# in a slipstream the same speed takes fewer watts, so your watts go further
+	me["draft"] = _draft(0)
+	var mvt := Game.speed_from_power(p / (1.0 - float(me["draft"])), b["mass"], b["cda"], _crr(b) + (FORD_CRR if me["wet"] else 0.0), g)
+	if Game.hp_ratio() < 0.3:
+		mvt *= 0.92
+	if Input.is_action_just_pressed("powerup"):
+		_use_powerup(0)
+	if float(me["socks"]) > 0.0:
+		mvt *= PowerUps.SOCKS_BOOST
+	if float(me["down"]) > 0.0:
+		mvt = 0.0
+		me["v"] = move_toward(me["v"], 0.0, 14.0 * delta)
+	if float(me["air"]) <= 0.0:   # no traction in the air
+		me["v"] += (minf(mvt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
+	var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
+	me["lat"] = clampf(me["lat"] + steer * 1.1 * delta, -0.4, 0.4)
+	me["s"] += me["v"] * delta
+	if me["s"] >= road_len:
+		me["s"] = road_len
+		me["v"] = 0.0
+	me["phase"] += (Trainer.cadence() if Trainer.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
+	_terrain_events(0, delta)
+	if me["s"] >= length and not me["done"]:
+		_finish(0)
+	idle_t = idle_t + delta if me["done"] and me["v"] < 0.5 else 0.0
 	# rivals
 	for k in range(1, riders.size()):
 		var r: Dictionary = riders[k]
-		if r["done"]:
-			r["s"] += 3.0 * delta
-			r["phase"] += 6.0 * delta
+		if r["done"]:   # soft-pedal down the run-out, stopping at the end of the road
+			r["v"] = move_toward(r["v"], COOL_SPEED if r["s"] < road_len - 1.0 else 0.0, 2.0 * delta)
+			r["s"] = minf(r["s"] + r["v"] * delta, road_len)
+			r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 			continue
 		r["surge_in"] -= delta
 		if r["surge_in"] <= 0.0:
@@ -863,7 +898,8 @@ func _step_riders(delta: float) -> void:
 	_squash()
 	if finish_count > 0 and not over:
 		over_clock += delta
-	if not over and (finish_count >= riders.size() or (me["done"] and over_clock > 10.0) or over_clock > 420.0):
+	# results once you reach the end of the run-out (or stop on it); a 7 minute cut-off if you never finish
+	if not over and ((me["done"] and (me["s"] >= road_len or idle_t > IDLE_END)) or (not me["done"] and over_clock > 420.0)):
 		_end_race()
 
 
@@ -1198,7 +1234,7 @@ func _finish(i: int) -> void:
 	r["place"] = finish_count
 	if i == 0:
 		player_finish_time = clock
-		Game.toast.emit("FINISHED!  Place #%d" % finish_count, Color(1.0, 0.9, 0.3))
+		Game.toast.emit("FINISHED!  Place #%d  -  keep rolling to cool down" % finish_count, Color(1.0, 0.9, 0.3))
 		if finish_count == 1:
 			for k in 2:
 				Talk.say(randi() % Talk.rivals.size(), "race_win_player", true)
@@ -1296,6 +1332,7 @@ func debug_spots() -> Array:
 				out.append(float(a["s"]) - (2.0 if want == "bear" else (16.0 if want == "deer" else 4.0)))
 				break
 	out.append(float(course["length"]) - 25.0)
+	out.append(float(course["length"]) + 150.0)   # out on the run-out
 	return out
 
 

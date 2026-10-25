@@ -17,6 +17,7 @@ const GEARS := 21
 const START_GEAR := 11
 const EASIEST := 0.33    # gear 1, ratio to gear 11
 const HARDEST := 2.55    # gear 21
+const FIXED_GEAR := 9     # the fixie's one and only gear
 
 ## Shifter buttons: LS1 = easier, RS1 = harder.
 const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}
@@ -200,6 +201,9 @@ func role_info(role: String) -> Dictionary:
 
 
 func _process(delta: float) -> void:
+	if Game.fixed_gear() and gear != FIXED_GEAR:
+		gear = FIXED_GEAR
+		_grade_clock = 2.0   # tell the trainer straight away
 	for action in _release_later:
 		if not _held.has(action):
 			Input.action_release(action)
@@ -341,8 +345,10 @@ func gear_ratio(g: int = gear) -> float:
 
 
 func shift(step: int) -> void:
-	var g := clampi(gear + step, 1, GEARS)
 	shift_flash = 1.2
+	if Game.fixed_gear():   # nothing to shift: just flash the one gear
+		return
+	var g := clampi(gear + step, 1, GEARS)
 	if g == gear:
 		return
 	gear = g

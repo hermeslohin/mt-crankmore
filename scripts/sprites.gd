@@ -18,6 +18,8 @@ extends RefCounted
 const DIRS := 8
 const ANCHOR_UP := 12    # room below the contact point for the near wheel in the diagonal views
 const FALL_FPS := 10.0   # fall frames per second; the last frame is held while the rider lies there
+const STRIP_FEET_MARGIN := 4.0   # pixels below the feet in a strip frame (see tools/import_sprite.gd)
+const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above its spot on the ground
 
 ## Which character the player rides as: "rookie_boy" or "rookie_girl" (Game sets it).
 static var player_sheet := "rookie_boy"
@@ -79,4 +81,41 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var src := Rect2(col * fw, dir_row(w) * fh, fw, fh)
 	var dst := Rect2((c - Vector2(fw * 0.5, fh - ANCHOR_UP)).round(), Vector2(fw, fh))
 	ci.draw_texture_rect_region(tex, dst, src)
+	return true
+
+
+## An animation row (art/<name>.png, square frames side by side) drawn at the screen point `at`: standing on it with
+## their feet there (`feet`, people) or centred on it (a spinning pizza). `t` is in seconds. Returns false when there
+## is no such art.
+static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps := 10.0, feet := true) -> bool:
+	var tex := sheet(name)
+	if tex == null:
+		return false
+	var fh := tex.get_height()
+	var frames := maxi(1, tex.get_width() / fh)
+	var src := Rect2(posmod(int(t * fps), frames) * fh, 0, fh, fh)
+	var dst := Rect2((at - Vector2(fh * 0.5, fh - STRIP_FEET_MARGIN if feet else fh * 0.5)).round(), Vector2(fh, fh))
+	ci.draw_texture_rect_region(tex, dst, src)
+	return true
+
+
+## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets) with its middle on `at`,
+## heading `w` (world direction), tinted by `tint`.
+static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE) -> bool:
+	var tex := sheet(name)
+	if tex == null:
+		return false
+	var f := tex.get_height() / DIRS
+	var src := Rect2(0, dir_row(w) * f, f, f)
+	var dst := Rect2((at - Vector2(f * 0.5, f * 0.5 + VEHICLE_LIFT)).round(), Vector2(f, f))
+	ci.draw_texture_rect_region(tex, dst, src, tint)
+	return true
+
+
+## A single picture (art/<name>.png) with the middle of its bottom edge on `at`. Returns false when there is none.
+static func draw_image(ci: CanvasItem, name: String, at: Vector2) -> bool:
+	var tex := sheet(name)
+	if tex == null:
+		return false
+	ci.draw_texture(tex, (at - Vector2(tex.get_width() * 0.5, tex.get_height())).round())
 	return true

@@ -735,7 +735,7 @@ func _place_specials() -> void:
 		["pizza", "Pepperoni Peak", Vector2(24, 100), Vector2(3, 3)],
 		["bike", "Spokes & Stuff", Vector2(62, 88), Vector2(3, 3)],
 		["bike", "Gravel Gods Cycles", Vector2(126, 96), Vector2(3, 3)],
-		["er", "St. Pedro's ER", Vector2(96, 92), Vector2(4, 3)],
+		["er", "St. Pedro's Hospital", Vector2(96, 92), Vector2(3, 3)],
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
 	]
@@ -1304,7 +1304,7 @@ func _route(from: Vector2, to: Vector2, off: Vector2) -> Array:
 
 func _spawn_cars() -> void:
 	# light traffic spread over the longer roads (about one car per 100 tiles of road)
-	var kinds := ["car", "car", "car", "bus", "van", "jeep", "car", "van", "car", "jeep", "car", "car"]
+	var kinds := ["car", "car", "truck", "car", "motorcycle", "car", "truck", "car", "motorcycle", "car", "truck", "car"]
 	var long_roads: Array = []
 	for ri in roads.size():
 		if float(roads[ri]["len"]) > 25.0:
@@ -1315,20 +1315,16 @@ func _spawn_cars() -> void:
 		var kind: String = kinds[k]
 		var c := {"road": ri, "s": randf_range(3.0, float(r["len"]) - 3.0), "dir": 1.0 if randf() < 0.5 else -1.0,
 			"speed": 0.0, "max": randf_range(2.2, 3.4) * PACE, "col": CAR_COLORS[randi() % CAR_COLORS.size()], "kind": kind,
-			"hl": 0.55, "hw": 0.3, "h": 9.0, "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT}
+			"hl": 0.55, "hw": 0.3, "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT}
 		match kind:
-			"bus":
-				c["hl"] = 1.05
+			"truck":
+				c["hl"] = 0.8
 				c["hw"] = 0.34
-				c["h"] = 15.0
-				c["max"] = 2.0 * PACE
-				c["col"] = Color(1.0, 0.8, 0.15)
-			"van":
-				c["hl"] = 0.65
-				c["hw"] = 0.32
-				c["h"] = 13.0
-			"jeep":
-				c["col"] = Color(0.35, 0.5, 0.25)
+				c["max"] = randf_range(2.0, 2.8) * PACE
+			"motorcycle":
+				c["hl"] = 0.38
+				c["hw"] = 0.16
+				c["max"] = randf_range(3.2, 4.2) * PACE
 		_car_pose(c)
 		cars.append(c)
 
@@ -2890,12 +2886,8 @@ func _draw_building_inner(b: Dictionary) -> void:
 			draw_line(top + Vector2(-10, 0), top + Vector2(0, -10), Color.WHITE, 2.0)
 			draw_line(top + Vector2(0, -10), top + Vector2(10, 0), Color.WHITE, 2.0)
 		"er":
-			Iso.box(self, pos, size, h, col, 0.0, Season.roof(Color(0.85, 0.9, 0.95)))
-			Iso.windows(self, pos, size, h, Color(0.7, 0.9, 1.0))
-			_door(b, pos, size)
-			var top := Iso.to_screen(center, h + 1.0)
-			draw_rect(Rect2(top + Vector2(-4, -13), Vector2(8, 26)), Color(0.9, 0.1, 0.15))
-			draw_rect(Rect2(top + Vector2(-13, -4), Vector2(26, 8)), Color(0.9, 0.1, 0.15))
+			# St. Pedro's hospital, with its helicopter pad on the roof: a picture standing on the lot's near corner
+			Sprites.draw_image(self, "hospital", Iso.to_screen(pos + size))
 		"race":
 			Iso.box(self, pos, size, h, col, 0.0, Season.roof(Color(0.92, 0.92, 0.92)))
 			for cy in int(size.y + 0.5):
@@ -3181,6 +3173,7 @@ func _draw_ped(p: Dictionary) -> void:
 
 ## The pizza man outside each shop. With an order waiting he dances with the steaming box held high,
 ## and when you ride up he hands it over; otherwise he waits, tapping his foot.
+## The pizza shop's baker: dancing with a pizza held overhead while an order waits, otherwise tapping a foot.
 func _draw_chef(si: int) -> void:
 	var sh: Dictionary = shops[si]
 	var ground := Iso.to_screen(sh["chef"])
@@ -3189,111 +3182,43 @@ func _draw_chef(si: int) -> void:
 		if o["state"] == "open" and o["shop"] == si:
 			waiting = true
 	var giving := handoff > 0.0 and handoff_shop == si
-	var t := t_ * 1.0 + si * 0.7
-	var base := ground
-	var kick := 0.0
-	var face := 1.0
-	if waiting and not giving:
-		base += Vector2(sin(t * 4.0) * 2.0, -absf(sin(t * 8.0)) * 3.0)
-		kick = sin(t * 8.0) * 3.0
-		face = 1.0 if fposmod(t, 3.0) < 1.5 else -1.0
-	var o := Iso.OUTLINE
+	var t := t_ + si * 0.7
 	draw_colored_polygon(PackedVector2Array([ground + Vector2(-6, 0), ground + Vector2(0, -3), ground + Vector2(6, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.22))
-	# legs + shoes
-	var pants := Color(0.22, 0.22, 0.3)
-	var hip := base + Vector2(0, -11)
-	for s in [-1.0, 1.0]:
-		var foot: Vector2 = base + Vector2(s * 3.0 + (kick * s if s > 0.0 else 0.0), -maxf(0.0, kick * s) * 0.8)
-		if not waiting:
-			foot = base + Vector2(s * 2.5, -(absf(sin(t * 6.0)) * 1.5 if s > 0.0 else 0.0))
-		draw_line(hip + Vector2(s * 1.5, 0), foot, o, 4.0)
-		draw_line(hip + Vector2(s * 1.5, 0), foot, pants, 2.0)
-		draw_rect(Rect2(foot + Vector2(-2, -1), Vector2(4, 2)), o)
-	# body: red shirt, white apron
-	draw_rect(Rect2(base + Vector2(-5, -24), Vector2(10, 14)), o)
-	draw_rect(Rect2(base + Vector2(-4, -23), Vector2(8, 12)), Color(0.88, 0.2, 0.18))
-	draw_rect(Rect2(base + Vector2(-3, -19), Vector2(6, 8)), Color(0.98, 0.97, 0.94))
-	draw_rect(Rect2(base + Vector2(-1, -17), Vector2(2, 2)), Color(0.9, 0.2, 0.2))
-	# head, moustache, chef hat
-	var head := base + Vector2(0, -28)
-	draw_circle(head, 4.2, o)
-	draw_circle(head, 3.5, Color(0.97, 0.78, 0.62))
-	draw_rect(Rect2(head + Vector2(-3 + face, 0.5), Vector2(6, 1.5)), Color(0.2, 0.12, 0.08))
-	draw_rect(Rect2(head + Vector2(-1.5 + face * 1.5, -1.5), Vector2(1, 1)), o)
-	draw_rect(Rect2(head + Vector2(0.5 + face * 1.5, -1.5), Vector2(1, 1)), o)
-	draw_rect(Rect2(head + Vector2(-4, -5), Vector2(8, 3)), o)
-	draw_rect(Rect2(head + Vector2(-3, -5), Vector2(6, 2)), Color(1, 1, 1))
-	for c in [Vector2(-2.5, -8), Vector2(2.5, -8), Vector2(0, -10)]:
-		draw_circle(head + c, 3.2, o)
-	for c in [Vector2(-2.5, -8), Vector2(2.5, -8), Vector2(0, -10)]:
-		draw_circle(head + c, 2.6, Color(1, 1, 1))
-	# arms and the pizza box
-	var sl := base + Vector2(-5, -22)
-	var sr := base + Vector2(5, -22)
-	var box := Vector2.ZERO
-	if giving:
-		var to := (Iso.to_screen(p_pos, 18.0) - sr).normalized()
-		box = sr + to * 9.0
-		draw_line(sl, box + Vector2(-3, 1), o, 3.0)
-		draw_line(sr, box + Vector2(3, 1), o, 3.0)
-		draw_line(sl, box + Vector2(-3, 1), Color(0.88, 0.2, 0.18), 1.0)
-		draw_line(sr, box + Vector2(3, 1), Color(0.88, 0.2, 0.18), 1.0)
-		return   # the box itself is drawn flying to the rider in _draw_player
-	if waiting:
-		box = base + Vector2(sin(t * 4.0) * 4.0, -40.0 + sin(t * 8.0) * 1.5)
-		for a in [[sl, box + Vector2(-5, 2)], [sr, box + Vector2(5, 2)]]:
-			draw_line(a[0], a[1], o, 3.0)
-			draw_line(a[0], a[1], Color(0.97, 0.78, 0.62), 1.0)
-		Iso.poly(self, PackedVector2Array([box + Vector2(-8, 0), box + Vector2(0, -4), box + Vector2(8, 0), box + Vector2(0, 4)]), Color(0.97, 0.95, 0.88))
-		draw_colored_polygon(PackedVector2Array([box + Vector2(-8, 0), box + Vector2(0, 4), box + Vector2(0, 6), box + Vector2(-8, 2)]), Color(0.85, 0.8, 0.7))
-		draw_colored_polygon(PackedVector2Array([box + Vector2(8, 0), box + Vector2(0, 4), box + Vector2(0, 6), box + Vector2(8, 2)]), Color(0.75, 0.7, 0.6))
-		draw_rect(Rect2(box + Vector2(-2, -1), Vector2(4, 2)), Color(0.9, 0.2, 0.2))
-		BikeDraw._steam(self, box + Vector2(0, -3), 1.0)
+	var slug := _shop_slug(sh["name"])
+	if waiting and not giving:
+		Sprites.draw_strip(self, "chef_%s_dance" % slug, ground, t, 10.0)
+		BikeDraw._steam(self, ground + Vector2(0, -50.0), 1.0)
 		# music notes drifting up
 		for k in 2:
 			var u := fposmod(t * 0.6 + k * 0.5, 1.0)
-			var np := base + Vector2(10.0 + k * 4.0 + sin(u * 6.0) * 3.0, -26.0 - u * 18.0)
+			var np := ground + Vector2(14.0 + k * 4.0 + sin(u * 6.0) * 3.0, -26.0 - u * 18.0)
 			var nc := Color(1.0, 0.85, 0.3, 1.0 - u)
 			draw_circle(np, 1.6, nc)
 			draw_line(np + Vector2(1.4, 0), np + Vector2(1.4, -6), nc, 1.0)
 			draw_line(np + Vector2(1.4, -6), np + Vector2(3.4, -4), nc, 1.0)
 	else:
-		# arms folded, foot tapping
-		draw_line(sl, base + Vector2(3, -17), o, 3.0)
-		draw_line(sr, base + Vector2(-3, -16), o, 3.0)
-		draw_line(sl, base + Vector2(3, -17), Color(0.97, 0.78, 0.62), 1.0)
-		draw_line(sr, base + Vector2(-3, -16), Color(0.97, 0.78, 0.62), 1.0)
+		# standing around; while handing the pizza out they hold still (the box itself is drawn flying to the rider)
+		Sprites.draw_strip(self, "chef_%s_tap" % slug, ground, 0.0 if giving else t, 8.0)
+
+
+## "The Cheesy Chairlift" -> "the_cheesy_chairlift": the file name part of a shop's art.
+func _shop_slug(shop_name: String) -> String:
+	var out := ""
+	for ch in shop_name.to_lower():
+		out += ch if (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") else "_"
+	return out.replace("__", "_").trim_prefix("_").trim_suffix("_")
 
 
 func _draw_car(c: Dictionary) -> void:
-	var col: Color = c["col"]
 	var fwd: Vector2 = c["fwd"]
 	var pos: Vector2 = c["pos"]
 	var hl: float = c["hl"]
 	var hw: float = c["hw"]
 	var rt := Vector2(-fwd.y, fwd.x)
 	draw_colored_polygon(_to_screen_poly(PackedVector2Array([pos + fwd * hl + rt * hw, pos - fwd * hl + rt * hw, pos - fwd * hl - rt * hw, pos + fwd * hl - rt * hw])), Color(0, 0, 0, 0.25))
-	for wx in [0.62, -0.62]:
-		for wy in [1.0, -1.0]:
-			var wp := Iso.to_screen(pos + fwd * hl * wx + rt * hw * wy * 0.95, 2.0)
-			draw_circle(wp, 3.2, Iso.OUTLINE)
-			draw_circle(wp, 1.4, Color(0.6, 0.6, 0.65))
-	match c["kind"]:
-		"bus":
-			Iso.obox(self, pos, fwd, hl, hw, 7.0, col, 1.0)
-			Iso.obox(self, pos, fwd, hl * 0.98, hw * 0.98, 5.0, Color(0.55, 0.75, 0.95), 8.0)
-			Iso.obox(self, pos, fwd, hl, hw, 3.0, col, 13.0, Color(0.95, 0.95, 0.95))
-		"van":
-			Iso.obox(self, pos, fwd, hl, hw, 12.0, col, 1.0)
-			Iso.obox(self, pos + fwd * (hl - 0.18), fwd, 0.12, hw * 0.95, 5.0, Color(0.55, 0.75, 0.95), 6.0)
-		_:
-			Iso.obox(self, pos, fwd, hl, hw, 6.0, col, 1.0)
-			Iso.obox(self, pos - fwd * 0.08, fwd, hl * 0.55, hw * 0.88, 5.0, Color(0.6, 0.8, 0.95), 7.0, Iso.shade(col, 1.1))
-	for side in [0.6, -0.6]:
-		var lamp := Iso.to_screen(pos + fwd * (hl + 0.02) + rt * hw * side, 4.0)
-		draw_rect(Rect2(lamp - Vector2(1, 1), Vector2(3, 2)), Color(1.0, 0.95, 0.6))
-		var tail := Iso.to_screen(pos - fwd * (hl + 0.02) + rt * hw * side, 4.0)
-		draw_rect(Rect2(tail - Vector2(1, 1), Vector2(3, 2)), Color(0.95, 0.2, 0.2))
+	# the sprites are white vehicles, painted in the car's colour (the motorbike keeps its own)
+	var tint := Color.WHITE if c["kind"] == "motorcycle" else Color.WHITE.lerp(c["col"], 0.7)
+	Sprites.draw_vehicle(self, "vehicle_%s" % c["kind"], Iso.to_screen(pos), fwd, tint)
 
 
 func _draw_player() -> void:

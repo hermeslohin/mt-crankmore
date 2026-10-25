@@ -734,6 +734,8 @@ func _debug_shot() -> void:
 	if OS.get_environment("PIZZA_AT") == "junctions":
 		for j in city.junctions:
 			spots.append(j["pos"])
+	elif OS.get_environment("PIZZA_AT") == "er":
+		spots.append(city.zone_anchor("er")["pos"])
 	elif OS.get_environment("PIZZA_AT") == "shops":
 		for k in 3:
 			city._post_order()

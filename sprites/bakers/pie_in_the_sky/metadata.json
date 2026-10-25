@@ -1,0 +1,91 @@
+{
+  "group_id": "7e5f9729-0dc6-4c0e-9dc6-4e6756fe1275",
+  "states": [
+    {
+      "character": {
+        "id": "7cc46773-93ad-47b3-b651-ec67635615ea",
+        "name": "Idle",
+        "prompt": "cheerful pizza baker dressed like a pilot, a blue pilot cap with aviator goggles pushed up, a sky-blue apron over a white shirt, small wings badge on the chest, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:25:19.030454+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "tap": {
+            "south": [
+              "Idle/animations/tap/south/frame_000.png",
+              "Idle/animations/tap/south/frame_001.png",
+              "Idle/animations/tap/south/frame_002.png",
+              "Idle/animations/tap/south/frame_003.png",
+              "Idle/animations/tap/south/frame_004.png",
+              "Idle/animations/tap/south/frame_005.png",
+              "Idle/animations/tap/south/frame_006.png",
+              "Idle/animations/tap/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "42b23364-2937-4bd2-97db-29c831333317",
+        "name": "Holding pizza",
+        "prompt": "cheerful pizza baker dressed like a pilot, a blue pilot cap with aviator goggles pushed up, a sky-blue apron over a white shirt, small wings badge on the chest, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:28:24.083185+00:00"
+      },
+      "folder": "Holding_pizza",
+      "frames": {
+        "rotations": {
+          "south": "Holding_pizza/rotations/south.png",
+          "south-east": "Holding_pizza/rotations/south-east.png",
+          "east": "Holding_pizza/rotations/east.png",
+          "north-east": "Holding_pizza/rotations/north-east.png",
+          "north": "Holding_pizza/rotations/north.png",
+          "north-west": "Holding_pizza/rotations/north-west.png",
+          "west": "Holding_pizza/rotations/west.png",
+          "south-west": "Holding_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "dance": {
+            "south": [
+              "Holding_pizza/animations/dance/south/frame_000.png",
+              "Holding_pizza/animations/dance/south/frame_001.png",
+              "Holding_pizza/animations/dance/south/frame_002.png",
+              "Holding_pizza/animations/dance/south/frame_003.png",
+              "Holding_pizza/animations/dance/south/frame_004.png",
+              "Holding_pizza/animations/dance/south/frame_005.png",
+              "Holding_pizza/animations/dance/south/frame_006.png",
+              "Holding_pizza/animations/dance/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-25T23:35:26.772286"
+}

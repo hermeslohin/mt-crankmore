@@ -136,59 +136,13 @@ static func draw_gift(ci: CanvasItem, c: Vector2, t: float) -> void:
 ## A spinning pizza in flight, `u` (0..1) along the way from `a` to `b` in a shallow arc.
 static func draw_frisbee(ci: CanvasItem, a: Vector2, b: Vector2, u: float, t: float) -> void:
 	var p := a.lerp(b, u) + Vector2(0, -sin(u * PI) * 14.0)
-	var w := 6.0
-	var h := 2.5 + absf(sin(t * 20.0)) * 1.0
-	var poly := PackedVector2Array()
-	for i in 10:
-		var ang := i * TAU / 10.0
-		poly.append(p + Vector2(cos(ang) * w, sin(ang) * h))
-	Iso.poly(ci, poly, Color(1.0, 0.82, 0.35))
-	ci.draw_circle(p + Vector2(cos(t * 20.0) * 3.0, 0), 1.0, Color(0.8, 0.15, 0.12))
-	ci.draw_circle(p + Vector2(-cos(t * 20.0) * 3.0, 0), 1.0, Color(0.8, 0.15, 0.12))
+	Sprites.draw_strip(ci, "pizza_spin", p, t, 24.0, false)
 
 
-## The pizza mascot: a giant slice costume with arms, legs and a goofy face, dancing.
+## The pizza mascot: a giant slice costume, dancing (art/mascot_dance.png).
 static func draw_mascot(ci: CanvasItem, ground: Vector2, t: float) -> void:
-	var o := Iso.OUTLINE
-	var hop := absf(sin(t * 7.0)) * 4.0
-	var sway := sin(t * 3.5) * 3.0
-	var base := ground + Vector2(sway, -hop)
 	ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-8, 0), ground + Vector2(0, -3), ground + Vector2(8, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.25))
-	# legs, kicking in turn
-	for s in [-1.0, 1.0]:
-		var kick := maxf(0.0, sin(t * 7.0 * s)) * 4.0
-		var foot: Vector2 = ground + Vector2(s * 4.0 + kick * s, -kick * 0.6)
-		ci.draw_line(base + Vector2(s * 3.0, -8), foot, o, 4.0)
-		ci.draw_line(base + Vector2(s * 3.0, -8), foot, Color(0.95, 0.95, 0.95), 2.0)
-		ci.draw_rect(Rect2(foot + Vector2(-3, -1), Vector2(6, 3)), Color(0.85, 0.15, 0.12))
-	# the slice: crust on top, point at the bottom
-	var top := base + Vector2(0, -34)
-	var slice := PackedVector2Array([top + Vector2(-11, 0), top + Vector2(11, 0), base + Vector2(0, -6)])
-	Iso.poly(ci, slice, Color(1.0, 0.8, 0.3))
-	ci.draw_rect(Rect2(top + Vector2(-12, -4), Vector2(24, 6)), o)
-	ci.draw_rect(Rect2(top + Vector2(-11, -3), Vector2(22, 4)), Color(0.8, 0.5, 0.2))
-	for p in [Vector2(-5, 6), Vector2(5, 7), Vector2(0, 15), Vector2(-2, 21)]:
-		ci.draw_circle(top + p, 2.2, Color(0.8, 0.15, 0.12))
-	# face
-	ci.draw_circle(top + Vector2(-3, 9), 1.8, Color(1, 1, 1))
-	ci.draw_circle(top + Vector2(3, 9), 1.8, Color(1, 1, 1))
-	ci.draw_rect(Rect2(top + Vector2(-3.5, 8.5), Vector2(1, 1)), o)
-	ci.draw_rect(Rect2(top + Vector2(2.5, 8.5), Vector2(1, 1)), o)
-	ci.draw_arc(top + Vector2(0, 12), 3.0, 0.2, PI - 0.2, 6, o, 1.0)
-	# arms waving overhead
-	for s in [-1.0, 1.0]:
-		var wave := sin(t * 7.0 + s) * 4.0
-		var hand: Vector2 = top + Vector2(s * (16.0 + wave * 0.5), -6.0 - absf(wave))
-		ci.draw_line(top + Vector2(s * 9.0, 4), hand, o, 3.0)
-		ci.draw_line(top + Vector2(s * 9.0, 4), hand, Color(1.0, 0.8, 0.3), 1.0)
-		ci.draw_circle(hand, 2.0, Color(1, 1, 1))
-	# music notes
-	for q in 2:
-		var u := fposmod(t * 0.7 + q * 0.5, 1.0)
-		var np := base + Vector2(14.0 + q * 5.0 + sin(u * 6.0) * 3.0, -30.0 - u * 18.0)
-		var nc := Color(1.0, 0.85, 0.3, 1.0 - u)
-		ci.draw_circle(np, 1.6, nc)
-		ci.draw_line(np + Vector2(1.4, 0), np + Vector2(1.4, -6), nc, 1.0)
+	Sprites.draw_strip(ci, "mascot_dance", ground, t, 10.0)
 
 
 ## Flames licking up behind a rider in Fire Socks (`c` = rider, `back` = screen direction behind).

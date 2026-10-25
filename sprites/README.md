@@ -67,3 +67,13 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
   falls (for example Cryptic Carl's bag fall and bike-only fall); regenerate those in PixelLab if they show in game.
 - The game packs these into its 8-row bike sheets with `tools/import_rider.gd` (see the top-level README); `rows=`
   picks which export direction goes on each sheet row and `anim=` which animation (`pedaling` or `fall`).
+
+## Other sprites
+
+| Folder | What | Game art |
+|---|---|---|
+| `bakers/<shop>/` | one baker per pizza shop (`Idle` state with a `tap` animation, `Holding_pizza` state with a `dance` animation, south view) | `art/chef_<shop>_tap.png`, `art/chef_<shop>_dance.png` |
+| `mascot/pizza-mascot/` | the Walkie Talkie's dancing pizza-slice mascot (`dance` animation, south view) | `art/mascot_dance.png` |
+| `props/pizza-spin/` | the thrown pizza, spinning (8 frames) | `art/pizza_spin.png` |
+| `vehicles/{car,truck,motorcycle}/` | the traffic, white vehicles in 8 directions (`rotations/`) | `art/vehicle_<kind>.png` |
+| `buildings/hospital.png` | St. Pedro's Hospital with a helicopter pad on the roof (a 192x176 image) | `art/hospital.png` |

@@ -1,0 +1,49 @@
+{
+  "group_id": "1709d56e-4c86-4080-8114-6ae56fae6fdc",
+  "states": [
+    {
+      "character": {
+        "id": "d9c5d8a6-7adf-43b3-84b9-c45d1d9e11fb",
+        "name": "Idle",
+        "prompt": "goofy pizza mascot: a person in a giant triangular pizza slice costume with a brown crust at the top, melted yellow cheese, red pepperoni circles and a cartoon smiling face on the slice, thin arms in white gloves and thin legs with red sneakers sticking out",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:22:41.305862+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "dance": {
+            "south": [
+              "Idle/animations/dance/south/frame_000.png",
+              "Idle/animations/dance/south/frame_001.png",
+              "Idle/animations/dance/south/frame_002.png",
+              "Idle/animations/dance/south/frame_003.png",
+              "Idle/animations/dance/south/frame_004.png",
+              "Idle/animations/dance/south/frame_005.png",
+              "Idle/animations/dance/south/frame_006.png",
+              "Idle/animations/dance/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-25T23:32:49.394239"
+}

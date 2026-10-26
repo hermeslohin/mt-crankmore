@@ -24,6 +24,10 @@ const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above
 ## The pedestrian designs (art/ped_<design>_walk.png and _cheer.png): the townsfolk, spectators and joggers.
 const PEDESTRIANS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady"]
 
+## True in cold weather (see Season.cold): characters then use their winter sheets (art/winter_<name>.png: hat, gloves
+## and a jacket) when there is one.
+static var cold := false
+
 ## Which character the player rides as: "rookie_boy" or "rookie_girl" (Game sets it).
 static var player_sheet := "rookie_boy"
 
@@ -49,6 +53,15 @@ static func sheet(sheet_name: String) -> Texture2D:
 	return tex
 
 
+## The sheet for a person or rider: the winter version in cold weather if there is one, else the usual one.
+static func outfit(sheet_name: String) -> Texture2D:
+	if cold:
+		var w := sheet("winter_" + sheet_name)
+		if w != null:
+			return w
+	return sheet(sheet_name)
+
+
 ## Forget loaded art (after new files were dropped in).
 static func reload() -> void:
 	_cache.clear()
@@ -72,7 +85,7 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var base := sheet_name(who) + ("_fall" if falling else "")
 	var tex: Texture2D = null
 	for suffix in (["_pizza", "_boxed", ""] if has_pizza else (["_boxed", ""] if boxed else [""])):
-		tex = sheet(base + suffix)
+		tex = outfit(base + suffix)
 		if tex != null:
 			break
 	if tex == null:
@@ -91,7 +104,7 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 ## their feet there (`feet`, people and animals) or centred on it (a spinning pizza), mirrored left to right when `flip`,
 ## multiplied by `tint`. `t` is in seconds. Returns false when there is no such art.
 static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps := 10.0, feet := true, flip := false, tint := Color.WHITE) -> bool:
-	var tex := sheet(name)
+	var tex := outfit(name)
 	if tex == null:
 		return false
 	var fh := tex.get_height()
@@ -120,7 +133,7 @@ static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, 
 ## tools/import_sprite.gd people) standing with their feet on `at`, walking towards the world direction `w`. `t` is in
 ## seconds.
 static func draw_person(ci: CanvasItem, name: String, at: Vector2, w: Vector2, t: float, fps := 8.0, tint := Color.WHITE) -> bool:
-	var tex := sheet(name)
+	var tex := outfit(name)
 	if tex == null:
 		return false
 	var f := tex.get_height() / DIRS

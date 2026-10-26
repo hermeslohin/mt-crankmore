@@ -20,6 +20,7 @@ var current := "summer"
 
 func _ready() -> void:
 	current = today()
+	Sprites.cold = cold()
 
 
 func today() -> String:
@@ -36,9 +37,22 @@ func today() -> String:
 func set_choice(c: String) -> void:
 	choice = c if c in ORDER else "auto"
 	var now := today() if choice == "auto" else choice
+	Sprites.cold = cold()
 	if now != current:
 		current = now
+		Sprites.cold = cold()
 		changed.emit()
+
+
+## Cold weather, when people wear their hats, gloves and jackets: all winter, plus the cold ends of fall and spring
+## (November and March) when the season follows the date.
+func cold() -> bool:
+	if current == "winter":
+		return true
+	if choice != "auto":
+		return false
+	var m: int = Time.get_date_dict_from_system()["month"]
+	return (current == "fall" and m == 11) or (current == "spring" and m == 3)
 
 
 ## LEFT / RIGHT on the menu: auto, spring, summer, fall, winter.

@@ -161,11 +161,7 @@ func _notification(what: int) -> void:
 ## Quitting (the title screen's Quit or closing the window) saves the game. The ride isn't posted: it stays saved
 ## until you post it from the Strava menu or the pause menu.
 func _quit() -> void:
-	if not viewer.is_empty():
-		# the event viewer never keeps what happened: the save goes back as it was
-		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
-		f.store_string(viewer["backup"])
-		f.close()
+	if not viewer.is_empty():   # the event viewer never saves (Game.no_save), so there's nothing to put back
 		get_tree().quit()
 		return
 	Game.save_game()
@@ -751,14 +747,15 @@ func _debug_events() -> void:
 ## Dev helper: PIZZA_DEBUG=eventviewer (or tools/event_viewer.sh) is the event viewer: ride around town and step
 ## through every happening, call-out and challenge one at a time with ] / N (next), [ / P (back) and R (again).
 ## Each starts right by you, in the season and at the time of day it needs, at its place (the town hall, the lake...)
-## if it has one. Your save is put back as it was when you quit.
+## if it has one. Nothing in here is saved.
 const VIEWER_SEASON := {"snowball_fight": "winter", "sledding": "winter", "tree_lighting": "winter", "egg_hunt": "spring",
 	"duck_crossing": "spring", "volleyball": "summer", "fishing": "summer", "lemonade": "summer", "trick_or_treat": "fall",
 	"hayride": "fall", "harvest_festival": "fall", "zombie_kids": "fall", "santa": "winter"}
 const VIEWER_HOUR := {"santa": 22.0, "fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
 
 func _debug_viewer() -> void:
-	viewer = {"backup": FileAccess.get_file_as_string(Game.SAVE_PATH), "i": -1, "status": "",
+	Game.no_save = true   # nothing that happens in here touches your save
+	viewer = {"i": -1, "status": "",
 		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
 			"soapbox", "group_ride", "fire", "ambulance", "crime", "bike_theft", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]
 			+ city.events.all_kinds()}

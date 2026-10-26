@@ -67,7 +67,11 @@ const VEHICLE_DIMS := {
 	"sedan_hotrod_orange": [0.55, 0.3, 3.0, 4.0], "sedan_beetle_yellow": [0.5, 0.29, 2.0, 2.8], "sedan_microcar_sky": [0.4, 0.26, 2.0, 3.0],
 	"truck_firetruck": [0.9, 0.36, 2.4, 3.2], "truck_garbage": [0.9, 0.36, 1.6, 2.2], "truck_icecream": [0.8, 0.34, 1.8, 2.4],
 	"truck_tow": [0.8, 0.34, 2.2, 3.0], "truck_tractor": [0.6, 0.32, 1.1, 1.7], "van_school_bus": [1.05, 0.36, 1.8, 2.4],
-	"van_mail": [0.65, 0.32, 2.2, 3.0], "van_foodtruck": [0.8, 0.34, 1.6, 2.2], "van_minivan_purple": [0.65, 0.32, 2.2, 3.0]}
+	"van_mail": [0.65, 0.32, 2.2, 3.0], "van_foodtruck": [0.8, 0.34, 1.6, 2.2], "van_minivan_purple": [0.65, 0.32, 2.2, 3.0],
+	"sedan_suv_green": [0.6, 0.3, 2.2, 3.0], "sedan_jeep_khaki": [0.55, 0.3, 2.0, 3.0], "sedan_pickup_red": [0.6, 0.3, 2.2, 3.0],
+	"sedan_sportswagon_teal": [0.6, 0.3, 2.2, 3.2], "sedan_cab_checker": [0.6, 0.3, 2.2, 3.0], "sedan_vintage_cream": [0.55, 0.29, 1.8, 2.6],
+	"truck_cement_mixer": [0.85, 0.36, 1.6, 2.2], "truck_delivery_box": [0.85, 0.34, 2.0, 2.8], "truck_milk": [0.85, 0.34, 1.8, 2.4],
+	"truck_logging": [0.9, 0.34, 1.6, 2.2], "van_camper_orange": [0.65, 0.32, 1.8, 2.6], "van_bakery": [0.7, 0.32, 2.0, 2.8]}
 const PAINTED_VEHICLES := ["car", "truck"]
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]
 const ER_JOKES := [

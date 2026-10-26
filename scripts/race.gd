@@ -622,14 +622,14 @@ func _build_road_geometry() -> void:
 
 ## What each kind of animal does (see _step_animals): the skittish ones bolt when a rider gets close, some dash across
 ## the course, others stand and watch, and deer-like animals come in small herds.
-const FLEERS := ["deer", "fox", "squirrel", "rabbit", "elk", "wolf", "raccoon", "hedgehog", "chipmunk", "skunk"]
-const SMALL_FLEERS := ["squirrel", "rabbit", "hedgehog", "chipmunk", "skunk"]
-const CROSSERS := ["deer", "fox", "squirrel", "elk", "wolf", "raccoon"]
-const WATCHERS := {"goat": "MEHH!", "marmot": "EEP!", "moose": "HRRMPH", "bighorn": "BAAH!", "badger": "HISS!"}
-const HERDERS := ["deer", "goat", "elk", "bighorn"]
-const LITTLE := ["rabbit", "squirrel", "marmot", "hedgehog", "chipmunk", "skunk"]
-const FLEE_SPEED := {"deer": 4.0, "fox": 3.5, "rabbit": 3.0, "squirrel": 2.5, "elk": 4.0, "wolf": 3.8, "raccoon": 3.0, "hedgehog": 2.0, "chipmunk": 3.0, "skunk": 2.5}
-const CROSS_SPEED := {"deer": 4.5, "fox": 4.0, "squirrel": 3.0, "elk": 4.5, "wolf": 4.2, "raccoon": 3.4}
+const FLEERS := ["deer", "fox", "squirrel", "rabbit", "elk", "wolf", "raccoon", "hedgehog", "chipmunk", "skunk", "otter", "coyote"]
+const SMALL_FLEERS := ["squirrel", "rabbit", "hedgehog", "chipmunk", "skunk", "otter"]
+const CROSSERS := ["deer", "fox", "squirrel", "elk", "wolf", "raccoon", "coyote"]
+const WATCHERS := {"goat": "MEHH!", "marmot": "EEP!", "moose": "HRRMPH", "bighorn": "BAAH!", "badger": "HISS!", "mountain_lion": "HSSSS!", "porcupine": "RATTLE", "beaver": "THWAP!"}
+const HERDERS := ["deer", "goat", "elk", "bighorn", "ram_lamb"]
+const LITTLE := ["rabbit", "squirrel", "marmot", "hedgehog", "chipmunk", "skunk", "otter", "ram_lamb"]
+const FLEE_SPEED := {"deer": 4.0, "fox": 3.5, "rabbit": 3.0, "squirrel": 2.5, "elk": 4.0, "wolf": 3.8, "raccoon": 3.0, "hedgehog": 2.0, "chipmunk": 3.0, "skunk": 2.5, "otter": 3.0, "coyote": 3.8}
+const CROSS_SPEED := {"deer": 4.5, "fox": 4.0, "squirrel": 3.0, "elk": 4.5, "wolf": 4.2, "raccoon": 3.4, "coyote": 4.2}
 
 ## Wildlife along the course. Deer, foxes and squirrels may dash across in front of you, bears give chase,
 ## goats and marmots watch from the rocks, moose wade by the creeks.
@@ -650,7 +650,8 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 			kind = "goat" if r < 0.25 else ("marmot" if r < 0.45 else ("bighorn" if r < 0.65 else ("badger" if r < 0.8 else ("bear" if r < 0.9 else "deer"))))
 		else:
 			for w in [["deer", 0.2], ["bear", 0.1], ["rabbit", 0.1], ["squirrel", 0.1], ["fox", 0.07], ["moose", 0.05], ["goat", 0.08], ["elk", 0.1],
-					["wolf", 0.05], ["raccoon", 0.05], ["hedgehog", 0.04], ["chipmunk", 0.04], ["skunk", 0.04]]:
+					["wolf", 0.05], ["raccoon", 0.05], ["hedgehog", 0.04], ["chipmunk", 0.04], ["skunk", 0.04],
+					["coyote", 0.04], ["otter", 0.03], ["beaver", 0.03], ["porcupine", 0.03], ["ram_lamb", 0.03], ["mountain_lion", 0.02]]:
 				r -= float(w[1])
 				if r <= 0.0:
 					kind = w[0]
@@ -1696,7 +1697,8 @@ func _shadow(c: Vector2, w: float) -> void:
 
 ## Shadow width (px) under each animal, about its body length.
 const ANIMAL_SHADOW := {"bear": 24.0, "deer": 22.0, "moose": 26.0, "goat": 14.0, "marmot": 9.0, "rabbit": 9.0, "squirrel": 9.0, "fox": 17.0,
-	"elk": 26.0, "wolf": 18.0, "raccoon": 12.0, "hedgehog": 8.0, "chipmunk": 8.0, "skunk": 10.0, "bighorn": 18.0, "badger": 13.0}
+	"elk": 26.0, "wolf": 18.0, "raccoon": 12.0, "hedgehog": 8.0, "chipmunk": 8.0, "skunk": 10.0, "bighorn": 18.0, "badger": 13.0,
+	"mountain_lion": 22.0, "porcupine": 10.0, "otter": 13.0, "beaver": 12.0, "coyote": 17.0, "ram_lamb": 11.0}
 
 
 ## An animal from its sheets (art/animal_<kind>_idle.png and _run.png; the bear also _roar.png), facing right and

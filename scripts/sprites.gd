@@ -23,7 +23,7 @@ const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above
 
 ## Every pedestrian design there may be art for (art/ped_<design>_walk.png and _cheer.png): the townsfolk, spectators
 ## and joggers. pedestrians() lists the ones that are actually there.
-const PEDESTRIAN_DESIGNS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician"]
+const PEDESTRIAN_DESIGNS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician", "baker", "cyclist_fan", "photographer", "mailman", "nurse", "dogwalker", "busker", "scout"]
 static var _peds: Array = []
 
 

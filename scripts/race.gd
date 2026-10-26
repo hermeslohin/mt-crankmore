@@ -1818,24 +1818,7 @@ func _draw_obstacle(ob: Dictionary) -> void:
 					draw_rect(Rect2(rp - Vector2(2, 1), Vector2(4, 2)), Color(0.66, 0.64, 0.6))
 
 
-## Pixel sprites from [x, y, w, h, colour(, outline)] rectangles in 2x2-pixel units, drawn facing right (face 1)
-## or mirrored, with a 1 px outline.
-func _sprite(base: Vector2, face: float, rects: Array) -> void:
-	for r in rects:
-		if r.size() < 6 or r[5]:
-			draw_rect(_flip(base, face, r[0], r[1], r[2], r[3]).grow(1.0), Iso.OUTLINE)
-	for r in rects:
-		draw_rect(_flip(base, face, r[0], r[1], r[2], r[3]), r[4])
-
-
-func _flip(base: Vector2, face: float, x: float, y: float, w: float, h: float) -> Rect2:
-	x *= 2.0
-	y *= 2.0
-	w *= 2.0
-	h *= 2.0
-	return Rect2(Vector2(base.x + x if face > 0.0 else base.x - x - w, base.y + y), Vector2(w, h))
-
-
+## A soft oval shadow on the ground.
 func _shadow(c: Vector2, w: float) -> void:
 	var poly := PackedVector2Array()
 	for q in 8:
@@ -1843,107 +1826,31 @@ func _shadow(c: Vector2, w: float) -> void:
 	draw_colored_polygon(poly, Color(0, 0, 0, 0.22))
 
 
+## Shadow width (px) under each animal, about its body length.
+const ANIMAL_SHADOW := {"bear": 24.0, "deer": 22.0, "moose": 26.0, "goat": 14.0, "marmot": 9.0, "rabbit": 9.0, "squirrel": 9.0, "fox": 17.0}
+
+
+## An animal from its sheets (art/animal_<kind>_idle.png and _run.png; the bear also _roar.png), facing right and
+## mirrored when it faces left. Dark bears are the same bear, darker.
 func _draw_animal(a: Dictionary) -> void:
 	var p: Vector2 = a["pos"]
 	var base := Iso.to_screen(p, _tz(p) + 1.5).round()
-	var f: float = a["face"]
-	var run: bool = a["run"]
-	var ph: float = a["phase"]
-	var g := int(fposmod(ph * 10.0, 2.0)) if run else 0     # gallop frame
-	var ink := Iso.OUTLINE
-	match a["kind"]:
-		"bear":
-			var col := Color(0.18, 0.14, 0.13) if a["dark"] else Color(0.45, 0.29, 0.16)
-			var dk := Iso.shade(col, 0.72)
-			var mz := Color(0.78, 0.6, 0.4)
-			_shadow(base, 24.0)
-			if a["state"] == "roar":
-				_sprite(base, f, [[-4, -5, 3, 5, dk], [1, -5, 3, 5, dk], [-5, -19, 10, 15, col], [-8, -18, 4, 3, col], [4, -18, 5, 3, col],
-					[-4, -26, 8, 7, col], [-5, -28, 2, 2, col], [3, -28, 2, 2, col], [1, -23, 4, 3, mz]])
-				_sprite(base, f, [[2, -21, 3, 1, Color(0.85, 0.15, 0.15), false], [0, -25, 1, 1, ink, false], [4, -23, 1, 1, ink, false]])
-			else:
-				var bob := -1 if g == 1 else 0
-				_sprite(base, f, [[-9 + g * 2, -5, 3, 5, dk], [6 - g * 2, -5, 3, 5, dk], [-6 - g, -5, 3, 5, col], [3 + g, -5, 3, 5, col],
-					[-9, -12 + bob, 17, 8, col], [-3, -14 + bob, 7, 3, col], [7, -14 + bob, 6, 6, col], [8, -16 + bob, 2, 2, col], [11, -11 + bob, 4, 3, mz]])
-				_sprite(base, f, [[14, -11 + bob, 1, 1, ink, false], [10, -12 + bob, 1, 1, ink, false]])
-		"deer":
-			var col := Color(0.72, 0.5, 0.3)
-			var dk := Iso.shade(col, 0.7)
-			var white := Color(0.97, 0.95, 0.9)
-			_shadow(base, 16.0)
-			var graze: bool = not run and sin(ph * 0.7) > 0.3
-			var bob := -1 if g == 1 else 0
-			var legs: Array = [[-6, -6, 1, 6, dk], [-4, -6, 1, 6, dk], [3, -6, 1, 6, dk], [5, -6, 1, 6, dk]] if not run else \
-				([[-9, -6, 1, 5, dk], [-7, -6, 1, 4, dk], [6, -6, 1, 5, dk], [8, -6, 1, 4, dk]] if g == 0 else [[-4, -6, 1, 6, dk], [-2, -6, 1, 6, dk], [1, -6, 1, 6, dk], [3, -6, 1, 6, dk]])
-			var body: Array = [[-7, -11 + bob, 13, 5, col], [-8, -12 + bob, 2, 2, white]]
-			if graze:
-				body += [[5, -10, 3, 4, col], [7, -7, 4, 3, col], [6, -9, 1, 2, col]]
-			else:
-				body += [[4, -15 + bob, 3, 5, col], [5, -17 + bob, 5, 3, col], [4, -19 + bob, 1, 2, col]]
-			_sprite(base, f, legs + body)
-			var det: Array = [[-4, -7 + bob, 8, 1, white, false]]
-			if graze:
-				det.append([10, -6, 1, 1, ink, false])
-			else:
-				det.append([9, -16 + bob, 1, 1, ink, false])
-				if a["stag"]:
-					var ac := Color(0.85, 0.75, 0.55)
-					det += [[5, -23 + bob, 1, 5, ac, false], [7, -22 + bob, 1, 4, ac, false], [4, -22 + bob, 1, 1, ac, false], [8, -23 + bob, 1, 1, ac, false]]
-			_sprite(base, f, det)
-		"rabbit":
-			var col := Color(0.62, 0.52, 0.42)
-			var hop := -int(absf(sin(ph * 12.0)) * 4.0) if run else 0
-			_shadow(base, 8.0)
-			_sprite(base, f, [[-3, -4 + hop, 5, 3, col], [1, -6 + hop, 3, 3, col], [1, -9 + hop, 1, 3, col], [3, -9 + hop, 1, 3, col], [-4, -4 + hop, 2, 2, Color(1, 1, 1)]])
-		"squirrel":
-			var col := Color(0.68, 0.33, 0.15)
-			var hop := -int(absf(sin(ph * 14.0)) * 2.0) if run else 0
-			_shadow(base, 8.0)
-			_sprite(base, f, [[-2, -4 + hop, 4, 3, col], [-5, -9 + hop, 3, 6, col], [1, -6 + hop, 3, 2, col], [2, -7 + hop, 1, 1, col]])
-		"fox":
-			var col := Color(0.92, 0.46, 0.12)
-			var dk := Color(0.25, 0.15, 0.12)
-			_shadow(base, 14.0)
-			_sprite(base, f, [[-4 - g, -3, 1, 3, dk], [3 + g, -3, 1, 3, dk], [-2 + g, -3, 1, 3, dk], [1 - g, -3, 1, 3, dk],
-				[-5, -6, 10, 3, col], [-10, -7, 5, 2, col], [-11, -7, 2, 2, Color(1, 1, 1)], [4, -8, 4, 3, col], [7, -7, 2, 2, Color(1, 1, 1)],
-				[4, -10, 1, 2, col], [6, -10, 1, 2, col]])
-			_sprite(base, f, [[6, -8, 1, 1, ink, false], [8, -7, 1, 1, ink, false]])
-		"goat":
-			var col := Color(0.95, 0.95, 0.92)
-			var dk := Color(0.55, 0.55, 0.55)
-			_shadow(base, 12.0)
-			_sprite(base, f, [[-4, -4, 1, 4, dk], [-2, -4, 1, 4, dk], [2, -4, 1, 4, dk], [4, -4, 1, 4, dk], [-5, -9, 10, 5, col], [4, -12, 3, 4, col], [6, -8, 1, 2, col]])
-			_sprite(base, f, [[4, -15, 1, 3, Color(0.25, 0.22, 0.2), false], [5, -15, 1, 1, Color(0.25, 0.22, 0.2), false], [6, -11, 1, 1, ink, false]])
-		"marmot":
-			var col := Color(0.58, 0.42, 0.26)
-			var up := not run and sin(ph * 0.9) > 0.0
-			_shadow(base, 8.0)
-			if up:
-				_sprite(base, f, [[-2, -7, 4, 7, col], [-1, -10, 3, 3, col]])
-				_sprite(base, f, [[-1, -6, 2, 4, Color(0.8, 0.68, 0.5), false], [1, -9, 1, 1, ink, false]])
-			else:
-				_sprite(base, f, [[-3, -4, 6, 4, col], [2, -5, 3, 3, col]])
-		"moose":
-			var col := Color(0.3, 0.2, 0.13)
-			var leg := Color(0.55, 0.45, 0.35)
-			var ant := Color(0.8, 0.7, 0.5)
-			_shadow(base, 26.0)
-			_sprite(base, f, [[-7, -9, 2, 9, leg], [-4, -9, 2, 9, leg], [4, -9, 2, 9, leg], [7, -9, 2, 9, leg],
-				[-9, -17, 18, 8, col], [-2, -19, 6, 2, col], [8, -18, 4, 4, col], [10, -15, 4, 4, col], [9, -12, 2, 3, col]])
-			_sprite(base, f, [[4, -22, 7, 2, ant], [4, -24, 1, 2, ant], [7, -24, 1, 2, ant], [10, -24, 1, 2, ant]])
-			_sprite(base, f, [[10, -17, 1, 1, ink, false]])
+	var kind: String = a["kind"]
+	var look := "run" if a["run"] else "idle"
+	if kind == "bear" and a["state"] == "roar":
+		look = "roar"
+	var tint := Color(0.5, 0.46, 0.46) if kind == "bear" and a["dark"] else Color.WHITE
+	_shadow(base, ANIMAL_SHADOW[kind])
+	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t_ + float(a["phase"]), 14.0 if look == "run" else 8.0, true, float(a["face"]) < 0.0, tint)
 
 
-## A pair of eagles circling high over the course.
+## A pair of eagles circling high over the course (art/animal_eagle_fly.png).
 func _draw_birds(me_pos: Vector2) -> void:
 	for q in 2:
 		var ang := t_ * (0.35 + q * 0.12) + q * PI
 		var p := me_pos + Vector2(4.0 + q * 3.0, -5.0) + Vector2(cos(ang), sin(ang)) * (3.5 + q)
 		var c := Iso.to_screen(p, _tz(me_pos) + 150.0 + q * 30.0)
-		var flap := sin(t_ * (5.0 + q)) * 3.0
-		var wing := Color(0.32, 0.22, 0.14)
-		draw_polyline(PackedVector2Array([c + Vector2(-8, -2 + flap), c + Vector2(-3, 0), c, c + Vector2(3, 0), c + Vector2(8, -2 + flap)]), wing, 2.0)
-		draw_rect(Rect2(c + Vector2(-1, -2), Vector2(2, 2)), Color(0.98, 0.98, 0.95))
+		Sprites.draw_strip(self, "animal_eagle_fly", c, t_ + q * 0.37, 8.0 + q, false)
 
 
 func _crowded(k: int) -> bool:

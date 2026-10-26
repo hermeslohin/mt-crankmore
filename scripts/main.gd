@@ -94,6 +94,8 @@ func _ready() -> void:
 			_debug_ride()
 		"wipeout":
 			_debug_wipeout()
+		"animals":
+			_debug_animals()
 		"buildings":
 			_start_game()
 			var count := {}
@@ -650,6 +652,36 @@ func _debug_wipeout() -> void:
 	print("WIPEOUT: p_fall=%.2f er_timer=%.2f" % [city.p_fall, city.er_timer])
 	if backup != "":
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=animals [PIZZA_OUT=dir] lines up one of every animal beside the player in a race (standing,
+## then running; the bear also roaring) and saves a screenshot of each.
+func _debug_animals() -> void:
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	Trainer._autostart_clock = 0.0
+	Game.money = maxi(Game.money, 1000)
+	_start_race(0)
+	await get_tree().create_timer(0.3).timeout
+	var kinds := ["bear", "deer", "moose", "goat", "marmot", "rabbit", "squirrel", "fox"]
+	var s0 := float(race.riders[0]["s"]) + 4.0
+	for look in ["idle", "run", "roar"]:
+		race.animals.clear()
+		for i in kinds.size():
+			var side := 1.0 if i % 2 == 0 else -1.0
+			var p: Vector2 = race._pose(s0 + i * 0.9, side * (1.6 + (i % 3) * 0.9))["pos"]
+			race.animals.append({"kind": kinds[i], "pos": p, "home": p, "s": s0 + i, "side": side, "state": "roar" if look == "roar" else "idle", "t": 99.0,
+				"face": 1.0 if i % 4 < 2 else -1.0, "vel": Vector2.ZERO, "phase": float(i), "run": look == "run", "cross": false, "stag": true,
+				"dark": i % 3 == 1, "done": true})
+		race.riders[0]["s"] = s0 - 3.0
+		race.riders[0]["v"] = 0.0
+		for k in 3:
+			await get_tree().process_frame
+		cam.position = race.cam_target()
+		await get_tree().create_timer(0.4).timeout
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/animals_%s.png" % [out, look])
 	get_tree().quit()
 
 

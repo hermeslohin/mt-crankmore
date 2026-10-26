@@ -208,11 +208,9 @@ func pumpkin(ci: CanvasItem, b: Vector2, size: float, sd: int) -> void:
 		ci.draw_rect(Rect2(c + Vector2(-2, 2), Vector2(4, 1)), o)
 
 
+## A butterfly (art/animal_butterfly.png) centred on `p`, tinted towards `col` so they are not all orange.
 func butterfly(ci: CanvasItem, p: Vector2, col: Color, flap: float) -> void:
-	var w := 1.0 + absf(sin(flap)) * 2.0
-	ci.draw_rect(Rect2(p + Vector2(-w - 1, -2), Vector2(w, 3)), col)
-	ci.draw_rect(Rect2(p + Vector2(1, -2), Vector2(w, 3)), col)
-	ci.draw_rect(Rect2(p + Vector2(0, -2), Vector2(1, 4)), Iso.OUTLINE)
+	Sprites.draw_strip(ci, "animal_butterfly", p, flap / 14.0, 14.0, false, false, Color.WHITE.lerp(col, 0.4))
 
 
 ## A little bed of tulips.

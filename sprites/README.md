@@ -82,3 +82,4 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 | `buildings/hotels/` | one themed hotel per hotel name (192x208) | `art/building_<name>.png` |
 | `buildings/condos/` | the six condo blocks (160x160) | `art/building_<name>.png` |
 | `buildings/chalets/` | 16 chalet designs (128x112) | `art/building_chalet_NN.png` |
+| `animals/<kind>/` | the race-course wildlife: bear (`idle`, `run`, `roar`), deer, moose, goat, fox, marmot, rabbit, squirrel (`idle`, `run`), all east-facing; `eagle` (`fly`) and `butterfly` (`flutter`) | `art/animal_<kind>_<anim>.png` |

@@ -805,6 +805,10 @@ func _debug_shot() -> void:
 			spots.append(j["pos"])
 	elif OS.get_environment("PIZZA_AT") == "er":
 		spots.append(city.zone_anchor("er")["pos"])
+	elif OS.get_environment("PIZZA_AT") == "townhall":
+		for b in city.buildings:
+			if b["kind"] == "townhall":
+				spots.append(b["door"])
 	elif OS.get_environment("PIZZA_AT") == "shops":
 		for k in 3:
 			city._post_order()

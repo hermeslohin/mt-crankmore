@@ -27,10 +27,14 @@ const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above
 const NORMAL_DESIGNS := ["kid", "tourist", "grandpa", "lady", "teen", "grandma", "dad_stroller", "tourist_family",
 	"norm_man_jeans", "norm_woman_sundress", "norm_man_plaid", "norm_woman_jeans_jacket", "norm_old_man_cane", "norm_old_woman",
 	"norm_teen_girl", "norm_teen_boy", "norm_student", "norm_mom_bags", "norm_man_suit_casual", "norm_woman_sweater",
-	"norm_man_heavy", "norm_woman_tall", "norm_couple_kid", "norm_man_shorts"]
+	"norm_man_heavy", "norm_woman_tall", "norm_couple_kid", "norm_man_shorts",
+	"norm_man_windbreaker", "norm_woman_cardigan", "norm_man_overalls", "norm_woman_tracksuit", "norm_man_bald_glasses",
+	"norm_woman_curly_hair", "norm_teen_skater_plain", "norm_man_fleece", "norm_woman_office", "norm_old_man_vest",
+	"norm_woman_ponytail_runner_casual", "norm_man_denim_jacket", "norm_woman_hat_scarf", "norm_boy_kid",
+	"norm_man_tall_thin", "norm_woman_short_hair"]
 const CHARACTER_DESIGNS := ["jogger", "hiker", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician",
 	"baker", "cyclist_fan", "photographer", "mailman", "nurse", "dogwalker", "construction", "sweeper", "courier", "police",
-	"gardener", "newsboy", "crossing_guard", "barista"]
+	"gardener", "newsboy", "crossing_guard", "barista", "scout", "balloon_vendor"]
 const PEDESTRIAN_DESIGNS := NORMAL_DESIGNS + CHARACTER_DESIGNS
 const NORMAL_WEIGHT := 4
 static var _peds: Array = []

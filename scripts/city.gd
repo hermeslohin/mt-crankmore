@@ -73,6 +73,7 @@ const VEHICLE_DIMS := {
 	"truck_cement_mixer": [0.85, 0.36, 1.6, 2.2], "truck_delivery_box": [0.85, 0.34, 2.0, 2.8], "truck_milk": [0.85, 0.34, 1.8, 2.4],
 	"truck_logging": [0.9, 0.34, 1.6, 2.2], "van_camper_orange": [0.65, 0.32, 1.8, 2.6], "van_bakery": [0.7, 0.32, 2.0, 2.8]}
 const PAINTED_VEHICLES := ["car", "truck"]
+const CAR_COUNT := 110   # vehicles in the town's traffic
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]
 const ER_JOKES := [
 	"Doctor: \"Good news: you're fine. Bad news: your bike filed a complaint.\"",
@@ -724,6 +725,11 @@ func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color =
 			b["col"] = Color(0.6, 0.42, 0.3)
 			b["roof"] = Color(0.3, 0.32, 0.42)
 			b["roof_h"] = 18.0
+		"townhall":
+			b["h"] = 52.0
+			b["col"] = Color(0.95, 0.9, 0.78)
+			b["roof"] = Color(0.75, 0.28, 0.22)
+			b["roof_h"] = 18.0
 	if bname != "":
 		b["name"] = bname
 	var idx := buildings.size()
@@ -762,6 +768,7 @@ func _place_specials() -> void:
 		["er", "St. Pedro's Hospital", Vector2(96, 92), Vector2(3, 3)],
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
+		["townhall", "Mt. Crankmore Town Hall", PLAZA + Vector2(9, -9), Vector2(3, 3)],
 	]
 	var pizza_i := 0
 	for sp in specials:
@@ -1302,9 +1309,16 @@ func _route(from: Vector2, to: Vector2, off: Vector2) -> Array:
 func _spawn_cars() -> void:
 	# traffic spread over the longer roads
 	# a random mix of every kind of vehicle that has art, different each game
-	var pool: Array = VEHICLE_DIMS.keys().filter(func(k): return Sprites.sheet("vehicle_%s" % k) != null)
+	# (each kind also comes in the colours tools/recolor_vehicle.gd made: art/vehicle_<kind>_c<n>.png)
+	var pool: Array = []   # [kind, art]
+	for k in VEHICLE_DIMS.keys():
+		if Sprites.sheet("vehicle_%s" % k) != null:
+			pool.append([k, "vehicle_%s" % k])
+			for n in range(1, 7):
+				if Sprites.sheet("vehicle_%s_c%d" % [k, n]) != null:
+					pool.append([k, "vehicle_%s_c%d" % [k, n]])
 	var kinds: Array = []
-	for k in 38:
+	for k in CAR_COUNT:
 		kinds.append(pool[randi() % pool.size()])
 	var long_roads: Array = []
 	for ri in roads.size():
@@ -1313,10 +1327,10 @@ func _spawn_cars() -> void:
 	for k in kinds.size():
 		var ri: int = long_roads[(k * 7) % long_roads.size()]
 		var r: Dictionary = roads[ri]
-		var kind: String = kinds[k]
+		var kind: String = kinds[k][0]
 		var d: Array = VEHICLE_DIMS[kind]
 		var c := {"road": ri, "s": randf_range(3.0, float(r["len"]) - 3.0), "dir": 1.0 if randf() < 0.5 else -1.0,
-			"speed": 0.0, "max": randf_range(d[2], d[3]) * PACE, "col": CAR_COLORS[randi() % CAR_COLORS.size()], "kind": kind,
+			"speed": 0.0, "max": randf_range(d[2], d[3]) * PACE, "col": CAR_COLORS[randi() % CAR_COLORS.size()], "kind": kind, "art": kinds[k][1],
 			"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT}
 		_car_pose(c)
 		cars.append(c)
@@ -2904,7 +2918,7 @@ func _draw_building(b: Dictionary) -> void:
 	_draw_building_inner(b)
 	Iso.fade = 1.0
 	var kind: String = b["kind"]
-	var always := kind in ["pizza", "bike", "er", "race", "gondola"]
+	var always := kind in ["pizza", "bike", "er", "race", "gondola", "townhall"]
 	var center: Vector2 = b["pos"] + b["size"] * 0.5
 	if always or (active and p_pos.distance_to(center) < 7.0) or kind == "hotel":
 		var col := Color(1.0, 0.95, 0.5) if always else Color(1, 1, 1)
@@ -2926,6 +2940,8 @@ func _building_art(b: Dictionary) -> String:
 			art = "building_race_hq"
 		"gondola":
 			art = "building_gondola_base"
+		"townhall":
+			art = "building_town_hall"
 		"pizza", "bike", "shop", "hotel", "condo":
 			art = "building_" + _shop_slug(str(b["name"]).trim_suffix(" II"))
 		"chalet":
@@ -2958,7 +2974,7 @@ func _draw_building_inner(b: Dictionary) -> void:
 	pos += inset
 	size -= inset * 2.0
 	match kind:
-		"chalet", "condo", "hotel", "gondola":
+		"chalet", "condo", "hotel", "gondola", "townhall":
 			Iso.box(self, pos, size, h, col)
 			if kind == "chalet":
 				_chalet_trim(pos, size, h)
@@ -3237,7 +3253,7 @@ func _draw_car(c: Dictionary) -> void:
 	var rt := Vector2(-fwd.y, fwd.x)
 	draw_colored_polygon(_to_screen_poly(PackedVector2Array([pos + fwd * hl + rt * hw, pos - fwd * hl + rt * hw, pos - fwd * hl - rt * hw, pos + fwd * hl - rt * hw])), Color(0, 0, 0, 0.25))
 	var tint := Color.WHITE.lerp(c["col"], 0.7) if c["kind"] in PAINTED_VEHICLES else Color.WHITE
-	if not Sprites.draw_vehicle(self, "vehicle_%s" % c["kind"], Iso.to_screen(pos), fwd, tint):
+	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), Iso.to_screen(pos), fwd, tint):
 		Sprites.draw_vehicle(self, "vehicle_car", Iso.to_screen(pos), fwd, Color.WHITE.lerp(c["col"], 0.7))
 	if c.get("siren", false):
 		TownEvents.draw_siren(self, c, Iso.to_screen(pos), t_)
@@ -3450,6 +3466,7 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 			"bike": col = Color(0.3, 0.6, 1.0)
 			"er": col = Color.WHITE
 			"race": col = Color(1.0, 0.9, 0.2)
+			"townhall": col = Color(0.75, 0.5, 1.0)
 		if col.a > 0.0:
 			var mp := minimap_point(b["pos"] + b["size"] * 0.5, rect)
 			ci.draw_rect(Rect2(mp - Vector2(3, 3), Vector2(6, 6)), Iso.OUTLINE)

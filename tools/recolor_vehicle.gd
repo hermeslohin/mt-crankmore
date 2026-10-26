@@ -6,7 +6,7 @@ extends SceneTree
 ##   godot --headless -s tools/recolor_vehicle.gd -- [variants=4]
 
 const SKIP := ["car", "truck", "sedan_police", "sedan_taxi", "van_ambulance", "truck_firetruck", "van_school_bus", "van_mail",
-	"truck_icecream", "sedan_cab_checker", "van_city_bus", "sedan_horse_carriage", "truck_tractor"]
+	"truck_icecream", "sedan_cab_checker", "van_city_bus", "sedan_horse_carriage", "truck_tractor", "snowcat", "snowmobile"]
 # per variant: hue shift (turns), saturation and value multipliers
 const LOOKS := [[0.5, 1.0, 1.0], [0.25, 1.05, 1.0], [0.75, 0.9, 1.05], [0.0, 0.35, 1.12], [0.12, 1.0, 0.7], [0.62, 1.1, 0.85]]
 

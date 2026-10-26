@@ -491,7 +491,7 @@ func _draw_vehicle(name: String, pz: Dictionary) -> void:
 func _draw_groomer(name: String, p: Vector2, dir: Vector2) -> void:
 	var at := Iso.to_screen(p, race._tz(p) + 1.5)
 	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-14, 0), at + Vector2(0, -6), at + Vector2(14, 0), at + Vector2(0, 6)]), Color(0.3, 0.35, 0.5, 0.25))
-	Sprites.draw_vehicle(race, name, at + Vector2(0, -1 if int(t_ * 6.0) % 2 == 0 else 0), dir)
+	Sprites.draw_vehicle(race, name, at + Vector2(0, -1 if int(t_ * 6.0) % 2 == 0 else 0), dir, Color.WHITE, int(t_ * 6.0))
 
 
 func _draw_devil(pz: Dictionary, running: bool) -> void:

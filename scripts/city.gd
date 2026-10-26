@@ -1690,6 +1690,8 @@ func _update_player(delta: float) -> void:
 		target *= PowerUps.SOCKS_BOOST
 	if p_blocked:
 		target = minf(target, 0.4 * PACE)
+	if events != null and events.blocks_rider(p_pos, p_fwd):
+		target = 0.0   # a cow in the road: you can't ride through it, wait for it to wander off
 	if Input.is_action_just_pressed("powerup"):
 		_use_powerup(-1)
 	# coast in gently when riding up to a pickup window or a delivery door

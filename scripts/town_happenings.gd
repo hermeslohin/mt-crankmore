@@ -907,6 +907,23 @@ func _end(e: Dictionary) -> void:
 	super._end(e)
 
 
+## Cows are solid: ride up to one and you stop until it wanders out of your way (it lets you know).
+func blocks_rider(pos: Vector2, fwd: Vector2) -> bool:
+	for e in events:
+		if e["kind"] != "cows":
+			continue
+		for a in e["actors"]:
+			if not a.get("cow", false):
+				continue
+			var rel: Vector2 = (a["pos"] as Vector2) - pos
+			var ahead := rel.dot(fwd)
+			if ahead > -0.1 and ahead < 0.95 and absf(rel.dot(fwd.orthogonal())) < 0.6:
+				if a["label_t"] <= 0.0:
+					_say(a, ["MOOO!", "Moo?", "*chews*", "Mooo. (not moving)"].pick_random(), 1.6)
+				return true
+	return false
+
+
 ## The cows, ducks and the giant balloon's handlers have the road: cars wait for them (with the band and group rides).
 func ride_spots() -> Array:
 	var out: Array = super.ride_spots()

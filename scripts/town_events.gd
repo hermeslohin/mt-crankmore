@@ -1571,6 +1571,12 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["t"] = minf(float(e["t"]), 0.3)
 
 
+## Whether something solid is right in front of a rider at `pos` heading `fwd`, so they have to stop (see
+## TownHappenings: cows).
+func blocks_rider(_pos: Vector2, _fwd: Vector2) -> bool:
+	return false
+
+
 ## The group riders (traffic gives them room like the band).
 func ride_spots() -> Array:
 	var out: Array = []

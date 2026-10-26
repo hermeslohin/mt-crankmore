@@ -8,7 +8,7 @@ extends RefCounted
 ##   * a devil superfan who runs alongside you up one of the climbs;
 ##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, a TV helicopter overhead;
 ##   * a mountain cog railway straight down the hillside, with level crossings and a train that comes by now and then;
-##   * up in the snow, a ski area: skiers and snowboarders carving down, a ski school snake, ski patrol, a chairlift with
+##   * up in the snow, a ski area: skiers and snowboarders carving down, a ski school snake, ski patrol, chairlifts with
 ##     its chairs going round, the lodge, a cocoa stand, racks, slalom gates, a snowcat grooming and a snowmobile.
 ## Static things go into the race's statics (drawn by Race._draw_deco); the moving ones come from movers() each frame.
 
@@ -25,7 +25,9 @@ var rail_y1 := 0.0
 var crossings: Array = []      # {s, y}: where the railway crosses the road
 var devil := {}                # {s0, s1, side}
 var skiers: Array = []         # {design, p0, len, amp, speed, ph}: each carves down its own run and starts again
-var lift := {}                 # {x, y0, y1, towers: [y...]}: the chairlift (bottom y0 is the lower end, nearer the camera)
+var lift := {}                 # {x, y0, y1, towers: [y...]}: the main chairlift (bottom y0 is the lower end, nearer the camera)
+var lifts: Array = []          # every chairlift up the mountain (the main one first)
+const SKIER_COUNT := 40
 var groomers: Array = []       # {name, a, b, speed, ph}: snowcat and snowmobile going back and forth
 const SKIER_DESIGNS := ["skier_red", "skier_blue", "skier_kid", "skier_retro", "snowboarder_green", "snowboarder_pink", "ski_patrol"]
 const CHAIR_SPACING := 3.2     # tiles between chairs
@@ -271,6 +273,7 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 	skiers.clear()
 	groomers.clear()
 	lift = {}
+	lifts.clear()
 	if Sprites.sheet("ped_skier_red_ski") == null:
 		return
 	# snowy ground away from the road
@@ -283,7 +286,7 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 	if snow.size() < 30:
 		return
 	# skiers: each picks a run that stays in the snow, carving down towards the camera (+y)
-	for k in 14:
+	for k in SKIER_COUNT:
 		for _try in 20:
 			var p0: Vector2 = snow[rng.randi() % snow.size()]
 			var run := rng.randf_range(6.0, 12.0)
@@ -293,19 +296,20 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 				skiers.append({"design": design, "p0": p0, "len": run, "amp": rng.randf_range(0.8, 1.6) * (1.6 if board else 1.0),
 					"speed": rng.randf_range(0.9, 1.5) * (0.5 if design == "ski_patrol" else 1.0), "ph": rng.randf() * 10.0, "lag": 0.0})
 				break
-	# a ski school: the instructor and three kids following in a snake
+	# ski schools: an instructor and three kids following in a snake
 	if not snow.is_empty() and Sprites.sheet("ped_ski_instructor_ski") != null:
-		var p0: Vector2 = snow[rng.randi() % snow.size()]
-		var ph := rng.randf() * 10.0
-		for k in 4:
-			skiers.append({"design": "ski_instructor" if k == 0 else "skier_kid", "p0": p0, "len": 9.0, "amp": 1.3, "speed": 0.55, "ph": ph, "lag": k * 0.9})
-	# the chairlift: the snowy column with the longest run of snow
-	var best_x := -1.0
-	var best := [0.0, 0.0]
-	for f in [0.2, 0.3, 0.45, 0.55, 0.7, 0.8]:
+		for school in 2:
+			var p0: Vector2 = snow[rng.randi() % snow.size()]
+			var ph := rng.randf() * 10.0
+			for k in 4:
+				skiers.append({"design": "ski_instructor" if k == 0 else "skier_kid", "p0": p0, "len": 9.0, "amp": 1.3, "speed": 0.55, "ph": ph, "lag": k * 0.9})
+	# chairlifts up the mountain: the snowy columns with the longest runs of snow, well apart (the longest first)
+	var runs: Array = []   # [length, x, bottom y, top y]
+	for f in [0.12, 0.2, 0.28, 0.36, 0.45, 0.55, 0.64, 0.72, 0.8, 0.88]:
 		var x: float = race.leg_len * float(f)
 		if race.life == self and rail_x >= 0.0 and absf(x - rail_x) < 6.0:
 			continue
+		var best := [0.0, 0.0]
 		var y := float(race.oy + race.gh) - 2.0
 		var run_start := -1.0
 		while y > race.oy + 2.0:
@@ -314,22 +318,31 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 					run_start = y
 				if run_start - y > best[0] - best[1]:
 					best = [run_start, y]
-					best_x = x
 			else:
 				run_start = -1.0
 			y -= 1.0
-	if best_x >= 0.0 and best[0] - best[1] > 14.0:
+		if best[0] - best[1] > 14.0:
+			runs.append([best[0] - best[1], x, best[0], best[1]])
+	runs.sort_custom(func(a, b): return a[0] > b[0])
+	for rn in runs:
+		if lifts.size() >= 3 or lifts.any(func(l): return absf(float(l["x"]) - float(rn[1])) < 9.0):
+			continue
+		var bx: float = rn[1]
 		var towers: Array = []
-		var ty: float = best[0] - 2.0
-		while ty > best[1] + 2.0:
-			if race._rd(Vector2(best_x, ty)) > 1.4:
+		var ty: float = float(rn[2]) - 2.0
+		while ty > float(rn[3]) + 2.0:
+			if race._rd(Vector2(bx, ty)) > 1.4:
 				towers.append(ty)
 			ty -= 7.0
-		lift = {"x": best_x, "y0": best[0], "y1": best[1], "towers": towers}
+		lifts.append({"x": bx, "y0": rn[2], "y1": rn[3], "towers": towers, "ph": rng.randf() * 10.0})
 		for t in towers:
-			_sprite_at("ski_chairlift_tower", Vector2(best_x, t))
-		_sprite_at("ski_chairlift_station", Vector2(best_x + 0.4, best[0] + 1.5))
-		_sprite_at("ski_chairlift_station", Vector2(best_x + 0.4, best[1] - 1.0), true)
+			_sprite_at("ski_chairlift_tower", Vector2(bx, t))
+		_sprite_at("ski_chairlift_station", Vector2(bx + 0.4, float(rn[2]) + 1.5))
+		_sprite_at("ski_chairlift_station", Vector2(bx + 0.4, float(rn[3]) - 1.0), true)
+	if not lifts.is_empty():
+		lift = lifts[0]
+		var best_x: float = lift["x"]
+		var best := [float(lift["y0"]), float(lift["y1"])]
 		# the base area by the bottom station
 		var base := Vector2(best_x + 4.5, best[0] + 1.0)
 		_sprite_at("ski_ski_lodge", base + Vector2(2.0, 1.0))
@@ -370,31 +383,31 @@ func _draw_skier(sk: Dictionary, p: Vector2, dir: Vector2, u: float) -> void:
 	Sprites.draw_person(race, "ped_%s_ski" % sk["design"], at, dir, t_ + float(sk["ph"]), 8.0, Color(1, 1, 1, a))
 
 
+## [position, going up?, the lift] for every chair on every lift.
 func _chairs() -> Array:
 	var out: Array = []
-	if lift.is_empty():
-		return out
-	var y0: float = lift["y0"]
-	var y1: float = lift["y1"]
-	var span := y0 - y1
-	var loop := span * 2.0
-	var n := int(loop / CHAIR_SPACING)
-	for k in n:
-		var u := fposmod(t_ * LIFT_SPEED + k * CHAIR_SPACING, loop)
-		var up := u < span
-		var y := y0 - u if up else y1 + (u - span)
-		var p := Vector2(float(lift["x"]) + (-0.45 if up else 0.45), y)
-		out.append([p, up])
+	for l in lifts:
+		var y0: float = l["y0"]
+		var y1: float = l["y1"]
+		var span := y0 - y1
+		var loop := span * 2.0
+		var n := int(loop / CHAIR_SPACING)
+		for k in n:
+			var u := fposmod((t_ + float(l["ph"])) * LIFT_SPEED + k * CHAIR_SPACING, loop)
+			var up := u < span
+			var y := y0 - u if up else y1 + (u - span)
+			var p := Vector2(float(l["x"]) + (-0.45 if up else 0.45), y)
+			out.append([p, up, l])
 	return out
 
 
-func _cable_z(y: float) -> float:
+func _cable_z(l: Dictionary, y: float) -> float:
 	# the cable hangs between the towers, about 70 px above the ground under it
-	return race._tz(Vector2(float(lift["x"]), y)) + 70.0 - 8.0 * absf(sin(y / 7.0 * PI))
+	return race._tz(Vector2(float(l["x"]), y)) + 70.0 - 8.0 * absf(sin(y / 7.0 * PI))
 
 
-func _draw_chair(p: Vector2, up: bool) -> void:
-	var z := _cable_z(p.y)
+func _draw_chair(p: Vector2, up: bool, l: Dictionary) -> void:
+	var z := _cable_z(l, p.y)
 	var top := Iso.to_screen(p, z)
 	race.draw_line(top, top + Vector2(0, 12), Color(0.2, 0.2, 0.25), 1.0)
 	Sprites.draw_vehicle(race, "obj_chairlift_chair_riders" if up else "obj_chairlift_chair", top + Vector2(0, 26), Vector2(0, -1) if up else Vector2(0, 1))
@@ -402,16 +415,15 @@ func _draw_chair(p: Vector2, up: bool) -> void:
 
 ## The chairlift cables, drawn over everything (they are high up).
 func draw_lift_cables(ci: CanvasItem) -> void:
-	if lift.is_empty():
-		return
-	for side in [-0.45, 0.45]:
-		var pts := PackedVector2Array()
-		var y: float = lift["y1"]
-		while y <= float(lift["y0"]):
-			pts.append(Iso.to_screen(Vector2(float(lift["x"]) + side, y), _cable_z(y)))
-			y += 1.0
-		if pts.size() > 1:
-			ci.draw_polyline(pts, Color(0.18, 0.18, 0.22, 0.85), 1.0)
+	for l in lifts:
+		for side in [-0.45, 0.45]:
+			var pts := PackedVector2Array()
+			var y: float = l["y1"]
+			while y <= float(l["y0"]):
+				pts.append(Iso.to_screen(Vector2(float(l["x"]) + side, y), _cable_z(l, y)))
+				y += 1.0
+			if pts.size() > 1:
+				ci.draw_polyline(pts, Color(0.18, 0.18, 0.22, 0.85), 1.0)
 
 
 # ---------------------------------------------------------------------
@@ -453,7 +465,7 @@ func movers() -> Array:
 		var r := _skier_pos(sk, t_)
 		out.append([r[0], _draw_skier.bind(sk, r[0], r[1], r[2])])
 	for c in _chairs():
-		out.append([c[0], _draw_chair.bind(c[0], c[1])])
+		out.append([c[0], _draw_chair.bind(c[0], c[1], c[2])])
 	for g in groomers:
 		var span := (g["b"] as Vector2).distance_to(g["a"])
 		var u := fposmod(t_ * float(g["speed"]) / span + float(g["ph"]), 2.0)

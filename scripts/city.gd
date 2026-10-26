@@ -126,6 +126,14 @@ var events: TownEvents          # random happenings around the player (see TownE
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
+## Chairlifts up Mt. Crankmore from the hills by the gondola: a bottom station in town, towers up the lift line (the
+## trees cleared), and the cable running on up the mountain in the backdrop, with chairs going round.
+const LIFT_BASES := [Vector2(14, 46), Vector2(40, 16), Vector2(12, 24)]
+const LIFT_SUMMITS := [Vector2(-300, -1380), Vector2(140, -1420), Vector2(-120, -1460)]   # where each cable meets the mountain (screen)
+const LIFT_Z := 80.0          # px: the cable's height over the ground
+const LIFT_CHAIR_GAP := 72.0  # px between chairs along the cable
+const LIFT_SPEED_PX := 18.0   # px per second
+var lifts: Array = []         # {base: world pos, line: [world points up the lift line], summit, pts (cable, screen; built on first draw), len}
 var rng := RandomNumberGenerator.new()
 var _name_i := {"shop": 0, "hotel": 0}
 
@@ -392,6 +400,7 @@ func _generate() -> void:
 	_place_nature()
 	_build_road_geometry()
 	_build_lake_geometry()
+	_place_lifts()
 	for t in trees:
 		var key := Vector2i(floori(t["pos"].x / CHUNK), floori(t["pos"].y / CHUNK))
 		if not tree_chunks.has(key):
@@ -1045,6 +1054,86 @@ func _road_dist(p: Vector2) -> float:
 	return best
 
 
+## Finds a clear spot near each LIFT_BASES point for a bottom station and runs the lift line from there straight up
+## the screen (world -x -y) to the edge of the map: towers every 6 tiles where the ground is free, trees cleared.
+func _place_lifts() -> void:
+	for li in LIFT_BASES.size():
+		var want: Vector2 = LIFT_BASES[li]
+		var base := Vector2.INF
+		for r in range(0, 8):
+			for k in 16:
+				var q := want + Vector2.from_angle(TAU * k / 16.0) * r
+				var i := clampi(int(q.y), 0, N - 1) * N + clampi(int(q.x), 0, N - 1)
+				if reserved[i] == 0 and solid[i] == 0 and road_d[i] > 2.5 and tiles[i] != T.WATER:
+					base = q.floor() + Vector2(0.5, 0.5)
+					break
+			if base != Vector2.INF:
+				break
+		if base == Vector2.INF:
+			continue
+		var line: Array = []
+		var up := Vector2(-1, -1).normalized()
+		var q := base
+		while q.x > -2.0 and q.y > -2.0:
+			line.append(q)
+			q += up
+		lifts.append({"base": base, "line": line, "summit": LIFT_SUMMITS[li], "pts": PackedVector2Array(), "len": 0.0})
+		props.append({"kind": "lift_station", "pos": base})
+		for k in range(4, line.size(), 6):
+			var tq: Vector2 = line[k]
+			var ti := clampi(int(tq.y), 0, N - 1) * N + clampi(int(tq.x), 0, N - 1)
+			if tq.x < 0.0 or tq.y < 0.0 or (reserved[ti] != 2 and road_d[ti] > 1.5):
+				props.append({"kind": "lift_tower", "pos": tq})
+		trees = trees.filter(func(t): return not line.any(func(lq): return (lq as Vector2).distance_to(t["pos"]) < 1.1))
+
+
+## The cable's screen points (needs the terrain on) and its length, worked out once.
+func _lift_cable(l: Dictionary) -> PackedVector2Array:
+	if l["pts"].is_empty():
+		var pts := PackedVector2Array()
+		for q in l["line"]:
+			pts.append(Iso.to_screen(q, LIFT_Z))
+		pts.append(l["summit"])
+		var length := 0.0
+		for i in range(1, pts.size()):
+			length += pts[i - 1].distance_to(pts[i])
+		l["pts"] = pts
+		l["len"] = length
+	return l["pts"]
+
+
+## The point `d` px along a polyline.
+func _along(pts: PackedVector2Array, d: float) -> Vector2:
+	for i in range(1, pts.size()):
+		var seg := pts[i - 1].distance_to(pts[i])
+		if d <= seg:
+			return pts[i - 1].lerp(pts[i], d / maxf(seg, 0.001))
+		d -= seg
+	return pts[pts.size() - 1]
+
+
+## The lift cables and chairs (people riding up, empty chairs coming down), over everything like the gondola.
+func _draw_lifts(vr: Rect2) -> void:
+	var view := vr.grow(60.0)
+	for l in lifts:
+		var pts := _lift_cable(l)
+		var down := PackedVector2Array()
+		for q in pts:
+			down.append(q + Vector2(12, 3))
+		draw_polyline(pts, Color(0.15, 0.15, 0.2, 0.9), 1.0)
+		draw_polyline(down, Color(0.15, 0.15, 0.2, 0.9), 1.0)
+		var length: float = l["len"]
+		var n := int(length * 2.0 / LIFT_CHAIR_GAP)
+		for k in n:
+			var u := fposmod(t_ * LIFT_SPEED_PX + k * LIFT_CHAIR_GAP, length * 2.0)
+			var going_up := u < length
+			var p := _along(pts, u) if going_up else _along(pts, length * 2.0 - u) + Vector2(12, 3)
+			if not view.has_point(p):
+				continue
+			draw_line(p, p + Vector2(0, 10), Color(0.2, 0.2, 0.25), 1.0)
+			Sprites.draw_vehicle(self, "obj_chairlift_chair_riders" if going_up else "obj_chairlift_chair", p + Vector2(0, 26), Vector2(-1, -1) if going_up else Vector2(1, 1))
+
+
 func _season_spots(sr: RandomNumberGenerator, n: int, rmin: float, rmax: float, road_max: float) -> Array:
 	var taken: Array = season_props.map(func(e): return e["pos"])
 	var out: Array = []
@@ -1067,6 +1156,9 @@ func _bystander(sr: RandomNumberGenerator, pos: Vector2) -> Dictionary:
 		"giver": false, "gcool": 0.0, "shout": ""}
 
 
+const WINTER_SKIERS := 50   # skiers on the town's hills in winter
+
+
 func _place_season() -> void:
 	var sr := RandomNumberGenerator.new()
 	sr.seed = 1717
@@ -1075,8 +1167,8 @@ func _place_season() -> void:
 	for p in _season_spots(sr, 26, 7.0, 62.0, 4.0):
 		season_props.append({"season": "winter", "kind": "snowman", "pos": p, "sd": sr.randi() % 100})
 	var skiers := 0
-	for p in _season_spots(sr, 80, 8.0, 70.0, 99.0):
-		if skiers >= 14:
+	for p in _season_spots(sr, 260, 8.0, 76.0, 99.0):
+		if skiers >= WINTER_SKIERS:
 			break
 		var g := Vector2(height_m(p + Vector2(0.5, 0)) - height_m(p - Vector2(0.5, 0)), height_m(p + Vector2(0, 0.5)) - height_m(p - Vector2(0, 0.5)))
 		if g.length() < 0.08:
@@ -2896,6 +2988,7 @@ func _draw_world() -> void:
 			9: Iso.held(Iso.ground_z(it[3]), _draw_sprop.bind(it[2], it[3]))
 			10: Iso.held(Iso.ground_z(it[2]["pos"]), events.draw_actor.bind(self, it[2]))
 	_draw_gondola_cable()
+	_draw_lifts(vr)
 	_draw_overlays()
 
 
@@ -3492,6 +3585,10 @@ func _draw_prop(p: Dictionary) -> void:
 	match p["kind"]:
 		"lamp":
 			Sprites.draw_image(self, "scenery_lamp_post", base)
+		"lift_station":
+			Sprites.draw_image(self, "ski_chairlift_station", base + Vector2(0, 6))
+		"lift_tower":
+			Sprites.draw_image(self, "ski_chairlift_tower", base + Vector2(0, 4))
 		"stall":
 			Sprites.draw_image(self, "scenery_stall_%s" % STALL_ART[ci % STALL_ART.size()], Iso.to_screen(p["pos"] + Vector2(0.5, 0.5)) + Vector2(0, 6))
 		"umbrella":

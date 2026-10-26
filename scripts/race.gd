@@ -2159,8 +2159,12 @@ func _draw_deco(e: Dictionary) -> void:
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))
 		"fan":
 			var b := Iso.to_screen(e["pos"], e["z"])
-			var design: String = e["design"] if e.has("design") else Sprites.pedestrians()[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.pedestrians().size()]
-			Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
+			# their costume if nobody on screen has it yet, else whoever's free (nobody shows up twice; see Sprites.cast)
+			if e.has("design") and not e.has("looks"):
+				e["looks"] = [e["design"]] + Sprites._order(e)
+			var design := Sprites.cast(e, e.get("looks", []))
+			if design != "":
+				Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
 		"skier":
@@ -2171,9 +2175,9 @@ func _draw_deco(e: Dictionary) -> void:
 				var p := p0 + Vector2(sin(u * TAU * 2.0) * 0.8, u * 3.0)
 				var b := Iso.to_screen(p, _tz(p))
 				var nxt := p0 + Vector2(sin((u + 0.01) * TAU * 2.0) * 0.8, (u + 0.01) * 3.0)
-				var sk: String = ["skier_red", "skier_blue", "skier_kid", "skier_retro", "snowboarder_green", "snowboarder_pink"][int(absf(p0.x * 7.0)) % 6]
-				if not Sprites.draw_person(self, "ped_%s_ski" % sk, b, nxt - p, t_, 8.0):
-					Sprites.draw_person(self, "person_skier", b, nxt - p, 0.0)
+				var sk := Sprites.cast(e, Sprites.skiers())
+				if sk != "":
+					Sprites.draw_person(self, "ped_%s_ski" % sk, b, nxt - p, t_, 8.0)
 		"pumpkins":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			for k in 1 + int(e["sd"]) % 3:
@@ -2192,11 +2196,17 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(e["pos"], e["z"])
 			Sprites.draw_image(self, "scenery_picnic_red" if int((e["pos"] as Vector2).x) % 2 == 0 else "scenery_picnic_blue", b + Vector2(0, 12))
 			for side in [-1.0, 1.0]:   # two spectators sitting by the blanket, waving
-				Sprites.draw_cheer(self, "ped_%s_cheer" % Sprites.pedestrians()[(int((e["pos"] as Vector2).x) + (0 if side > 0 else 3)) % Sprites.pedestrians().size()], b + Vector2(side * 22.0, 8), t_ + side)
+				var who: Dictionary = e.get("fan%d" % int(side), {})
+				e["fan%d" % int(side)] = who
+				var look := Sprites.cast(who)
+				if look != "":
+					Sprites.draw_cheer(self, "ped_%s_cheer" % look, b + Vector2(side * 22.0, 8), t_ + side)
 		"kite":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			var ph: float = e["ph"]
-			Sprites.draw_person(self, "ped_kid_walk", b, Vector2(1, 1), 0.0)
+			var flier := Sprites.cast(e, ["kid", "bucket_hat_kid", "norm_boy_kid", "scout", "skater_kid"].filter(func(d): return Sprites.sheet("ped_%s_walk" % d) != null))
+			if flier != "":
+				Sprites.draw_person(self, "ped_%s_walk" % flier, b, Vector2(1, 1), 0.0)
 			var hand := b + Vector2(4, -26)
 			var k := b + Vector2(30 + sin(t_ * 0.7 + ph) * 8.0, -78 + cos(t_ * 1.1 + ph) * 6.0)
 			draw_polyline(PackedVector2Array([hand, hand.lerp(k, 0.5) + Vector2(0, 8), k]), Color(1, 1, 1, 0.7), 1.0)

@@ -1056,6 +1056,40 @@ func _road_dist(p: Vector2) -> float:
 
 ## Finds a clear spot near each LIFT_BASES point for a bottom station and runs the lift line from there straight up
 ## the screen (world -x -y) to the edge of the map: towers every 6 tiles where the ground is free, trees cleared.
+## The kid who plays in a leaf pile, round and round: stands beside it, runs at it, dives in and disappears under a
+## burst of leaves, bursts back out cheering, then walks back to the start.
+const LEAF_KIDS := ["kid", "bucket_hat_kid", "skater_kid", "norm_boy_kid", "scout", "norm_teen_girl"]
+func _draw_leaf_kid(e: Dictionary, b: Vector2) -> void:
+	var kid: Dictionary = e["kid"]
+	var look := Sprites.cast(kid, LEAF_KIDS.filter(func(d): return Sprites.sheet("ped_%s_walk" % d) != null))
+	var c := fposmod(t_ + float(e["ph"]) * 2.0, 8.0)
+	var home := Vector2(-26, 6)   # screen offset of where they stand, beside the pile
+	var leaves := -1.0            # seconds into a burst of leaves
+	if look != "":
+		var to_pile := (-home).normalized()
+		var w := Iso.to_world(to_pile)   # world direction they face running at the pile
+		if c < 3.0:
+			Sprites.draw_person(self, "ped_%s_walk" % look, b + home, w, 0.0, 0.0)
+		elif c < 3.7:
+			Sprites.draw_person(self, "ped_%s_walk" % look, b + home.lerp(Vector2(-6, 2), (c - 3.0) / 0.7), w, c, 14.0)
+		elif c < 4.2:
+			var u := (c - 3.7) / 0.5   # the dive: up and into the pile
+			Sprites.draw_person(self, "ped_%s_walk" % look, b + Vector2(-6, 2).lerp(Vector2(0, 4), u) + Vector2(0, -sin(u * PI) * 12.0), w, 1.0, 0.0)
+		elif c < 5.4:
+			leaves = c - 4.2   # under the leaves
+		elif c < 6.4:
+			Sprites.draw_cheer(self, "ped_%s_cheer" % look, b + Vector2(0, 3), c - 5.4)
+			leaves = c - 4.2
+		else:
+			Sprites.draw_person(self, "ped_%s_walk" % look, b + Vector2(0, 3).lerp(home, (c - 6.4) / 1.6), Iso.to_world(home.normalized()), c, 8.0)
+	if leaves >= 0.0:
+		for k in 12:
+			var hk := int(e["sd"]) * 13 + k * 7
+			var u := fposmod(leaves * 0.8 + k / 12.0, 1.0)
+			var q := b + Vector2(float(hk % 25) - 12.0 + sin(u * 6.0 + k) * 4.0, -2.0 - sin(u * PI) * (10.0 + float(hk % 9)))
+			draw_rect(Rect2(q.round(), Vector2(2, 1)), Season.FALL_LEAVES[hk % 4])
+
+
 func _place_lifts() -> void:
 	for li in LIFT_BASES.size():
 		var want: Vector2 = LIFT_BASES[li]
@@ -1264,32 +1298,21 @@ func _draw_sprop(e: Dictionary, at: Vector2) -> void:
 				return   # off to the lift
 			var d: Vector2 = e["dir"]
 			var vel: Vector2 = d * float(e["run"]) + Vector2(-d.y, d.x) * cos(u * TAU * 3.0) * 0.7 * TAU * 3.0
-			var sk: String = ["skier_red", "skier_blue", "skier_kid", "skier_retro", "snowboarder_green", "snowboarder_pink"][int(absf(float(e["pos"].x) * 7.0)) % 6]
-			if not Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0):
-				Sprites.draw_person(self, "person_skier", b, vel, 0.0)
+			var sk := Sprites.cast(e, Sprites.skiers())
+			if sk != "":
+				Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0)
 		"skater":
 			var a: float = e["a0"] + t_ * float(e["w"])
 			var tan := Vector2(-sin(a), cos(a)) * signf(e["w"])
-			Sprites.draw_person(self, "person_skater", b, tan, 0.0)
+			var sd := Sprites.cast(e)   # townsfolk out skating, gliding in one stride
+			if sd != "":
+				Sprites.draw_person(self, "ped_%s_walk" % sd, b, tan, 0.25 + 0.25 * float(int(t_ * 0.8 + float(e["a0"]) * 3.0) % 2), 8.0)
 		"pumpkins":
 			for k in int(e["n"]):
 				Season.pumpkin(self, b + Vector2(k * 7.0 - (int(e["n"]) - 1) * 3.5, (k % 2) * 3.0), 1.3 if k == 0 else 0.9, int(e["sd"]) + k)
 		"leafpile":
 			Season.leaf_pile(self, b, e["sd"])
-			# a kid takes a run and jumps in every few seconds; leaves fly
-			var c := fposmod(t_ + float(e["ph"]), 5.0)
-			if c < 1.2:
-				var kid: Dictionary = e["kid"]
-				kid["cheer"] = 1.0
-				kid["phase"] = 0.0
-				Iso.hold_z += sin(c / 1.2 * PI) * 14.0
-				_draw_ped(kid)
-				Iso.hold_z -= sin(c / 1.2 * PI) * 14.0
-				if c > 0.9:
-					for k in 8:
-						var hk := int(e["sd"]) * 13 + k * 7
-						var fly := (c - 0.9) * 40.0
-						draw_rect(Rect2(b + Vector2(float(hk % 21) - 10.0, -fly - float(hk % 7)) + Vector2(float(k - 4) * fly * 0.3, 0), Vector2(2, 1)), Season.FALL_LEAVES[hk % 4])
+			_draw_leaf_kid(e, b)
 		"scarecrow":
 			Sprites.draw_image(self, "scenery_scarecrow", b)
 		"flowers":
@@ -1586,12 +1609,15 @@ func _spawn_life() -> void:
 			"col": shirts[randi() % shirts.size()], "hair": hairs[randi() % hairs.size()], "skin": skins[randi() % skins.size()],
 			"t": randf_range(5.0, 20.0), "phase": randf() * TAU, "look": randi() % Sprites.pedestrians().size(), "face": Vector2(1, 1), "cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
 		made += 1
-	# 1 in 8 of them hand out power-ups to whoever rides past
-	var idx := range(peds.size())
-	idx.shuffle()
-	for k in peds.size():
-		peds[idx[k]]["giver"] = k < mini(ceili(peds.size() / float(PowerUps.GIVER_ODDS)), 18)   # the crowd grew; the gifts didn't
-		peds[idx[k]]["gcool"] = 0.0
+	for p in peds:
+		p["giver"] = false
+		p["gcool"] = 0.0
+	# the gift-givers: their own people, standing on the pavement with a present (see _update_giver)
+	for k in GIVER_COUNT:
+		var g := {"giver": true, "gcool": randf_range(0.0, 20.0), "state": "away", "pos": Vector2.ZERO, "road": -1, "phase": randf() * TAU,
+			"t": 0.0, "cool": 0.0, "cheer": 0.0, "shout": "", "face": Vector2(1, 1)}
+		_giver_spot(g)
+		peds.append(g)
 	for k in 3:
 		boats.append({"a": randf() * TAU, "rf": randf_range(0.35, 0.65), "w": randf_range(0.05, 0.09) * (1.0 if k % 2 == 0 else -1.0), "col": PIZZA_COLORS[k]})
 
@@ -2312,9 +2338,8 @@ func _update_life(delta: float) -> void:
 		p["t"] -= delta
 		p["cool"] = maxf(0.0, p["cool"] - delta)
 		if p["giver"]:
-			p["gcool"] = maxf(0.0, p["gcool"] - delta)
-			if p["gcool"] <= 0.0:
-				_try_give(p, riding)
+			_update_giver(p, delta, riding)
+			continue
 		# townsfolk cheer you on as you ride past: they stop, jump and shout
 		if p["cheer"] > 0.0:
 			p["cheer"] -= delta
@@ -2715,6 +2740,73 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 
 
 ## A power-up person hands one to whoever rides past with empty hands.
+const GIVER_COUNT := 8
+
+## A gift-giver's day: "ready" (on the pavement, present held high, a present on the map), "thanks" (just handed it
+## over), then "away": once you can't see them they move on to another spot out of sight, and some time later they
+## are ready there with a new present. They never walk, and never pop up where you can see.
+func _update_giver(p: Dictionary, delta: float, riding: bool) -> void:
+	p["phase"] = float(p["phase"]) + delta
+	p["say_t"] = maxf(0.0, float(p.get("say_t", 0.0)) - delta)
+	match p["state"]:
+		"ready":
+			_try_give(p, riding)
+			if p["gcool"] > 0.0:
+				p["state"] = "thanks"
+				p["t"] = 3.0
+		"thanks":
+			p["t"] -= delta
+			if p["t"] <= 0.0 and not _in_view(p["pos"]):
+				_giver_spot(p)
+				p["state"] = "away"
+		"away":
+			p["gcool"] = maxf(0.0, p["gcool"] - delta)
+			if p["gcool"] <= 0.0:
+				if _in_view(p["pos"]):
+					_giver_spot(p)   # you're looking right at the spot: pick another
+				else:
+					p["state"] = "ready"
+
+
+## Somewhere on a pavement, out of sight of the player.
+func _giver_spot(p: Dictionary) -> void:
+	for _try in 60:
+		var ri := randi() % roads.size()
+		var r: Dictionary = roads[ri]
+		var s := randf_range(1.0, float(r["len"]) - 1.0)
+		var at := _road_at(r, s)
+		var side := 1.0 if randf() < 0.5 else -1.0
+		var q: Vector2 = at[0] + Vector2(-at[1].y, at[1].x) * side * (ROAD_HW + 0.55)
+		var ix := int(q.x)
+		var iy := int(q.y)
+		if ix < 0 or iy < 0 or ix >= N or iy >= N or solid[iy * N + ix] != 0 or tiles[iy * N + ix] == T.WATER or _in_view(q):
+			continue
+		p["pos"] = q
+		p["road"] = ri
+		p["face"] = -Vector2(-at[1].y, at[1].x) * side   # facing the road
+		return
+
+
+## Roughly on screen (around the player, where the camera is).
+func _in_view(q: Vector2) -> bool:
+	var d := Iso.to_screen(q) - Iso.to_screen(p_pos)
+	return absf(d.x) < 460.0 and absf(d.y) < 300.0
+
+
+func _draw_giver(p: Dictionary, ground: Vector2) -> void:
+	if p["state"] == "away":
+		return
+	var look := Sprites.cast(p, Sprites.givers(), true)
+	if look == "":
+		return
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+	if p["state"] == "ready" or not Sprites.draw_strip(self, "giver_%s_idle" % look, ground, float(p["phase"]), 6.0):
+		# holding the present out over the road (after handing it over, without an empty-handed sheet: standing still)
+		Sprites.draw_strip(self, "giver_%s_wave" % look, ground, float(p["phase"]) if p["state"] == "ready" else 0.0, 8.0)
+	if p["state"] == "thanks" and p["shout"] != "":
+		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
+
+
 func _try_give(p: Dictionary, riding: bool) -> void:
 	if riding and pu == "" and p_down <= 0.0 and p_pos.distance_to(p["pos"]) < 2.0:
 		pu = PowerUps.pick(PowerUps.TOWN)
@@ -3604,15 +3696,17 @@ func _draw_prop(p: Dictionary) -> void:
 func _draw_ped(p: Dictionary) -> void:
 	var ground := Iso.to_screen(p["pos"])
 	var cheering: bool = p["cheer"] > 0.0
+	if p["giver"]:
+		_draw_giver(p, ground)
+		return
+	# their look: their own, unless someone else on screen already looks like that (see Sprites.cast)
+	var design := Sprites.cast(p, p.get("looks", []))
+	if design == "":
+		return
 	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
-	var look := int(p.get("look", int(absf(p["pos"].x * 7.0 + p["pos"].y * 3.0)))) % Sprites.pedestrians().size()
-	var design: String = Sprites.pedestrians()[look]
 	if cheering:
 		Sprites.draw_cheer(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0)
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
-	elif p["giver"] and p["gcool"] <= 0.0:
-		# holding a power-up gift out over the road
-		Sprites.draw_strip(self, "giver_%s_wave" % ("red" if look % 2 == 0 else "blue"), ground, t_ + float(p["phase"]), 8.0)
 	else:
 		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0)
 	if float(p.get("say_t", 0.0)) > 0.0:
@@ -3908,6 +4002,15 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 		if not carry.is_empty():
 			var mp := minimap_point(spots[carry["dest"]]["pos"], rect)
 			ci.draw_rect(Rect2(mp - Vector2(3, 3), Vector2(6, 6)), Color(0.3, 1.0, 0.4))
+	# gift-givers waiting with a present: a little wrapped box
+	for p in peds:
+		if p["giver"] and p["state"] == "ready":
+			var gp := minimap_point(p["pos"], rect).round()
+			ci.draw_rect(Rect2(gp - Vector2(3, 3), Vector2(7, 7)), Iso.OUTLINE)
+			ci.draw_rect(Rect2(gp - Vector2(2, 2), Vector2(5, 5)), Color(0.95, 0.25, 0.4))
+			ci.draw_rect(Rect2(gp - Vector2(0, 2), Vector2(1, 5)), Color(1.0, 0.85, 0.2))
+			ci.draw_rect(Rect2(gp - Vector2(2, 0), Vector2(5, 1)), Color(1.0, 0.85, 0.2))
+			ci.draw_rect(Rect2(gp - Vector2(1, 4), Vector2(3, 1)), Color(1.0, 0.85, 0.2))
 	for i in rival_state.size():
 		ci.draw_rect(Rect2(minimap_point(rival_state[i]["pos"], rect) - Vector2(1, 1), Vector2(3, 3)), Talk.rivals[i]["color"])
 	var pp := minimap_point(p_pos, rect)

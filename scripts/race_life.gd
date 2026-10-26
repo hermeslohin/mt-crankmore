@@ -380,7 +380,11 @@ func _draw_skier(sk: Dictionary, p: Vector2, dir: Vector2, u: float) -> void:
 	var at := Iso.to_screen(p, race._tz(p))
 	var a := clampf(minf(u, 1.0 - u) * 12.0, 0.0, 1.0)   # fade in at the top and out at the bottom of the run
 	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-6, 0), at + Vector2(0, -2.5), at + Vector2(6, 0), at + Vector2(0, 2.5)]), Color(0.3, 0.35, 0.5, 0.25 * a))
-	Sprites.draw_person(race, "ped_%s_ski" % sk["design"], at, dir, t_ + float(sk["ph"]), 8.0, Color(1, 1, 1, a))
+	# a different skier for everyone on screen (the ski school's kids from the little ones, the instructor is the instructor)
+	var look := Sprites.cast(sk, ["ski_instructor"] if sk["design"] == "ski_instructor" else Sprites.skiers(sk["design"] == "skier_kid" and float(sk["lag"]) > 0.0))
+	if look == "":
+		return
+	Sprites.draw_person(race, "ped_%s_ski" % look, at, dir, t_ + float(sk["ph"]), 8.0, Color(1, 1, 1, a))
 
 
 ## [position, going up?, the lift] for every chair on every lift.
@@ -509,6 +513,7 @@ func _draw_groomer(name: String, p: Vector2, dir: Vector2) -> void:
 func _draw_devil(pz: Dictionary, running: bool) -> void:
 	var at := Iso.to_screen(pz["pos"], pz["z"])
 	var n: Vector2 = pz["n"]
+	Sprites.cast(devil, ["fan_devil"], true)   # the one and only devil: no fan in the same costume next to him
 	if running:
 		Sprites.draw_person(race, "ped_fan_devil_walk", at, Vector2(-n.y, n.x), t_, 12.0)
 		if int(t_ * 1.5) % 3 == 0:

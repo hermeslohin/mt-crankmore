@@ -42,15 +42,16 @@ const PARADE_SPEED := 0.75     # m/s, a brisk march
 const PARADE_LAPS := 2.0
 const PARADE_ROW := 0.85       # m between rows
 ## The band, front to back, one row per line (three across, or one); designs without art are left out.
+## Every member is a different person: a role appearing twice needs two people for it (see Sprites.variants), and a
+## place with nobody left to fill it stays empty.
 const PARADE := [
 	["band_major"],
 	["band_flag", "band_baton", "band_flag"],
-	["trumpeter", "trumpeter", "trumpeter"],
-	["band_trombone", "band_trombone", "band_trombone"],
-	["band_clarinet", "band_sax", "band_clarinet"],
-	["drummer", "drummer", "drummer"],
-	["band_bass_drum", "band_cymbals", "band_bass_drum"],
-	["band_sousaphone", "band_sousaphone", "band_sousaphone"],
+	["trumpeter", "band_sax", "trumpeter"],
+	["band_clarinet", "band_clarinet"],
+	["band_trombone", "band_trombone"],
+	["drummer", "band_cymbals", "drummer"],
+	["band_sousaphone", "band_bass_drum", "band_sousaphone"],
 ]
 const PARADE_SHOUTS := ["Go band!", "Woo!", "76 trombones!", "Encore!", "Ba-dum-tss!", "Strike up the band!", "Bravo!"]
 const CRITTERS := ["squirrel", "squirrel", "rabbit", "rabbit", "chipmunk", "hedgehog", "raccoon", "skunk", "fox", "town_cat_ginger",
@@ -259,8 +260,9 @@ func _free(pos: Vector2) -> bool:
 	return city.solid[iy * city.N + ix] == 0 and city.tiles[iy * city.N + ix] != city.T.WATER
 
 
+## "" = anyone: their look comes from the cast when they're drawn (nobody appears twice on screen; see Sprites.cast).
 func _design() -> String:
-	return Sprites.pedestrians().pick_random()
+	return ""
 
 
 func _person(pos: Vector2, design: String, face: Vector2) -> Dictionary:
@@ -330,7 +332,7 @@ func _start(kind: String) -> void:
 			e["dir"] = 1.0 if randf() < 0.5 else -1.0
 			for k in 4:
 				var design := "drummer" if k % 2 == 0 else "trumpeter"
-				if k >= 3:
+				if k >= 3 or (k == 2 and Sprites.variants("drummer").size() < 2):   # nobody twice
 					design = _design()
 				var a := _person(pos, design, along * e["dir"])
 				a["lane"] = k
@@ -423,7 +425,7 @@ func _step_crew(delta: float) -> void:
 		return
 	var b: Dictionary = city.buildings[site]
 	if crew.is_empty():
-		for k in CREW_SIZE:
+		for k in mini(CREW_SIZE, maxi(1, Sprites.variants("construction").size())):   # one of each builder there is
 			var a := _person(_crew_spot(b), "construction", Vector2(1, 1))
 			a["anim"] = "idle"
 			a["wait"] = randf_range(0.0, 5.0)
@@ -468,8 +470,13 @@ func crew_lunch() -> void:
 
 func _start_parade(near_p := Vector2.INF) -> void:
 	var rows: Array = []
+	var used := {}
 	for row in PARADE:
-		var have: Array = row.filter(func(d): return _has("ped_%s_walk" % d))
+		var have: Array = []
+		for d in row:
+			if int(used.get(d, 0)) < Sprites.variants(d).size():
+				used[d] = int(used.get(d, 0)) + 1
+				have.append(d)
 		if not have.is_empty():
 			rows.append(have)
 	if rows.size() < 4:
@@ -492,7 +499,7 @@ func _start_parade(near_p := Vector2.INF) -> void:
 		for k in row.size():
 			var a := _person(Vector2.ZERO, row[k], Vector2.RIGHT)
 			a["row"] = ri
-			a["lat"] = 0.55 if row.size() == 1 else 0.2 + 0.35 * k   # across the lane, from the middle line out
+			a["lat"] = 0.15 + 0.8 * (k + 0.5) / row.size()   # across the lane, from the middle line out
 			a["moving"] = true
 			a["band"] = true
 			a["phase"] = 0.0   # in step
@@ -667,7 +674,16 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 	match a["type"]:
 		"person":
 			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+			# their look: anyone (from the cast), one of a list, or a role (a builder, a firefighter...) in whichever
+			# variant nobody else on screen is wearing
 			var d: String = a["design"]
+			if d == "":
+				d = Sprites.cast(a, a.get("looks", []))
+			else:
+				var v: Array = Sprites.variants(d)
+				d = Sprites.cast(a, v if not v.is_empty() else [d], true)
+			if d == "":
+				return
 			var anim: String = a["anim"]
 			ground.y -= float(a.get("lift", 0.0))   # standing on a soapbox
 			if a.get("down", false):
@@ -919,7 +935,8 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["line"] = 0
 			e["next"] = 0.5
 			e["actors"].append({"type": "crate", "pos": pos, "phase": 0.0, "label_t": 0.0})
-			var speaker := _person(pos + Vector2(0.01, 0.01), ["grandpa", "lady", "hiker", "norm_man_suit_casual", "grunge_teen", "mullet_dad"].filter(func(d): return _has("ped_%s_walk" % d)).pick_random(), across)
+			var speaker := _person(pos + Vector2(0.01, 0.01), "", across)
+			speaker["looks"] = ["grandpa", "lady", "hiker", "norm_man_suit_casual", "grunge_teen", "mullet_dad", "norm_old_woman", "pager_guy"].filter(func(d): return _has("ped_%s_walk" % d))
 			speaker["anim"] = "idle"
 			speaker["lift"] = 7.0
 			speaker["speaker"] = true
@@ -939,12 +956,12 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["t"] = 45.0
 			var have: Array = CLUB.filter(func(n): return Sprites.sheet("bike_" + n.to_lower()) != null)
 			var free_: Array = have.filter(func(n): return not Talk.rivals.any(func(rv): return str(rv["short"]) == n))
-			var names: Array = free_ if free_.size() >= 3 else have
-			if names.is_empty():
+			if free_.size() < 3:   # everyone's racing you already: no club ride (and nobody twice)
+				city.cars.erase(lead)
 				return false
-			names.shuffle()
-			for k in randi_range(6, 9):
-				e["actors"].append({"type": "rider", "who": names[k % names.size()], "k": k, "pos": lead["pos"], "face": lead["fwd"],
+			free_.shuffle()
+			for k in free_.size():
+				e["actors"].append({"type": "rider", "who": free_[k], "k": k, "pos": lead["pos"], "face": lead["fwd"],
 					"phase": 0.0, "pedal": randf() * TAU, "label_t": 0.0})
 			Game.toast.emit("Group ride! The Crankmore Wheelers are out.", Color(0.6, 0.9, 1.0))
 		"fire":
@@ -989,7 +1006,8 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["dir"] = dir
 			e["rs"] = float(b["s"])            # where the robber is along the road
 			e["cs"] = float(b["s"]) - dir * 4.0  # and the cop
-			var keeper := _person(b["door"], ["barista", "baker", "lady", "norm_woman_office"].filter(func(d): return _has("ped_%s_walk" % d)).pick_random(), Vector2(1, 1))
+			var keeper := _person(b["door"], "", Vector2(1, 1))
+			keeper["looks"] = ["barista", "baker", "lady", "norm_woman_office", "norm_man_bald_glasses"].filter(func(d): return _has("ped_%s_walk" % d))
 			keeper["anim"] = "cheer"
 			_say(keeper, "STOP, THIEF!", 4.0)
 			e["actors"].append(keeper)
@@ -1117,7 +1135,7 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 					e["t"] = 8.0
 			elif _parked(truck):
 				e["stage"] = "spray"
-				for k in 2:
+				for k in clampi(Sprites.variants("firefighter").size(), 1, 2):
 					var ff := _person(truck["pos"], "firefighter" if _has("ped_firefighter_walk") else "construction", Vector2(1, 1))
 					ff["to"] = (b["door"] as Vector2) + (truck["pos"] - (b["door"] as Vector2)) * 0.35 + Vector2(k * 0.5 - 0.25, 0.25 - k * 0.5)
 					ff["speed"] = 1.2
@@ -1172,7 +1190,7 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 			elif _parked(van):
 				e["stage"] = "treat"
 				e["clock"] = 7.0
-				for k in 2:
+				for k in clampi(Sprites.variants("paramedic").size(), 1, 2):
 					var m := _person(van["pos"], "paramedic" if _has("ped_paramedic_walk") else "nurse", Vector2(1, 1))
 					m["to"] = (patient["pos"] as Vector2) + Vector2(0.5 - k, -0.4 + k * 0.8) * 0.6
 					m["speed"] = 1.4

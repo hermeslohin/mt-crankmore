@@ -172,6 +172,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	title_t += delta
+	if OS.has_environment("PIZZA_FPS") and Engine.get_process_frames() % 60 == 0:   # dev helper: print the frame rate
+		print("fps %d" % Engine.get_frames_per_second())
 	var target: Vector2
 	match mode:
 		Mode.TITLE:
@@ -866,6 +868,7 @@ func _debug_shot() -> void:
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/shot_%02d.png" % [out, k])
+	print("cast: %d forced doubles" % Sprites.doubles)
 	get_tree().quit()
 
 

@@ -55,6 +55,114 @@ static func pedestrians() -> Array:
 	return _peds
 
 
+## The cast: nobody shows up twice on screen at once. Everyone drawn asks cast() for their look each frame; someone
+## who was on screen last frame keeps theirs, and a newcomer gets the first look in their own (shuffled, everyday people
+## first) order that nobody else on screen has. `options` limits the choice (the givers, firefighters, kid skiers...);
+## when every option is taken it returns "" (skip drawing them), or options[0] when `must` (someone a scene needs).
+## Designs only ever worn by a role (police, builders...) are left out of the everyday choice.
+const ROLE_ONLY := ["police", "construction"]
+static var _uid := 0
+static var _cast_frame := -1
+static var _cast_prev := {}     # uid -> look, last frame
+static var _cast_now := {}      # uid -> look, this frame
+static var _taken := {}         # look -> uid, this frame
+static var _held := {}          # look -> uid that had it last frame
+static var _everyone: Array = []
+static var doubles := 0         # times someone had to be drawn in a look already on screen (debugging)
+
+
+static func cast(person: Dictionary, options: Array = [], must := false) -> String:
+	var f := Engine.get_process_frames()
+	if f != _cast_frame:
+		_cast_frame = f
+		_cast_prev = _cast_now
+		_cast_now = {}
+		_taken = {}
+		_held = {}
+		for u in _cast_prev:
+			_held[_cast_prev[u]] = u
+	var u := uid(person)
+	if _cast_now.has(u):
+		return _cast_now[u]
+	var pool: Array = options if not options.is_empty() else _order(person)
+	var pick := ""
+	var had: String = _cast_prev.get(u, "")
+	if had != "" and had in pool and not _taken.has(had):
+		pick = had
+	else:
+		for d in pool:
+			if not _taken.has(d) and (not _held.has(d) or _held[d] == u):
+				pick = d
+				break
+	if pick == "":
+		if not must or pool.is_empty():
+			return ""
+		pick = pool[0]
+		doubles += 1
+	_taken[pick] = u
+	_cast_now[u] = pick
+	return pick
+
+
+## A person's cast id (given on first sight).
+static func uid(person: Dictionary) -> int:
+	if not person.has("uid"):
+		_uid += 1
+		person["uid"] = _uid
+	return person["uid"]
+
+
+## A person's own order of everyday looks (cached on them): shuffled by their id, everyday people coming up more.
+static func _order(person: Dictionary) -> Array:
+	if person.has("order"):
+		return person["order"]
+	if _everyone.is_empty():
+		for d in pedestrians():
+			if not d in _everyone and not d in ROLE_ONLY:
+				_everyone.append(d)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = uid(person) * 7919 + 13
+	var weighted: Array = pedestrians().filter(func(d): return not d in ROLE_ONLY)
+	var out: Array = []
+	while out.size() < _everyone.size() and not weighted.is_empty():
+		var d: String = weighted[rng.randi() % weighted.size()]
+		if not d in out:
+			out.append(d)
+		weighted.erase(d)
+	person["order"] = out
+	return out
+
+
+## The designs of `role` with art: the role itself and its numbered variants (construction, construction_2, ...).
+static var _roles := {}
+static func variants(role: String, sheet_suffix := "_walk", prefix := "ped_") -> Array:
+	var key := prefix + role + sheet_suffix
+	if not _roles.has(key):
+		var out: Array = []
+		for d in [role] + range(2, 9).map(func(k): return "%s_%d" % [role, k]) + ROLE_EXTRAS.get(role, []):
+			if sheet(prefix + d + sheet_suffix) != null:
+				out.append(d)
+		_roles[key] = out
+	return _roles[key]
+const ROLE_EXTRAS := {"trumpeter": ["band_trumpeter_2"], "drummer": ["band_drummer_2"], "band_clarinet": ["band_flute"]}
+
+
+## The gift-givers' looks (art/giver_<look>_wave.png).
+const GIVER_LOOKS := ["red", "blue", "green", "yellow", "purple", "orange", "pink", "teal"]
+static func givers() -> Array:
+	return GIVER_LOOKS.filter(func(g): return sheet("giver_%s_wave" % g) != null)
+
+
+## Everyone who skis or snowboards (art/ped_<design>_ski.png); kids: just the little ones.
+static func skiers(kids := false) -> Array:
+	var out: Array = []
+	for d in ["skier_red", "skier_blue", "skier_retro", "skier_green", "skier_purple", "skier_orange", "skier_yellow", "snowboarder_green",
+			"snowboarder_pink", "snowboarder_black", "snowboarder_teal", "ski_patrol", "skier_kid", "skier_kid_2", "skier_kid_3"]:
+		if (not kids or d.begins_with("skier_kid")) and sheet("ped_%s_ski" % d) != null:
+			out.append(d)
+	return out
+
+
 ## True in cold weather (see Season.cold): characters then use their winter sheets (art/winter_<name>.png: hat, gloves
 ## and a jacket) when there is one.
 static var cold := false
@@ -95,6 +203,8 @@ static func outfit(sheet_name: String) -> Texture2D:
 
 ## Forget loaded art (after new files were dropped in).
 static func reload() -> void:
+	_roles.clear()
+	_everyone.clear()
 	_cache.clear()
 	_peds = []
 

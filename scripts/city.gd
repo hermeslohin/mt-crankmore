@@ -1763,6 +1763,16 @@ func _update_player(delta: float) -> void:
 				p_speed = 0.0
 				interact.emit(z["kind"])
 
+	# a ski patroller calling for help at the chairlift: A takes the medical kit up the mountain
+	if events != null:
+		var rc: Vector2 = events.rescue_call()
+		if rc != Vector2.INF and p_pos.distance_to(rc) < 6.0:
+			prompt = "A / E:  Save a person on Mt. Crankmore"
+			if Input.is_action_just_pressed("act_select"):
+				p_speed = 0.0
+				events.rescue_taken()
+				interact.emit("rescue")
+
 	if Input.is_action_just_pressed("honk"):
 		player_bubble = {"text": HONKS.pick_random(), "t": 2.2}
 		if randf() < 0.5:

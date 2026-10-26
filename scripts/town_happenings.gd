@@ -19,7 +19,7 @@ const CHAOS := {"outage": [7200.0, 14400.0], "cart": [7200.0, 14400.0], "hydrant
 const GULLS_EVERY := [1500.0, 2100.0]  # seagulls: every half hour or so (when you've a pizza on board)
 const KID_RACE_EVERY := [240.0, 480.0]  # a kid on a BMX wants a race (60% of your FTP wins $20)
 const TOWN := ["parade_float", "market", "car_wash", "wedding", "flash_mob", "cows", "hot_air_balloon", "movie_night",
-	"arcade_queue", "video_rush", "eating_contest", "fun_run"]
+	"arcade_queue", "video_rush", "eating_contest", "fun_run", "mountain_rescue"]
 const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual", "norm_woman_tracksuit", "norm_man_shorts", "cyclist_fan"]
 const RUN_LEN := 18.0                  # tiles of road closed for a fun run
 const SEASONAL := {"winter": ["snowball_fight", "sledding", "tree_lighting"], "spring": ["egg_hunt", "duck_crossing"],
@@ -106,6 +106,8 @@ func _fits(k: String) -> bool:
 			return Skies.dark() > 0.6
 		"cart", "hydrant":
 			return city.p_speed > 0.5
+		"mountain_rescue":
+			return not _lift_near().is_empty()
 	return true
 
 
@@ -114,6 +116,29 @@ func _named_near(part: String, r: float) -> Dictionary:
 		if str(b.get("name", "")).contains(part) and (b["door"] as Vector2).distance_to(city.p_pos) < r and int(b.get("road", -1)) >= 0:
 			return b
 	return {}
+
+
+func _lift_near() -> Dictionary:
+	for l in city.lifts:
+		if (l["base"] as Vector2).distance_to(city.p_pos) < 25.0:
+			return l
+	return {}
+
+
+## Where the ski patroller calling for help is (Vector2.INF when nobody is): City offers the rescue there.
+func rescue_call() -> Vector2:
+	for e in events:
+		if e["kind"] == "mountain_rescue" and not e.get("taken", false):
+			return e["actors"][0]["pos"]
+	return Vector2.INF
+
+
+## You took the rescue on: the patroller's call is answered.
+func rescue_taken() -> void:
+	for e in events:
+		if e["kind"] == "mountain_rescue":
+			e["taken"] = true
+			e["t"] = minf(float(e["t"]), 1.0)
 
 
 func _pizza_near() -> Dictionary:
@@ -163,7 +188,7 @@ func _fx(e: Dictionary, q: Vector2, fn: Callable) -> Dictionary:
 
 func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 	var needs_spot := not kind in ["parade_float", "flash_mob", "tree_lighting", "wedding", "arcade_queue", "video_rush",
-		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race"]
+		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race", "mountain_rescue"]
 	if needs_spot and sp.is_empty():
 		return false
 	var pos: Vector2 = e.get("pos", city.p_pos)
@@ -324,6 +349,17 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 				var f := _extra(e, table + ((kerb[0] as Vector2) - (b["door"] as Vector2)).normalized() * 1.0 + (kerb[1] as Vector2) * (k - 1.5) * 0.7, table)
 				f["anim"] = "cheer"
 			Game.toast.emit("Pizza-eating contest at %s!" % str(sh["name"]), Color(1.0, 0.75, 0.3))
+		"mountain_rescue":
+			# a ski patroller at the bottom of the chairlift: someone's hurt up the mountain. Ride over and press A to
+			# take the medical kit up Mt. Crankmore (see main._start_rescue).
+			var l := _lift_near()
+			if l.is_empty():
+				return false
+			e["t"] = 90.0
+			var patrol := _extra(e, (l["base"] as Vector2) + Vector2(1.2, 1.2), city.p_pos, "ski_patrol")
+			patrol["anim"] = "cheer"
+			_say(patrol, "HELP! Someone's hurt up on Mt. Crankmore!", 4.0)
+			Game.toast.emit("SAVE A PERSON ON MT. CRANKMORE! Ride to the chairlift and press A", Color(1.0, 0.4, 0.4))
 		"fun_run":
 			# a stretch of road closed for a fun run: barriers at both ends, four runners, people cheering. You can
 			# still ride through; cars wait at the barriers.
@@ -820,6 +856,14 @@ func _step(e: Dictionary, delta: float) -> void:
 					a["face"] = w[1]
 					if a["label_t"] <= 0.0 and randf() < delta * 0.1:
 						_say(a, ["Boo!", "Wheee!", "Spooky!", "Hold on to your hats!"].pick_random(), 1.5)
+		"mountain_rescue":
+			var patrol: Dictionary = e["actors"][0]
+			patrol["face"] = (city.p_pos - (patrol["pos"] as Vector2)).normalized()
+			if patrol["label_t"] <= 0.0:
+				_say(patrol, ["HELP! A skier's hurt up the mountain!", "We need someone fast! Grab the medical kit!", "Over here! Press A to help!"].pick_random(), 3.0)
+			if int(e["clock"]) % 15 == 14 and e.get("nagged", -1) != int(e["clock"]):
+				e["nagged"] = int(e["clock"])
+				Game.toast.emit("SAVE A PERSON ON MT. CRANKMORE! Ride to the chairlift and press A", Color(1.0, 0.4, 0.4))
 		"fun_run":
 			var r: Dictionary = city.roads[e["road"]]
 			var all_in := true

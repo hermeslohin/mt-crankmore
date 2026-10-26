@@ -507,6 +507,8 @@ func _on_interact(kind: String) -> void:
 			hud.open_menu(_bike_shop_menu)
 		"race":
 			hud.open_menu(_race_menu)
+		"rescue":
+			_start_rescue()
 
 
 func _bike_shop_menu() -> Dictionary:
@@ -557,7 +559,25 @@ func _race_menu() -> Dictionary:
 	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
 
 
+## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
+## quarter of the way up; afterwards you're back where you were in town.
+var rescue_from := {}
+
+func _start_rescue() -> void:
+	rescue_from = {"road": city.rr, "s": city.rs}
+	hud.close_menu()
+	mode = Mode.RACE
+	city.active = false
+	city.visible = false
+	race.visible = true
+	race.rescue = true
+	race.setup(0)
+	race.active = true
+	cam.position = race.cam_target()
+
+
 func _start_race(i: int) -> void:
+	race.rescue = false
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -571,6 +591,13 @@ func _start_race(i: int) -> void:
 
 
 func _on_race_finished(result: Dictionary) -> void:
+	if result.get("rescue", false):
+		hud.open_menu(func():
+			var t: float = result["time"]
+			return {"title": "You saved the skier on Mt. Crankmore!",
+				"sub": "The ski patrol take it from here.\nUp the mountain in %d:%04.1f.     Reward: $%d" % [int(t) / 60, fmod(t, 60.0), result["prize"]],
+				"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
+		return
 	Ride.on_race_finished(result["place"])
 	hud.open_menu(func():
 		var lines := ""
@@ -590,7 +617,9 @@ func _leave_race() -> void:
 	city.visible = true
 	mode = Mode.CITY
 	city.active = true
-	city.place_on(city.zone_anchor("race"))
+	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("race"))
+	race.rescue = false
+	rescue_from = {}
 	city.invuln = 1.5
 	cam.position = city.cam_target()
 
@@ -706,7 +735,7 @@ const VIEWER_HOUR := {"fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon":
 func _debug_viewer() -> void:
 	viewer = {"backup": FileAccess.get_file_as_string(Game.SAVE_PATH), "i": -1, "status": "",
 		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
-			"soapbox", "group_ride", "fire", "ambulance", "crime", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint"]
+			"soapbox", "group_ride", "fire", "ambulance", "crime", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]
 			+ city.events.all_kinds()}
 	_start_game()
 	Game.toast.emit("EVENT VIEWER: ] or N for the next event, [ or P to go back, R to run it again", Color(1.0, 0.85, 0.3))
@@ -715,6 +744,8 @@ func _debug_viewer() -> void:
 func _viewer_go(i: int) -> void:
 	var kinds: Array = viewer["kinds"]
 	i = posmod(i, kinds.size())
+	if mode == Mode.RACE:   # back down from the mountain first
+		_leave_race()
 	viewer["i"] = i
 	var kind: String = kinds[i]
 	# clear the stage: whatever was going on, any challenge, the clocks for anything else
@@ -754,6 +785,20 @@ func _viewer_go(i: int) -> void:
 				break
 	elif kind in ["parade", "parade_float", "flash_mob", "tree_lighting"]:
 		city.place_on({"road": 0, "s": 2.0})
+	elif kind == "mountain_rescue" and not city.lifts.is_empty():
+		var lb: Vector2 = city.lifts[0]["base"]
+		var best := {"road": 0, "s": 0.0}
+		var bd := 1e9
+		for ri in city.roads.size():
+			var r: Dictionary = city.roads[ri]
+			var q := 0.0
+			while q < float(r["len"]):
+				var dd: float = (city._road_at(r, q)[0] as Vector2).distance_to(lb)
+				if dd < bd:
+					bd = dd
+					best = {"road": ri, "s": q}
+				q += 1.0
+		city.place_on(best)
 	elif kind in ["fishing", "volleyball"]:
 		city.place_on({"road": 1, "s": 20.0})
 	elif kind == "eating_contest":
@@ -771,6 +816,8 @@ func _viewer_go(i: int) -> void:
 		"hill_sprint":
 			city.climb_t = 0.0
 			city._update_climbs(0.0)
+		"rescue_run":   # straight up the mountain with the medical kit
+			_start_rescue()
 		"seagulls":
 			if city.carry.is_empty():
 				city._post_order()

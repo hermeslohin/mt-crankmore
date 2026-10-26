@@ -561,6 +561,10 @@ func _draw_race_profile(mr: Rect2) -> void:
 			break
 		if race._snow_cover(race.pts[i].x, race.pts[i].y, race.elev[i] * race.vz / race.peak) > 0.5:
 			draw_rect(Rect2(floorf(pr.position.x + race.s_m[i] / length * pr.size.x), pr.position.y + pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0) - 1.0, 2, 2), Color(1, 1, 1))
+	if race.rescue:   # where the injured skier is: a red cross on the profile
+		var rx: float = floorf(pr.position.x + race.rescue_s / length * pr.size.x)
+		draw_rect(Rect2(rx - 1, pr.position.y - 2, 3, 9), Color(0.9, 0.15, 0.15))
+		draw_rect(Rect2(rx - 4, pr.position.y + 1, 9, 3), Color(0.9, 0.15, 0.15))
 	for t in race.tunnels:
 		var tx: float = pr.position.x + float(t["s0"]) / length * pr.size.x
 		draw_rect(Rect2(floorf(tx), pr.position.y + pr.size.y - 7, maxf(2.0, floorf((float(t["s1"]) - float(t["s0"])) / length * pr.size.x)), 3), Color(0.15, 0.15, 0.25))

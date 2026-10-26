@@ -443,6 +443,9 @@ func movers() -> Array:
 	var out: Array = []
 	if race.riders.is_empty():
 		return out
+	if race.rescue:   # the injured skier and the patroller waving you in
+		var pz: Dictionary = race._pose(race.rescue_s, 2.2)
+		out.append([pz["pos"], _draw_casualty.bind(pz)])
 	var length: float = race.course["length"]
 	var me: Dictionary = race.riders[0]
 	var lead := 0.0
@@ -508,6 +511,26 @@ func _draw_groomer(name: String, p: Vector2, dir: Vector2) -> void:
 	var at := Iso.to_screen(p, race._tz(p) + 1.5)
 	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-14, 0), at + Vector2(0, -6), at + Vector2(14, 0), at + Vector2(0, 6)]), Color(0.3, 0.35, 0.5, 0.25))
 	Sprites.draw_vehicle(race, name, at + Vector2(0, -1 if int(t_ * 6.0) % 2 == 0 else 0), dir, Color.WHITE, int(t_ * 6.0), Sprites.turn_state("race/" + name))
+
+
+## The rescue: an injured skier on a stretcher in the snow beside the road, a ski patroller waving you in, a red cross
+## flag so you can see where from down the road.
+func _draw_casualty(pz: Dictionary) -> void:
+	var at := Iso.to_screen(pz["pos"], pz["z"])
+	var n: Vector2 = pz["n"]
+	if not Sprites.draw_vehicle(race, "obj_stretcher_patient", at + Vector2(0, -4), Vector2(-n.y, n.x)):
+		race.draw_rect(Rect2(at + Vector2(-10, -6), Vector2(20, 5)), Color(0.85, 0.2, 0.2))
+	var patrol := at + Vector2(14, -2)
+	if not Sprites.draw_cheer(race, "ped_ski_patrol_cheer", patrol, t_):
+		Sprites.draw_cheer(race, "ped_nurse_cheer", patrol, t_)
+	# the flag
+	var pole := at + Vector2(-16, 0)
+	race.draw_line(pole, pole + Vector2(0, -44), Iso.OUTLINE, 2.0)
+	race.draw_rect(Rect2(pole + Vector2(1, -44), Vector2(16, 11)), Color.WHITE)
+	race.draw_rect(Rect2(pole + Vector2(7, -42), Vector2(4, 7)), Color(0.9, 0.15, 0.15))
+	race.draw_rect(Rect2(pole + Vector2(5, -40), Vector2(8, 3)), Color(0.9, 0.15, 0.15))
+	if int(t_ * 1.5) % 2 == 0:
+		_shout(patrol + Vector2(0, -58), "OVER HERE! HURRY!", Color(1.0, 0.4, 0.4))
 
 
 func _draw_devil(pz: Dictionary, running: bool) -> void:

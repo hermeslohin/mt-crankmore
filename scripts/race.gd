@@ -75,6 +75,12 @@ var fords := PackedFloat32Array()
 var animals: Array = []
 var pops: Array = []
 var riders: Array = []
+## A rescue (see main._start_rescue): you alone, carrying a medical kit up to an injured skier RESCUE_AT of the way
+## up the course; reaching them ends it.
+var rescue := false
+var rescue_s := 0.0
+const RESCUE_AT := 0.25
+const RESCUE_PAY := 250
 var clock := 0.0
 var countdown := 0.0
 var over := false
@@ -135,8 +141,11 @@ func setup(course_id: int) -> void:
 	_build_givers(rng)
 	_build_season()
 	_build_riders()
+	if rescue:
+		riders = [riders[0]]   # no race: just you and the medical kit
+		rescue_s = float(course["length"]) * RESCUE_AT
 	clock = 0.0
-	countdown = 4.0
+	countdown = 2.0 if rescue else 4.0
 	over = false
 	over_clock = 0.0
 	finish_count = 0
@@ -155,6 +164,9 @@ func setup(course_id: int) -> void:
 	pops.clear()
 	player_finish_time = 0.0
 	idle_t = 0.0
+	if rescue:
+		Game.toast.emit("Get the medical kit up to the injured skier, %d m up the mountain!" % int(rescue_s), Color(1.0, 0.45, 0.45))
+		return
 	# pre-race jabber
 	var ids := range(Talk.rivals.size())
 	ids.shuffle()
@@ -1249,7 +1261,11 @@ func _process(delta: float) -> void:
 	else:
 		clock += delta
 		_step_riders(delta)
-		_banter()
+		if rescue:
+			if float(riders[0]["s"]) >= rescue_s and not over:
+				_end_rescue()
+		else:
+			_banter()
 	_step_animals(delta)
 	for k in bubbles.keys():
 		bubbles[k]["t"] -= delta
@@ -1735,6 +1751,16 @@ func _banter() -> void:
 			Talk.say_random("race_leading")
 	else:
 		lead_clock = 0.0
+
+
+## Made it to the injured skier with the kit.
+func _end_rescue() -> void:
+	over = true
+	active = false
+	Trainer.send_grade(0.0)
+	Game.add_money(RESCUE_PAY)
+	Game.save_game()
+	finished.emit({"rescue": true, "time": clock, "prize": RESCUE_PAY, "course": course["name"]})
 
 
 func _end_race() -> void:

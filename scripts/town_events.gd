@@ -1587,6 +1587,15 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["t"] = minf(float(e["t"]), 0.3)
 
 
+## Where someone is calling for a mountain rescue (see TownHappenings), Vector2.INF when nobody is.
+func rescue_call() -> Vector2:
+	return Vector2.INF
+
+
+func rescue_taken() -> void:
+	pass
+
+
 ## Whether something solid is right in front of a rider at `pos` heading `fwd`, so they have to stop (see
 ## TownHappenings: cows).
 func blocks_rider(_pos: Vector2, _fwd: Vector2) -> bool:

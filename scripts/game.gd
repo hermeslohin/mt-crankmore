@@ -242,6 +242,8 @@ func new_game() -> void:
 
 
 func save_game() -> void:
+	if OS.has_environment("PIZZA_NO_SAVE"):   # dev helper: tests and screenshot runs never touch the player's save
+		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		return

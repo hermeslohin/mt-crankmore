@@ -510,7 +510,7 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 		"seagulls":
 			if not city.start_challenge("gulls"):
 				return false
-			e["t"] = 60.0
+			e["t"] = 100.0   # as long as the chase can last
 			for k in 4:
 				e["actors"].append({"type": "gull", "k": k, "pos": city.p_pos, "face": city.p_fwd, "phase": randf() * 2.0, "label_t": 0.0})
 			_say(e["actors"][0], "MINE! MINE!", 2.0)
@@ -867,7 +867,13 @@ func _step(e: Dictionary, delta: float) -> void:
 			var c: Dictionary = city.challenge
 			var kid: Dictionary = e["actors"][0]
 			if c.is_empty() or c["kind"] != "kid_race":
-				kid["pos"] = (kid["pos"] as Vector2) + (kid["face"] as Vector2) * 2.0 * delta
+				# pedals off up the road
+				if not e.has("leave_d"):
+					e["leave_d"] = ((kid["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 1.5) * delta
+				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE - 0.4)
+				kid["pos"] = at[0]
+				kid["face"] = at[1]
 				e["t"] = minf(float(e["t"]), 3.0)
 				return
 			var at: Array = city.challenge_pos()

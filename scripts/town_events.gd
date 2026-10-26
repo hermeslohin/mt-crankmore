@@ -1455,7 +1455,13 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 		"away":
 			# he pedals off out of sight
 			if robber["type"] == "rider":
-				robber["pos"] = (robber["pos"] as Vector2) + (robber["face"] as Vector2) * 4.0 * delta
+				# off up the road, round the bends
+				if not e.has("leave_d"):
+					e["leave_d"] = ((robber["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 3.0) * delta
+				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE)
+				robber["pos"] = at[0]
+				robber["face"] = at[1]
 				robber["pedal"] = float(robber["pedal"]) + delta * 9.0
 			if e["clock"] > 4.0:
 				robber["gone"] = true
@@ -1517,7 +1523,12 @@ func _step_dog(e: Dictionary, delta: float) -> void:
 			elif c["state"] == "lost":
 				e["stage"] = "gone"
 		"gone":
-			dog["pos"] = (dog["pos"] as Vector2) + (dog["face"] as Vector2) * 3.0 * delta
+			if not e.has("leave_d"):
+				e["leave_d"] = ((dog["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+			e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 2.5) * delta
+			var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE)
+			dog["pos"] = at[0]
+			dog["face"] = at[1]
 			if not e.get("sad", false):
 				e["sad"] = true
 				_say(owner, "Oh no... BISCUIT!", 3.0)
@@ -1535,7 +1546,7 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 		"roll_up":
 			# comes up from behind in the car lane and draws level
 			var u := clampf(float(e["clock"]) / 2.0, 0.0, 1.0)
-			var at: Array = city._rail_ahead(lerpf(-4.0, 0.4, u), 0.45)
+			var at: Array = city._rail_ahead(lerpf(-4.0, 0.4, u), city.CAR_LANE)
 			rod["pos"] = at[0]
 			rod["face"] = at[1]
 			if u >= 1.0:
@@ -1564,8 +1575,13 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["stage"] = "off"
 				e["clock"] = 0.0
 		"off":
-			# roars off up the road and away
-			rod["pos"] = (rod["pos"] as Vector2) + (rod["face"] as Vector2) * minf(float(e["clock"]) * 4.0, 7.0) * delta
+			# roars off up the road (following it, bends and all) and away
+			if not e.has("leave_d"):
+				e["leave_d"] = ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+			e["leave_d"] = float(e["leave_d"]) + (city.p_speed + minf(float(e["clock"]) * 4.0, 7.0)) * delta
+			var at: Array = city._rail_ahead(float(e["leave_d"]), city.CAR_LANE)
+			rod["pos"] = at[0]
+			rod["face"] = at[1]
 			if float(e["clock"]) > 5.0:
 				rod["gone"] = true
 				e["t"] = minf(float(e["t"]), 0.3)

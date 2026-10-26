@@ -12,31 +12,35 @@ extends Node2D
 
 signal interact(kind: String)
 
-const N := 160
+## The town's scale: every place on the map (roads, plaza, lake, hills, landmarks) is laid out in "design" tiles
+## and multiplied by MAP_K, so the map can grow and leave room for wider roads without redrawing it.
+const MAP_K := 1.25
+const N := 200              # 160 design tiles * MAP_K
 const MARGIN := 18
 const TILES_PER_MS := 0.45
 ## Overall pace of the town (rider, rivals, traffic). 0.7 = 30% slower than the original tuning.
 const PACE := 0.7
 const CAR_HIT_R := 0.14
 const CAR_BODY := 0.85      # the part of a car's sprite that's actually car (the rest is air): what can hit you
-const CAR_LANE := 0.42      # a car's distance from the middle of the road
-const BIKE_LANE := 0.95
-const ROAD_HW := 1.0
+const CAR_LANE := 0.62      # a car's distance from the middle of the road
+const BIKE_LANE := 1.22     # you ride out on the right-hand edge, clear of the cars
+const ROAD_HW := 1.3        # half the road's width: two lanes of traffic and a bike
 const TURN_R := 2.2         # how far before / after a junction the rider eases into / out of the turn
-const PLAZA := Vector2(72, 76)
-const RING_R := 9.5
-const LAKE := Vector2(120, 40)
-const LAKE_R := 13.0
-const BASE := Vector2(26, 28)
+const PLAZA := Vector2(72, 76) * MAP_K
+const RING_R := 9.5 * MAP_K
+const LAKE := Vector2(120, 40) * MAP_K
+const LAKE_R := 13.0 * MAP_K
+const BASE := Vector2(26, 28) * MAP_K
 ## Hills: [centre, radius (tiles), height (m)]. Negative height is a dip. The plaza and the lake stay flat.
 const HILLS := [
-	[Vector2(30, 34), 30.0, 8.0],     # the gondola side, rising towards Mt. Crankmore
-	[Vector2(78, 20), 18.0, 4.5],     # Summit Road / Lookout
-	[Vector2(28, 94), 18.0, 4.5],     # Chalet Hill
-	[Vector2(50, 134), 16.0, 3.5],    # Pine Hollow
-	[Vector2(108, 124), 18.0, 4.5],   # Ridge Road
-	[Vector2(148, 90), 14.0, 3.5],    # East shore bluffs
-	[Vector2(78, 148), 18.0, -2.5],   # Valley Bottom
+	# (centre, radius and height all scale with the map, so the slopes stay as steep)
+	[Vector2(30, 34) * MAP_K, 30.0 * MAP_K, 8.0 * MAP_K],     # the gondola side, rising towards Mt. Crankmore
+	[Vector2(78, 20) * MAP_K, 18.0 * MAP_K, 4.5 * MAP_K],     # Summit Road / Lookout
+	[Vector2(28, 94) * MAP_K, 18.0 * MAP_K, 4.5 * MAP_K],     # Chalet Hill
+	[Vector2(50, 134) * MAP_K, 16.0 * MAP_K, 3.5 * MAP_K],    # Pine Hollow
+	[Vector2(108, 124) * MAP_K, 18.0 * MAP_K, 4.5 * MAP_K],   # Ridge Road
+	[Vector2(148, 90) * MAP_K, 14.0 * MAP_K, 3.5 * MAP_K],    # East shore bluffs
+	[Vector2(78, 148) * MAP_K, 18.0 * MAP_K, -2.5 * MAP_K],   # Valley Bottom
 ]
 const PX_PER_M := 10.0                        # screen lift per metre of height
 const M_PER_TILE := 1.0 / (TILES_PER_MS * PACE)   # metres of riding per tile, matching the speed model
@@ -85,7 +89,7 @@ const VEHICLE_DIMS := {
 	"sedan_4x4_skis": [0.6, 0.31, 2.2, 3.0], "van_ski_shuttle": [0.75, 0.33, 1.8, 2.6], "sedan_retro_wagon_wood": [0.6, 0.3, 1.8, 2.6],
 	"sedan_sports_blue": [0.55, 0.3, 2.8, 3.8], "truck_moving_van": [0.95, 0.35, 1.6, 2.2], "sedan_rally": [0.55, 0.3, 3.0, 4.0]}
 const PAINTED_VEHICLES := ["car", "truck"]
-const CAR_COUNT := 50    # vehicles in the town's traffic
+const CAR_COUNT := 66    # vehicles in the town's traffic
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]
 const ER_JOKES := [
 	"Doctor: \"Good news: you're fine. Bad news: your bike filed a complaint.\"",
@@ -241,8 +245,8 @@ func height_m(p: Vector2) -> float:
 	for hill in HILLS:
 		var d: float = p.distance_to(hill[0]) / float(hill[1])
 		h += float(hill[2]) * exp(-d * d)
-	h *= smoothstep(RING_R + 3.0, RING_R + 22.0, p.distance_to(PLAZA))
-	h *= smoothstep(LAKE_R + 2.0, LAKE_R + 18.0, p.distance_to(LAKE))
+	h *= smoothstep(RING_R + 3.0 * MAP_K, RING_R + 22.0 * MAP_K, p.distance_to(PLAZA))
+	h *= smoothstep(LAKE_R + 2.0 * MAP_K, LAKE_R + 18.0 * MAP_K, p.distance_to(LAKE))
 	return h
 
 
@@ -377,10 +381,10 @@ func _generate() -> void:
 			elif Geometry2D.is_point_in_polygon(c, sand):
 				tiles[i] = T.SAND
 				reserved[i] = 1
-			elif c.distance_to(PLAZA) < RING_R + 1.9:
+			elif c.distance_to(PLAZA) < RING_R + ROAD_HW + 0.9:
 				tiles[i] = T.PLAZA
 				reserved[i] = 1
-			elif road_d[i] < 2.1 and c.distance_to(PLAZA) < 28.0:
+			elif road_d[i] < ROAD_HW + 1.1 and c.distance_to(PLAZA) < 28.0 * MAP_K:
 				tiles[i] = T.SIDEWALK
 			elif (x < 3 or y < 3 or x >= N - 3 or y >= N - 3) and road_d[i] > 3.0:
 				tiles[i] = T.FOREST
@@ -499,6 +503,12 @@ func _make_roads() -> void:
 		["Valley Bottom Road", "fsw", "fs", [Vector2(70, 152)]],
 		["Forest Road", "nw", "n", [Vector2(56, 36)]],
 	]
+	# the junctions and bends above are in design tiles: out to the map's scale (the plaza / lake points already are)
+	for key in n:
+		if not (key as String).begins_with("r") and not (key as String).begins_with("l"):
+			n[key] = n[key] * MAP_K
+	for e in edges:
+		e[3] = (e[3] as Array).map(func(v): return v * MAP_K)
 	_square_junctions(n, edges)
 	for e in edges:
 		var ctrl: Array = [n[e[1]]]
@@ -676,7 +686,7 @@ func _lot_free(pos: Vector2, size: Vector2, gap: int) -> bool:
 				return false
 			var i := y * N + x
 			if x >= x0 and x < x1 and y >= y0 and y < y1:
-				if reserved[i] != 0 or not (tiles[i] == T.GRASS or tiles[i] == T.SIDEWALK) or road_d[i] < 1.9:
+				if reserved[i] != 0 or not (tiles[i] == T.GRASS or tiles[i] == T.SIDEWALK) or road_d[i] < ROAD_HW + 0.9:
 					return false
 			elif reserved[i] == 2:
 				return false
@@ -798,12 +808,12 @@ func _place_specials() -> void:
 		["er", "St. Pedro's Hospital", Vector2(96, 92), Vector2(3, 3)],
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
-		["townhall", "Mt. Crankmore Town Hall", PLAZA + Vector2(9, -9), Vector2(3, 3)],
+		["townhall", "Mt. Crankmore Town Hall", Vector2(81, 67), Vector2(3, 3)],
 		["site", "Crankmore Heights", Vector2(46, 66), Vector2(3, 3)],
 	]
 	var pizza_i := 0
 	for sp in specials:
-		var target: Vector2 = sp[2]
+		var target: Vector2 = sp[2] * MAP_K   # (design tiles)
 		var cands: Array = []
 		for ri in roads.size():
 			var r: Dictionary = roads[ri]
@@ -853,11 +863,11 @@ func _place_specials() -> void:
 
 func _pick_kind(p: Vector2) -> Array:
 	var r := rng.randf()
-	if p.distance_to(PLAZA) < 22.0:
+	if p.distance_to(PLAZA) < 22.0 * MAP_K:
 		if r < 0.78:
 			return ["shop", Vector2(2, 2)]
 		return ["hotel", Vector2(3, 3)]
-	if p.distance_to(LAKE) < 26.0 or p.distance_to(BASE) < 15.0:
+	if p.distance_to(LAKE) < 26.0 * MAP_K or p.distance_to(BASE) < 15.0 * MAP_K:
 		if r < 0.5:
 			return ["hotel", Vector2(3, 3)]
 		if r < 0.75:
@@ -878,7 +888,7 @@ func _place_generic() -> void:
 			var p: Vector2 = at[0]
 			var tv: Vector2 = at[1]
 			var n := Vector2(-tv.y, tv.x)
-			var core := p.distance_to(PLAZA) < 22.0
+			var core := p.distance_to(PLAZA) < 22.0 * MAP_K
 			for side in [1.0, -1.0]:
 				var pick := _pick_kind(p)
 				var lot := _try_lot(p, n * side, pick[1], 0 if core else 1, false, ri, s)
@@ -899,7 +909,7 @@ func _place_nature() -> void:
 			var prob := 0.0
 			if tiles[i] == T.FOREST:
 				prob = 0.6
-			elif tiles[i] == T.GRASS and reserved[i] == 0 and road_d[i] > 2.4:
+			elif tiles[i] == T.GRASS and reserved[i] == 0 and road_d[i] > ROAD_HW + 1.4:
 				var near_building := false
 				for dy in range(-1, 2):
 					for dx in range(-1, 2):
@@ -909,7 +919,7 @@ func _place_nature() -> void:
 							near_building = true
 				if near_building:
 					continue
-				prob = clampf((Vector2(x, y).distance_to(PLAZA) - 12.0) / 50.0, 0.03, 0.3)
+				prob = clampf((Vector2(x, y).distance_to(PLAZA) - 12.0 * MAP_K) / (50.0 * MAP_K), 0.03, 0.3)
 			if prob > 0.0 and rng.randf() < prob:
 				trees.append(_make_tree(Vector2(x + rng.randf_range(0.2, 0.8), y + rng.randf_range(0.2, 0.8))))
 	for y in range(-MARGIN, N + MARGIN):
@@ -926,7 +936,7 @@ func _place_nature() -> void:
 		while s < float(r["len"]):
 			var at := _road_at(r, s)
 			var p: Vector2 = at[0]
-			var village := p.distance_to(PLAZA) < 24.0
+			var village := p.distance_to(PLAZA) < 24.0 * MAP_K
 			k += 1
 			if village or k % 3 == 0:
 				var tv: Vector2 = at[1]
@@ -954,7 +964,7 @@ func _open_spot(p: Vector2, road_max: float, taken: Array) -> bool:
 	if ix < 1 or iy < 1 or ix >= N - 1 or iy >= N - 1:
 		return false
 	var i := iy * N + ix
-	if tiles[i] != T.GRASS or reserved[i] != 0 or solid[i] != 0 or road_d[i] < 1.7 or road_d[i] > road_max:
+	if tiles[i] != T.GRASS or reserved[i] != 0 or solid[i] != 0 or road_d[i] < ROAD_HW + 0.7 or road_d[i] > road_max:
 		return false
 	for k in range(1, 4):   # a building just in front (towards the camera) would hide it
 		var fx := mini(ix + k, N - 1)
@@ -1095,13 +1105,13 @@ func _draw_leaf_kid(e: Dictionary, b: Vector2) -> void:
 
 func _place_lifts() -> void:
 	for li in LIFT_BASES.size():
-		var want: Vector2 = LIFT_BASES[li]
+		var want: Vector2 = LIFT_BASES[li] * MAP_K
 		var base := Vector2.INF
 		for r in range(0, 8):
 			for k in 16:
 				var q := want + Vector2.from_angle(TAU * k / 16.0) * r
 				var i := clampi(int(q.y), 0, N - 1) * N + clampi(int(q.x), 0, N - 1)
-				if reserved[i] == 0 and solid[i] == 0 and road_d[i] > 2.5 and tiles[i] != T.WATER:
+				if reserved[i] == 0 and solid[i] == 0 and road_d[i] > ROAD_HW + 1.5 and tiles[i] != T.WATER:
 					base = q.floor() + Vector2(0.5, 0.5)
 					break
 			if base != Vector2.INF:
@@ -1119,7 +1129,7 @@ func _place_lifts() -> void:
 		for k in range(4, line.size(), 6):
 			var tq: Vector2 = line[k]
 			var ti := clampi(int(tq.y), 0, N - 1) * N + clampi(int(tq.x), 0, N - 1)
-			if tq.x < 0.0 or tq.y < 0.0 or (reserved[ti] != 2 and road_d[ti] > 1.5):
+			if tq.x < 0.0 or tq.y < 0.0 or (reserved[ti] != 2 and road_d[ti] > ROAD_HW + 0.5):
 				props.append({"kind": "lift_tower", "pos": tq})
 		trees = trees.filter(func(t): return not line.any(func(lq): return (lq as Vector2).distance_to(t["pos"]) < 1.1))
 
@@ -1178,7 +1188,7 @@ func _season_spots(sr: RandomNumberGenerator, n: int, rmin: float, rmax: float, 
 		if out.size() >= n:
 			break
 		var a := sr.randf() * TAU
-		var p := PLAZA + Vector2(cos(a), sin(a)) * sr.randf_range(rmin, rmax)
+		var p := PLAZA + Vector2(cos(a), sin(a)) * sr.randf_range(rmin, rmax) * MAP_K
 		if _open_spot(p, road_max, taken):
 			out.append(p)
 			taken.append(p)
@@ -1216,7 +1226,7 @@ func _place_season() -> void:
 		for k in 7:
 			var q: Vector2 = p + dir * run * k / 6.0
 			var qi := clampi(int(q.y), 0, N - 1) * N + clampi(int(q.x), 0, N - 1)
-			if road_d[qi] < 1.4 or solid[qi] != 0 or tiles[qi] == T.WATER or reserved[qi] == 2:
+			if road_d[qi] < ROAD_HW + 0.4 or solid[qi] != 0 or tiles[qi] == T.WATER or reserved[qi] == 2:
 				clear = false
 		if clear:
 			season_props.append({"season": "winter", "kind": "skier", "pos": p, "origin": p, "dir": dir, "run": run,
@@ -1245,7 +1255,7 @@ func _place_season() -> void:
 	# summer: people playing catch and frisbee, flying kites, picnics, beach volleyball
 	var grass_at := func(q: Vector2) -> bool:
 		var qi := clampi(int(q.y), 0, N - 1) * N + clampi(int(q.x), 0, N - 1)
-		return tiles[qi] == T.GRASS and solid[qi] == 0 and reserved[qi] != 2 and road_d[qi] > 1.4
+		return tiles[qi] == T.GRASS and solid[qi] == 0 and reserved[qi] != 2 and road_d[qi] > ROAD_HW + 0.4
 	for p in _season_spots(sr, 120, 8.0, 55.0, 7.0):
 		if season_props.filter(func(e): return e["kind"] == "catch").size() >= 8:
 			break
@@ -1265,7 +1275,7 @@ func _place_season() -> void:
 		var p := LAKE + Vector2(cos(a), sin(a)) * (_lake_r(a) + 0.9)
 		var ix := int(p.x)
 		var iy := int(p.y)
-		if ix >= 0 and iy >= 0 and ix < N and iy < N and tiles[iy * N + ix] == T.SAND and road_d[iy * N + ix] > 2.5:
+		if ix >= 0 and iy >= 0 and ix < N and iy < N and tiles[iy * N + ix] == T.SAND and road_d[iy * N + ix] > ROAD_HW + 1.5:
 			var t := Vector2(-sin(a), cos(a))
 			var team := []
 			for j in 4:
@@ -1433,14 +1443,16 @@ func _build_road_geometry() -> void:
 			if int(cum[i]) % 2 == 0 and not _in_mouth(mid, ri):
 				dash = _ribbon(a, b, na, nb, 0.07)
 			var empty := PackedVector2Array()
-			var cut_l := _in_mouth(mid + nm * 0.82, ri) or _in_mouth(mid + nm * 1.18, ri)
-			var cut_r := _in_mouth(mid - nm * 0.82, ri)
+			var kerb_in := ROAD_HW - 0.18   # the white edge line
+			var kerb_out := ROAD_HW + 0.18  # the kerb stone
+			var cut_l := _in_mouth(mid + nm * kerb_in, ri) or _in_mouth(mid + nm * kerb_out, ri)
+			var cut_r := _in_mouth(mid - nm * kerb_in, ri)
 			var specks := PackedVector2Array()
 			for k in 3:
-				specks.append(Iso.to_screen(a.lerp(b, rng.randf()) + na * rng.randf_range(-0.85, 0.85)))
-			road_draw.append([Iso.to_screen((a + b) * 0.5), _ribbon(a, b, na, nb, 1.3), _ribbon(a, b, na, nb, ROAD_HW), dash,
-				empty if cut_l else _ribbon(a + na * 0.82, b + nb * 0.82, na, nb, 0.05), empty if cut_r else _ribbon(a - na * 0.82, b - nb * 0.82, na, nb, 0.05), specks,
-				empty if cut_l else _ribbon(a + na * 1.18, b + nb * 1.18, na, nb, 0.12)])
+				specks.append(Iso.to_screen(a.lerp(b, rng.randf()) + na * rng.randf_range(-0.85, 0.85) * ROAD_HW))
+			road_draw.append([Iso.to_screen((a + b) * 0.5), _ribbon(a, b, na, nb, ROAD_HW + 0.3), _ribbon(a, b, na, nb, ROAD_HW), dash,
+				empty if cut_l else _ribbon(a + na * kerb_in, b + nb * kerb_in, na, nb, 0.05), empty if cut_r else _ribbon(a - na * kerb_in, b - nb * kerb_in, na, nb, 0.05), specks,
+				empty if cut_l else _ribbon(a + na * kerb_out, b + nb * kerb_out, na, nb, 0.12)])
 	zebra.clear()
 	for j in junctions:
 		for l in j["links"]:
@@ -1453,7 +1465,7 @@ func _build_road_geometry() -> void:
 				var t: Vector2 = at[1]
 				var n := Vector2(-t.y, t.x)
 				for k in 5:
-					var c: Vector2 = at[0] + n * (-0.72 + k * 0.36)
+					var c: Vector2 = at[0] + n * (-0.72 + k * 0.36) * ROAD_HW
 					zebra.append(PackedVector2Array([Iso.to_screen(c + t * 0.32 + n * 0.1), Iso.to_screen(c - t * 0.32 + n * 0.1),
 						Iso.to_screen(c - t * 0.32 - n * 0.1), Iso.to_screen(c + t * 0.32 - n * 0.1)]))
 
@@ -1559,7 +1571,13 @@ func _spawn_cars() -> void:
 		var r: Dictionary = roads[ri]
 		var kind: String = kinds[k][0]
 		var d: Array = VEHICLE_DIMS[kind]
-		var c := {"road": ri, "s": randf_range(3.0, float(r["len"]) - 3.0), "dir": 1.0 if randf() < 0.5 else -1.0,
+		# somewhere on the road with room around it (cars don't start out on top of each other)
+		var s0 := randf_range(3.0, float(r["len"]) - 3.0)
+		for _try in 12:
+			if not cars.any(func(o): return o["road"] == ri and absf(float(o["s"]) - s0) < 3.0):
+				break
+			s0 = randf_range(3.0, float(r["len"]) - 3.0)
+		var c := {"road": ri, "s": s0, "dir": 1.0 if randf() < 0.5 else -1.0,
 			"speed": 0.0, "max": randf_range(d[2], d[3]) * PACE, "col": CAR_COLORS[randi() % CAR_COLORS.size()], "kind": kind, "art": kinds[k][1],
 			"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT}
 		_car_pose(c)
@@ -1596,7 +1614,7 @@ func _spawn_life() -> void:
 	# townsfolk strolling the pavements all over town
 	var made := 0
 	for tries in 4000:
-		if made >= 150:
+		if made >= 200:
 			break
 		var ri := randi() % roads.size()
 		var r: Dictionary = roads[ri]
@@ -2802,7 +2820,7 @@ const CHALLENGES := {
 	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 150.0, "count": 3.0},
 	"rush": {"title": "PIZZA RUSH", "pct": 0.80, "reward": 120, "stops": 5},
 	"climb": {"title": "HILL SPRINT", "pct": 1.05, "reward": 60},
-	"gulls": {"title": "SEAGULLS!", "pct": 0.90, "reward": 0, "gap": 4.0, "escape": 25.0, "time": 45.0},
+	"gulls": {"title": "SEAGULLS!", "pct": 0.90, "reward": 0, "gap": 15.0, "escape": 40.0, "time": 90.0},   # a head start, and time to get away
 }
 const RUSH_CHANCE := 0.12     # orders that are a pizza rush: five stops, paid a bonus for an 80% FTP average
 const CLIMB_EVERY := [150.0, 300.0]   # seconds between hill sprints showing up
@@ -3028,7 +3046,7 @@ func _update_climb(c: Dictionary) -> void:
 func challenge_pos() -> Array:
 	var tpm := TILES_PER_MS * PACE
 	if challenge.get("kind", "") == "race":
-		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, 0.45)
+		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, CAR_LANE)
 	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
 		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm, BIKE_LANE - 0.4)
 	if challenge.get("kind", "") == "gulls":
@@ -3059,14 +3077,17 @@ func _draw_finish() -> void:
 ## A chequered line across the road at `f` with a banner over it on two poles.
 func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color) -> void:
 	var n := Vector2(-fwd.y, fwd.x)
-	for k in 8:
+	# two rows of squares straight across the road, kerb to kerb, centred on the middle of the road
+	var squares := 10
+	var w := ROAD_HW * 2.0 / squares
+	for k in squares:
 		for row in 2:
-			var c: Vector2 = f + n * (-1.05 + k * 0.3) + fwd * (row * 0.15)
-			var q := PackedVector2Array([Iso.to_screen(c), Iso.to_screen(c + n * 0.3), Iso.to_screen(c + n * 0.3 + fwd * 0.15), Iso.to_screen(c + fwd * 0.15)])
+			var c: Vector2 = f + n * (-ROAD_HW + k * w) + fwd * ((row - 1) * 0.15)
+			var q := PackedVector2Array([Iso.to_screen(c), Iso.to_screen(c + n * w), Iso.to_screen(c + n * w + fwd * 0.15), Iso.to_screen(c + fwd * 0.15)])
 			draw_colored_polygon(q, Color.WHITE if (k + row) % 2 == 0 else Color(0.1, 0.1, 0.12))
-	# a banner on two poles
-	var a := Iso.to_screen(f - n * 1.25)
-	var b := Iso.to_screen(f + n * 1.25)
+	# a banner on two poles, just outside the kerbs
+	var a := Iso.to_screen(f - n * (ROAD_HW + 0.25))
+	var b := Iso.to_screen(f + n * (ROAD_HW + 0.25))
 	draw_line(a, a + Vector2(0, -40), Iso.OUTLINE, 2.0)
 	draw_line(b, b + Vector2(0, -40), Iso.OUTLINE, 2.0)
 	draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y - 46), Vector2(absf(b.x - a.x), 9)), col)

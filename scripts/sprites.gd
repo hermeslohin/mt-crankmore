@@ -448,9 +448,12 @@ static func turn_rows(st: Dictionary, w: Vector2) -> Array:
 		st["_prev"] = want
 		st["_at"] = -10.0
 	var cur: int = st["_row"]
-	if want != cur and absf(angle_difference(cur * PI / 4.0, w.angle())) > PI / 8.0 + TURN_LAG:
+	# a big swing (a U-turn, a hairpin) goes round one view at a time, each step finishing before the next
+	if want != cur and absf(angle_difference(cur * PI / 4.0, w.angle())) > PI / 8.0 + TURN_LAG and now - float(st["_at"]) >= TURN_FADE:
+		var step := posmod(want - cur, DIRS)
+		var next := posmod(cur + (1 if step <= DIRS / 2 else -1), DIRS)
 		st["_prev"] = cur
-		st["_row"] = want
+		st["_row"] = next
 		st["_at"] = now
 	return [st["_row"], st["_prev"], clampf((now - float(st["_at"])) / TURN_FADE, 0.0, 1.0)]
 

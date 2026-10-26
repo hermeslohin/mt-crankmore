@@ -160,6 +160,8 @@ var queued := ""              # a turn pressed before the junction was announced
 var uturn_hint := false
 var _from_j := -1             # the junction the rider just rode through (so it isn't taken twice)
 var _turn: Dictionary = {}    # the curve the rider is following through a junction (see _update_turn)
+var _uturn: Dictionary = {}   # a U-turn in progress: {from (position), fwd (heading then), t 0-1}
+const UTURN_TIME := 1.1       # seconds to swing round
 var _hint_clock := 0.0
 
 var p_pos := Vector2.ZERO
@@ -303,6 +305,7 @@ func place_on(anchor: Dictionary) -> void:
 	rs = anchor["s"]
 	pending = {}
 	_turn = {}
+	_uturn = {}
 	_from_j = -1
 	p_lat = 0.0
 	var w := _rail_world()
@@ -1733,7 +1736,8 @@ func _update_player(delta: float) -> void:
 		queued = ""
 		_turn = {}
 		_from_j = -1
-		p_speed *= 0.4
+		p_speed *= 0.3
+		_uturn = {"from": p_pos, "fwd": p_fwd, "t": 0.0}   # swing round in an arc (see below), not a flip
 		Game.toast.emit("U-turn!", Color(0.8, 0.9, 1.0))
 	_rail_step(p_speed * delta)
 	_update_pending()
@@ -1742,7 +1746,21 @@ func _update_player(delta: float) -> void:
 	# the paddles slide you across your lane; turns are picked with the D-pad / arrows only
 	p_lat = clampf(p_lat + Input.get_axis("lane_left", "lane_right") * 0.9 * delta, -0.75, 0.0)
 	rail_pos = w[0] + Vector2(-p_fwd.y, p_fwd.x) * p_lat
-	if p_pos.distance_to(rail_pos) > 3.0:
+	if not _uturn.is_empty():
+		# a U-turn: swing out ahead and round across the road to the other side, the bike turning with the curve
+		_uturn["t"] = float(_uturn["t"]) + delta / UTURN_TIME
+		var u := clampf(float(_uturn["t"]), 0.0, 1.0)
+		u = u * u * (3.0 - 2.0 * u)
+		var a: Vector2 = _uturn["from"]
+		var k: Vector2 = a + (_uturn["fwd"] as Vector2) * 1.6 + (rail_pos - a) * 0.5
+		var b: Vector2 = rail_pos
+		p_pos = a.lerp(k, u).lerp(k.lerp(b, u), u)
+		var tan := (k - a) * (1.0 - u) + (b - k) * u
+		if tan.length() > 0.01:
+			p_fwd = tan.normalized()
+		if float(_uturn["t"]) >= 1.0:
+			_uturn = {}
+	elif p_pos.distance_to(rail_pos) > 3.0:
 		p_pos = rail_pos
 	else:
 		p_pos = p_pos.lerp(rail_pos, 1.0 - exp(-14.0 * delta))

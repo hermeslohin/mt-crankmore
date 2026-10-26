@@ -293,6 +293,8 @@ func _draw_city_hud(w: float, h: float) -> void:
 		lines.append({"text": t, "col": Color(1.0, 0.8, 0.3) if chasers == 0 else Color(1.0, 0.55, 0.45)})
 	if lines.is_empty():
 		lines.append({"text": "Waiting for the phone to ring...", "col": Color(0.8, 0.85, 1.0)})
+	if not city.challenge.is_empty():
+		_draw_challenge(city, Rect2(w - 214, 24 + lines.size() * 10, 210, 50))
 	_panel(Rect2(w - 214, 4, 210, 16 + lines.size() * 10))
 	_text("PIZZA ORDERS", Vector2(w - 208, 14), 8, Color(1.0, 0.85, 0.3))
 	for i in lines.size():
@@ -575,6 +577,41 @@ func _draw_race_profile(mr: Rect2) -> void:
 	var dark := Color(0.12, 0.12, 0.15)
 	draw_string(font, Vector2(mr.position.x + 1, mr.position.y + 8), "%.2f km" % (maxf(0.0, length - me["s"]) / 1000.0), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, dark)
 	draw_string(font, Vector2(mr.position.x, mr.position.y + 8), _fmt_time(race.clock), HORIZONTAL_ALIGNMENT_RIGHT, mr.size.x - 1, 8, dark)
+
+
+## A challenge in progress (see City.CHALLENGES): what it pays, the watts it takes (green when you're on it) and how
+## it's going: the gap to the thief or dog, or you and the hot rod on the way to the line.
+func _draw_challenge(city, r: Rect2) -> void:
+	var c: Dictionary = city.challenge
+	_panel(r)
+	var x := r.position.x + 6
+	var y := r.position.y + 10
+	_text("%s  $%d" % [c["title"], int(c["reward"])], Vector2(x, y), 8, Color(1.0, 0.85, 0.3))
+	var need: int = city.challenge_watts()
+	var have := int(Trainer.power())
+	var on := have >= need
+	_text("Ride %d W+ (%d%% FTP)" % [need, int(round(float(c["pct"]) * 100.0))], Vector2(x, y + 11), 8, Color(0.85, 0.9, 1.0))
+	_text("%d W" % have, Vector2(r.end.x - 50, y + 11), 8, Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.5, 0.4), 44, HORIZONTAL_ALIGNMENT_RIGHT)
+	var bar := Rect2(x, y + 20, r.size.x - 12, 6)
+	draw_rect(bar.grow(1.0), INK)
+	draw_rect(bar, Color(0.25, 0.27, 0.35))
+	match c["state"]:
+		"won", "lost":
+			_text("WON!" if c["state"] == "won" else "MISSED IT", Vector2(x, y + 36), 8, Color(0.4, 1.0, 0.5) if c["state"] == "won" else Color(1.0, 0.5, 0.4))
+		"count":
+			_text("Get ready... %d" % int(ceil(float(c["count"]))), Vector2(x, y + 36), 8, Color.WHITE)
+		_:
+			if c["kind"] == "race":
+				var dist: float = c["dist"]
+				var me := clampf(float(c["me_m"]) / dist, 0.0, 1.0)
+				var them := clampf(float(c["them_m"]) / dist, 0.0, 1.0)
+				draw_rect(Rect2(bar.position + Vector2(bar.size.x * them - 2, -1), Vector2(4, 8)), Color(1.0, 0.55, 0.15))
+				draw_rect(Rect2(bar.position + Vector2(bar.size.x * me - 2, -1), Vector2(4, 8)), Color.WHITE)
+				_text("you %dm   hot rod %dm   / %dm" % [int(c["me_m"]), int(c["them_m"]), int(dist)], Vector2(x, y + 36), 8, Color.WHITE)
+			else:
+				var k := clampf(1.0 - (float(c["gap"]) - float(c["catch"])) / (float(c["lose"]) - float(c["catch"])), 0.0, 1.0)
+				draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.75, 0.3))
+				_text("%d m to go   %ds" % [int(float(c["gap"]) - float(c["catch"])), int(maxf(0.0, float(c["time"]) - float(c["t"])))], Vector2(x, y + 36), 8, Color.WHITE)
 
 
 func _draw_toasts(w: float) -> void:

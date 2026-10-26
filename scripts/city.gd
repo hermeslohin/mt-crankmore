@@ -43,7 +43,7 @@ const MAX_TOWN_SPEED := 13.0                  # m/s cap on descents
 enum T { GRASS, PLAZA, SIDEWALK, SAND, WATER, FOREST }
 
 const SHOP_NAMES := ["Sushi Slope", "Rewind Video", "Ski & Board", "Brew Peak Cafe", "Pixel Palace", "Gear Loft", "Poutine Hut",
-	"Track 9 Records", "Fudge Ridge", "Maple Mart", "Mega Mall", "Gelato Glacier", "Bike Spa", "The Cozy Mug", "Alpine Outfitters", "Fondue Fondue", "Summit Souvenirs", "Bear Paw Bakery",
+	"Track 9 Records", "Crankmore Savings Bank", "Maple Mart", "Mega Mall", "Gelato Glacier", "Bike Spa", "The Cozy Mug", "Alpine Outfitters", "Fondue Fondue", "Summit Souvenirs", "Bear Paw Bakery",
 	"Marmot Books", "Crepe Escape", "Trailhead Tees", "Cinnamon Lodge", "The Tuning Shop", "Snowcone Shack", "Moose Juice Bar",
 	"Glacier Gallery", "Granola Goods", "Hot Tub Supply", "Pinecone Pottery", "Sunburn Shades", "Waffle Chalet", "Peak Pharmacy",
 	"Lazy Lake Tackle", "The Yodel Deli", "Kayak Corner", "Sweater Weather", "Candle Cabin", "The Taffy Tram"]
@@ -1637,6 +1637,7 @@ func _process(delta: float) -> void:
 	_update_rivals(delta)
 	_update_life(delta)
 	_update_lamps(delta)
+	_update_challenge(delta)
 	if events != null:
 		events.update(delta)
 	_update_mascots(delta)
@@ -2740,6 +2741,135 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 
 
 ## A power-up person hands one to whoever rides past with empty hands.
+# ---- paid challenges ---------------------------------------------------------------
+## Things around town that pay if you can ride hard enough: a thief making off on a bike, a runaway dog, a hot rod
+## that wants to race. The quarry goes as fast as you would at `pct` of your FTP, so riding above that closes the gap
+## (or wins the race) and easing off lets it get away. TownEvents starts them and draws the quarry where
+## challenge_pos() says; the HUD shows the target watts and how it's going.
+const CHALLENGES := {
+	"thief": {"title": "CATCH THE THIEF", "pct": 1.10, "reward": 150, "gap": 12.0, "catch": 2.0, "lose": 45.0, "time": 80.0},
+	"dog": {"title": "CATCH THE DOG", "pct": 0.80, "reward": 50, "gap": 10.0, "catch": 1.5, "lose": 40.0, "time": 75.0},
+	"race": {"title": "BEAT THE HOT ROD", "pct": 1.20, "reward": 300, "dist": 110.0, "count": 3.0},
+}
+var challenge := {}   # the one going on: a CHALLENGES entry plus kind, state ("count", "on", "won", "lost"), t, gap / me_m, them_m
+
+
+## Starts a challenge (extra fields merged in). False if one is already going or you're not out riding.
+func start_challenge(kind: String, extra := {}) -> bool:
+	if not challenge.is_empty() or not active or er_timer > 0.0:
+		return false
+	challenge = (CHALLENGES[kind] as Dictionary).duplicate()
+	challenge.merge(extra, true)
+	challenge["kind"] = kind
+	challenge["t"] = 0.0
+	challenge["state"] = "count" if kind == "race" else "on"
+	challenge["me_m"] = 0.0
+	challenge["them_m"] = 0.0
+	if kind == "race":
+		var fin := _rail_ahead(float(challenge["dist"]) * TILES_PER_MS * PACE, 0.0)
+		challenge["finish"] = fin[0]
+		challenge["finish_fwd"] = fin[1]
+	return true
+
+
+## The quarry's speed (m/s): yours at `pct` of your FTP on this grade.
+func _quarry_mps() -> float:
+	var bike := Game.bike()
+	return minf(Game.speed_from_power(float(challenge["pct"]) * Game.ftp, bike["mass"], bike["cda"], bike["crr"], PowerUps.felt_grade(grade, 0.0)), MAX_TOWN_SPEED)
+
+
+## The watts a challenge asks for.
+func challenge_watts() -> int:
+	return int(round(float(challenge.get("pct", 1.0)) * Game.ftp))
+
+
+func _update_challenge(delta: float) -> void:
+	if challenge.is_empty():
+		return
+	var c := challenge
+	c["t"] = float(c["t"]) + delta
+	if c["state"] == "won" or c["state"] == "lost":
+		c["end"] = float(c.get("end", 3.0)) - delta
+		if c["end"] <= 0.0:
+			challenge = {}
+		return
+	if er_timer > 0.0 or not active:
+		_end_challenge(false)
+		return
+	var me := p_speed / (TILES_PER_MS * PACE)
+	var them := _quarry_mps()
+	match c["kind"]:
+		"race":
+			if c["state"] == "count":
+				c["count"] = float(c["count"]) - delta
+				if c["count"] <= 0.0:
+					c["state"] = "on"
+					c["t"] = 0.0
+					Game.toast.emit("GO!!", Color(1.0, 0.85, 0.3))
+				return
+			c["me_m"] = float(c["me_m"]) + me * delta
+			c["them_m"] = float(c["them_m"]) + minf(them, float(c["t"]) * 4.0) * delta   # it pulls away from a standing start
+			if float(c["me_m"]) >= float(c["dist"]):
+				_end_challenge(true)
+			elif float(c["them_m"]) >= float(c["dist"]):
+				_end_challenge(false)
+		_:
+			c["gap"] = maxf(0.0, float(c["gap"]) - (me - them) * delta)
+			if float(c["gap"]) <= float(c["catch"]):
+				_end_challenge(true)
+			elif float(c["gap"]) >= float(c["lose"]) or float(c["t"]) > float(c["time"]):
+				_end_challenge(false)
+
+
+func _end_challenge(won: bool) -> void:
+	challenge["state"] = "won" if won else "lost"
+	challenge["end"] = 3.0
+	if won:
+		Game.add_money(int(challenge["reward"]))
+		Game.save_game()
+		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "dog": "You caught the dog", "race": "You beat the hot rod"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
+	else:
+		Game.toast.emit({"thief": "The thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!"}[challenge["kind"]], Color(1.0, 0.6, 0.5))
+
+
+## Where the quarry is: [world position, heading] — the gap ahead of you along your road (the hot rod: its lead over
+## you, in the car lane beside you).
+func challenge_pos() -> Array:
+	var tpm := TILES_PER_MS * PACE
+	if challenge.get("kind", "") == "race":
+		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, 0.45)
+	return _rail_ahead(float(challenge.get("gap", 0.0)) * tpm, BIKE_LANE)
+
+
+## A point `d` tiles ahead of you along your road (behind if negative), `lane` tiles to the right of its middle.
+func _rail_ahead(d: float, lane: float) -> Array:
+	var r: Dictionary = roads[rr]
+	var at := _road_at(r, _wrap_s(r, rs + rdir * d))
+	var fwd: Vector2 = at[1] * rdir
+	return [at[0] + Vector2(-fwd.y, fwd.x) * lane, fwd]
+
+
+## The chequered finish line painted across the road for a hot rod race.
+func _draw_finish() -> void:
+	if challenge.get("kind", "") != "race" or challenge["state"] == "lost":
+		return
+	var f: Vector2 = challenge["finish"]
+	var fwd: Vector2 = challenge["finish_fwd"]
+	var n := Vector2(-fwd.y, fwd.x)
+	for k in 8:
+		for row in 2:
+			var c: Vector2 = f + n * (-1.05 + k * 0.3) + fwd * (row * 0.15)
+			var q := PackedVector2Array([Iso.to_screen(c), Iso.to_screen(c + n * 0.3), Iso.to_screen(c + n * 0.3 + fwd * 0.15), Iso.to_screen(c + fwd * 0.15)])
+			draw_colored_polygon(q, Color.WHITE if (k + row) % 2 == 0 else Color(0.1, 0.1, 0.12))
+	# a banner on two poles
+	var a := Iso.to_screen(f - n * 1.25)
+	var b := Iso.to_screen(f + n * 1.25)
+	draw_line(a, a + Vector2(0, -40), Iso.OUTLINE, 2.0)
+	draw_line(b, b + Vector2(0, -40), Iso.OUTLINE, 2.0)
+	draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y - 46), Vector2(absf(b.x - a.x), 9)), Color(0.95, 0.2, 0.2))
+	_label("FINISH", (a + b) * 0.5 + Vector2(0, -38), 8, Color.WHITE)
+
+
 const GIVER_COUNT := 8
 
 ## A gift-giver's day: "ready" (on the pavement, present held high, a present on the map), "thanks" (just handed it
@@ -3011,6 +3141,7 @@ func _draw_world() -> void:
 	_draw_ground(vr)
 	_draw_lake(vr)
 	_draw_roads(vr)
+	_draw_finish()
 	_draw_beacons()
 
 	var items: Array = []

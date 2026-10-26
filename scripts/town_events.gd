@@ -720,7 +720,11 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			ci.draw_line(ground + Vector2(-6, -4), ground + Vector2(6, -4), Color(0.4, 0.25, 0.14), 1.0)
 		"rider":
 			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-7, 0), ground + Vector2(0, -3), ground + Vector2(7, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.2))
-			Sprites.draw_rider(ci, ground, a["face"], a["pedal"], false, a["who"], false)
+			if not Sprites.draw_rider(ci, ground, a["face"], a["pedal"], false, a["who"], false) and a.has("design"):
+				# no bike art for them: they run for it instead
+				var look := Sprites.cast(a, Sprites.variants(a["design"]) if a["design"] != "" else [], true)
+				if not Sprites.draw_person(ci, "ped_%s_run" % look, ground, a["face"], ph, 12.0):
+					Sprites.draw_person(ci, "ped_%s_walk" % look, ground, a["face"], ph, 14.0)
 		"fire":
 			_draw_fire(ci, a, ground, ph)
 		"animal":
@@ -796,7 +800,7 @@ static func draw_siren(ci: CanvasItem, c: Dictionary, at: Vector2, t: float) -> 
 # ---------------------------------------------------------------------
 
 const SPECIALS := {"soapbox": [120.0, 240.0], "group_ride": [150.0, 300.0], "fire": [360.0, 600.0],
-	"ambulance": [300.0, 540.0], "crime": [240.0, 480.0]}
+	"ambulance": [300.0, 540.0], "crime": [240.0, 480.0], "runaway_dog": [240.0, 480.0], "hotrod": [300.0, 600.0]}
 var special_t := {}             # kind -> seconds until it next happens
 var fw_wait := -1.0             # seconds into the night until the fireworks (-1: not tonight yet)
 var fw_done := false            # had tonight's show
@@ -994,35 +998,57 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["actors"].append(helper)
 			e["car"] = _responder(["van_ambulance"], sp[1], float(sp[2]))
 		"crime":
-			var b := _building_near(["shop"])
+			# a robbery at the bank if it's close, else at a shop: the robber dashes out, a cop after him, and he's off on
+			# a bike. Catch him at 110% of your FTP (see City.CHALLENGES).
+			if not city.challenge.is_empty():
+				return false
+			var b := {}
+			var bank: Array = city.buildings.filter(func(q): return str(q.get("name", "")).ends_with("Bank") and int(q.get("road", -1)) >= 0 \
+				and (q["door"] as Vector2).distance_to(city.p_pos) < 16.0)
+			b = bank[0] if not bank.is_empty() and randf() < 0.6 else _building_near(["shop"])
 			if b.is_empty():
 				return false
-			var side := _door_side(b)
-			var dir := 1.0 if randf() < 0.5 else -1.0
-			e["t"] = 80.0
-			e["stage"] = "run"
-			e["road"] = b["road"]
-			e["side"] = side
-			e["dir"] = dir
-			e["rs"] = float(b["s"])            # where the robber is along the road
-			e["cs"] = float(b["s"]) - dir * 4.0  # and the cop
-			var keeper := _person(b["door"], "", Vector2(1, 1))
-			keeper["looks"] = ["barista", "baker", "lady", "norm_woman_office", "norm_man_bald_glasses"].filter(func(d): return _has("ped_%s_walk" % d))
-			keeper["anim"] = "cheer"
-			_say(keeper, "STOP, THIEF!", 4.0)
-			e["actors"].append(keeper)
-			var robber := _person(b["door"], "robber" if _has("ped_robber_walk") else "grunge_teen", Vector2(1, 0))
-			robber["robber"] = true
-			robber["fps"] = 14.0
+			e["b"] = b
+			e["t"] = 120.0
+			e["stage"] = "dash"
+			e["clock"] = 0.0
+			var robber := _person(b["door"], "robber" if _has("ped_robber_walk") else "", Vector2(1, 0))
+			robber["anim"] = "run"
 			robber["moving"] = true
+			robber["to"] = _kerb(b["road"], float(b["s"]), _door_side(b))[0]
+			robber["speed"] = 2.0
+			_say(robber, ["Ha ha!", "So long, suckers!", "Five-finger discount!"].pick_random(), 2.0)
 			e["actors"].append(robber)
-			var cop := _person(_kerb(b["road"], e["cs"], side)[0], "police", Vector2(1, 0))
-			cop["cop"] = true
-			cop["fps"] = 14.0
-			cop["moving"] = true
-			_say(cop, "Halt! Police!", 2.5)
-			e["actors"].append(cop)
-			Game.toast.emit("Robbery at %s! Stop that thief!" % str(b.get("name", "the shop")), Color(1.0, 0.45, 0.45))
+			Game.toast.emit("Robbery at %s!" % str(b.get("name", "the shop")), Color(1.0, 0.45, 0.45))
+		"runaway_dog":
+			# a dog slips its lead and runs off down the road: catch it at 80% of your FTP
+			if not city.challenge.is_empty():
+				return false
+			var dogs: Array = DOGS.filter(func(d): return _has("animal_%s_run" % d))
+			if dogs.is_empty():
+				return false
+			e["t"] = 110.0
+			e["stage"] = "loose"
+			var owner := _person(pos, "", sp[4])
+			owner["looks"] = ["lady", "norm_woman_sundress", "norm_woman_jeans_jacket", "norm_old_woman", "norm_woman_sweater", "norm_woman_tall", "dogwalker", "norm_woman_curly_hair"].filter(func(d): return _has("ped_%s_walk" % d))
+			owner["anim"] = "cheer"
+			_say(owner, "Help! Catch my dog!", 4.0)
+			e["actors"].append(owner)
+			e["actors"].append({"type": "animal", "name": dogs.pick_random(), "pos": pos, "face": sp[4], "anim": "run", "phase": 0.0, "label_t": 0.0})
+			if not city.start_challenge("dog"):
+				return false
+		"hotrod":
+			# a hot rod rolls up beside you and wants a race to a line 110 m up the road (120% of your FTP to win)
+			if not city.challenge.is_empty() or city.p_speed < 0.5:
+				return false
+			var cars: Array = ["vehicle_sedan_hotrod_orange", "vehicle_sedan_muscle_black", "vehicle_sedan_sports_red"].filter(func(n): return _has(n))
+			if cars.is_empty():
+				return false
+			e["t"] = 70.0
+			e["stage"] = "roll_up"
+			e["clock"] = 0.0
+			var rod := {"type": "vehicle", "name": cars[0], "pos": city.p_pos, "face": city.p_fwd, "phase": 0.0, "label_t": 0.0}
+			e["actors"].append(rod)
 	return true
 
 
@@ -1062,7 +1088,11 @@ func _step_special(e: Dictionary, delta: float) -> void:
 		"ambulance":
 			_step_ambulance(e, delta)
 		"crime":
-			_step_crime(e, delta, p, riding)
+			_step_crime(e, delta)
+		"runaway_dog":
+			_step_dog(e, delta)
+		"hotrod":
+			_step_hotrod(e, delta)
 
 
 func _step_fireworks(e: Dictionary, delta: float) -> void:
@@ -1240,67 +1270,94 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 				_drive_off(e)
 
 
-func _step_crime(e: Dictionary, delta: float, p: Vector2, riding: bool) -> void:
-	var r: Dictionary = city.roads[e["road"]]
-	var robber: Dictionary = e["actors"][1]
-	var cop: Dictionary = e["actors"][2]
-	var dir: float = e["dir"]
-	var side: float = e["side"]
+func _step_crime(e: Dictionary, delta: float) -> void:
+	var b: Dictionary = e["b"]
+	var robber: Dictionary = e["actors"][0]
+	e["clock"] = float(e["clock"]) + delta
 	match e["stage"]:
-		"run":
-			var rs: float = float(e["rs"]) + dir * 1.45 * delta
-			if not r["closed"]:
-				rs = clampf(rs, 0.5, float(r["len"]) - 0.5)
-			e["rs"] = rs
-			e["cs"] = float(e["cs"]) + dir * 1.75 * delta
-			# the robber dashes from the door to the pavement, then down it
-			var k: Array = _kerb(e["road"], rs, side)
-			robber["pos"] = (robber["pos"] as Vector2).move_toward(k[0], 2.5 * delta) if (robber["pos"] as Vector2).distance_to(k[0]) > 0.3 else k[0]
-			robber["face"] = (k[1] as Vector2) * dir
+		"dash":
+			_walk_to(robber, delta)
 			robber["anim"] = "run"
-			var kc: Array = _kerb(e["road"], e["cs"], side)
-			cop["pos"] = kc[0]
-			cop["face"] = (kc[1] as Vector2) * dir
-			cop["anim"] = "walk"
-			if robber["label_t"] <= 0.0 and randf() < delta * 0.5:
-				_say(robber, ["Ha ha!", "You'll never catch me!", "Out of my way!", "Five-finger discount!"].pick_random(), 1.6)
-			var gap: float = (float(e["rs"]) - float(e["cs"])) * dir
-			if r["closed"]:
-				gap = fposmod(gap, float(r["len"]))
-			if riding and p.distance_to(robber["pos"]) < 0.8:
-				# you rode right into him
-				Game.add_money(25)
-				Game.toast.emit("You stopped the thief! Reward: $25", Color(0.4, 1.0, 0.5))
-				_say(robber, "Foiled by a pizza courier!", 2.8)
+			if e["clock"] > 0.8 and e["actors"].size() == 1:
+				# the cop bursts out of the door after him
+				var cop := _person(b["door"], "police", (robber["pos"] as Vector2 - (b["door"] as Vector2)).normalized())
+				cop["cop"] = true
+				cop["anim"] = "run"
+				cop["fps"] = 14.0
+				cop["moving"] = true
+				cop["to"] = (b["door"] as Vector2).lerp(robber["pos"], 0.6)
+				cop["speed"] = 1.8
+				_say(cop, "STOP THAT THIEF!", 3.0)
+				e["actors"].append(cop)
+			if e["actors"].size() > 1:
+				_walk_to(e["actors"][1], delta)
+			if not robber.get("moving", false) and e["clock"] > 1.4:
+				# onto a bike and away: the chase is on (if you're riding; otherwise he just gets away)
+				e["stage"] = "chase"
+				robber["type"] = "rider"
+				robber["who"] = "thief" if Sprites.sheet("bike_thief") != null else ""
+				robber["pedal"] = 0.0
+				robber["k"] = 0
+				if not city.start_challenge("thief"):
+					e["stage"] = "away"
+					e["clock"] = 0.0
+		"chase":
+			var c: Dictionary = city.challenge
+			if c.is_empty() or c["kind"] != "thief":
+				e["stage"] = "away"
+				return
+			var at: Array = city.challenge_pos()
+			robber["pos"] = at[0]
+			robber["face"] = at[1]
+			robber["pedal"] = float(robber["pedal"]) + delta * 9.0
+			if robber["label_t"] <= 0.0 and randf() < delta * 0.4:
+				_say(robber, ["Can't catch me!", "Ha! Pedal harder!", "So long!", "You call that a sprint?"].pick_random(), 1.8)
+			if c["state"] == "won":
 				e["stage"] = "caught"
-			elif gap < 0.5:
-				e["stage"] = "caught"
-				_say(cop, ["BUSTED!", "Gotcha!", "You're nicked!"].pick_random(), 2.5)
-				_say(robber, ["It was like that when I got here!", "I want my lawyer!", "Aw, nuts."].pick_random(), 2.8)
-			if e["stage"] == "caught":
+				robber["type"] = "person"
 				robber["anim"] = "idle"
 				robber["moving"] = false
-				e["car"] = _responder(["sedan_police"], e["road"], float(e["rs"]))
-				e["clock"] = 4.0
+				_say(robber, ["Okay, okay! I give up!", "Foiled by a pizza courier!", "Curses!"].pick_random(), 3.0)
+				# the cop catches up on foot and the police car comes for him
+				if e["actors"].size() > 1:
+					var cop: Dictionary = e["actors"][1]
+					cop["pos"] = city.p_pos
+					cop["to"] = (robber["pos"] as Vector2) - (robber["face"] as Vector2) * 0.5
+					cop["speed"] = 2.2
+					cop["moving"] = true
+					cop["fps"] = 14.0
+				var r: Dictionary = city.roads[city.rr]
+				e["car"] = _responder(["sedan_police"], city.rr, city._wrap_s(r, city.rs + city.rdir * float(c["catch"]) * city.TILES_PER_MS * city.PACE))
+				e["clock"] = 0.0
+			elif c["state"] == "lost":
+				e["stage"] = "away"
+				e["clock"] = 0.0
+		"away":
+			# he pedals off out of sight
+			if robber["type"] == "rider":
+				robber["pos"] = (robber["pos"] as Vector2) + (robber["face"] as Vector2) * 4.0 * delta
+				robber["pedal"] = float(robber["pedal"]) + delta * 9.0
+			if e["clock"] > 4.0:
+				robber["gone"] = true
+				e["t"] = minf(float(e["t"]), 0.5)
 		"caught":
-			# the cop catches up and holds on to him until the police car comes
-			var near: Vector2 = (robber["pos"] as Vector2) - (robber["face"] as Vector2) * 0.45
-			cop["pos"] = (cop["pos"] as Vector2).move_toward(near, 1.75 * delta)
-			cop["moving"] = (cop["pos"] as Vector2).distance_to(near) > 0.05
-			cop["anim"] = "walk" if cop["moving"] else "idle"
-			robber["anim"] = "idle"
+			if e["actors"].size() > 1:
+				var cop: Dictionary = e["actors"][1]
+				_walk_to(cop, delta)
+				if not cop.get("moving", false):
+					cop["face"] = ((robber["pos"] as Vector2) - (cop["pos"] as Vector2)).normalized()
 			var car: Dictionary = e.get("car", {})
-			e["clock"] -= delta
-			if (car.is_empty() and e["clock"] <= 0.0) or _parked(car):
+			if (car.is_empty() and e["clock"] > 5.0) or _parked(car):
 				e["stage"] = "board"
-				for a in [robber, cop]:
+				for a in e["actors"]:
 					a["to"] = car["pos"] if not car.is_empty() else (a["pos"] as Vector2) + (a["face"] as Vector2) * 2.0
 					a["speed"] = 1.0
 					a["moving"] = true
 					a["fps"] = 8.0
+					a["anim"] = "walk"
 		"board":
 			var aboard := true
-			for a in [robber, cop]:
+			for a in e["actors"]:
 				if a.get("gone", false):
 					continue
 				_walk_to(a, delta)
@@ -1310,8 +1367,88 @@ func _step_crime(e: Dictionary, delta: float, p: Vector2, riding: bool) -> void:
 					a["gone"] = true
 			if aboard and not e.get("leaving", false):
 				e["leaving"] = true
-				e["actors"][0]["anim"] = "idle"
 				_drive_off(e)
+
+
+func _step_dog(e: Dictionary, delta: float) -> void:
+	var owner: Dictionary = e["actors"][0]
+	var dog: Dictionary = e["actors"][1]
+	var c: Dictionary = city.challenge
+	match e["stage"]:
+		"loose":
+			if c.is_empty() or c["kind"] != "dog":
+				e["stage"] = "gone"
+				return
+			var at: Array = city.challenge_pos()
+			dog["pos"] = at[0]
+			dog["face"] = at[1]
+			dog["anim"] = "run"
+			if dog["label_t"] <= 0.0 and randf() < delta * 0.3:
+				_say(dog, ["WOOF!", "Arf arf!", "Yip!"].pick_random(), 1.2)
+			if owner["label_t"] <= 0.0 and randf() < delta * 0.3:
+				_say(owner, ["Biscuit! Come back!", "Please catch him!", "BISCUIT!"].pick_random(), 2.0)
+			if c["state"] == "won":
+				e["stage"] = "caught"
+				dog["anim"] = "idle"
+				_say(dog, "Woof! (wags tail)", 2.5)
+				_say(owner, "My hero! Here's $50!", 3.0)
+				owner["anim"] = "cheer"
+				e["t"] = 8.0
+			elif c["state"] == "lost":
+				e["stage"] = "gone"
+		"gone":
+			dog["pos"] = (dog["pos"] as Vector2) + (dog["face"] as Vector2) * 3.0 * delta
+			if not e.get("sad", false):
+				e["sad"] = true
+				_say(owner, "Oh no... BISCUIT!", 3.0)
+				owner["anim"] = "idle"
+				e["t"] = minf(float(e["t"]), 5.0)
+		"caught":
+			if owner["label_t"] <= 0.0:
+				owner["anim"] = "idle"
+
+
+func _step_hotrod(e: Dictionary, delta: float) -> void:
+	var rod: Dictionary = e["actors"][0]
+	e["clock"] = float(e["clock"]) + delta
+	match e["stage"]:
+		"roll_up":
+			# comes up from behind in the car lane and draws level
+			var u := clampf(float(e["clock"]) / 2.0, 0.0, 1.0)
+			var at: Array = city._rail_ahead(lerpf(-4.0, 0.4, u), 0.45)
+			rod["pos"] = at[0]
+			rod["face"] = at[1]
+			if u >= 1.0:
+				_say(rod, ["Race you to that line! Winner gets $300!", "Hey pizza kid! First to the line, $300!", "Think you can beat this? To the line!"].pick_random(), 3.0)
+				if city.start_challenge("race"):
+					e["stage"] = "race"
+				else:
+					e["stage"] = "off"
+		"race":
+			var c: Dictionary = city.challenge
+			if c.is_empty() or c["kind"] != "race":
+				e["stage"] = "off"
+				e["clock"] = 0.0
+				return
+			var at: Array = city.challenge_pos()
+			rod["pos"] = at[0]
+			rod["face"] = at[1]
+			if c["state"] == "count" and rod["label_t"] <= 0.0:
+				_say(rod, str(int(ceil(float(c["count"])))) + "...", 0.9)
+			if c["state"] == "won":
+				_say(rod, ["No way! Fine. Here's your $300.", "What?! On a BIKE?", "Rematch next time!"].pick_random(), 3.0)
+				e["stage"] = "off"
+				e["clock"] = 0.0
+			elif c["state"] == "lost":
+				_say(rod, ["Eat my dust!", "Too slow, pizza kid!", "Vroom vroom, sucker!"].pick_random(), 3.0)
+				e["stage"] = "off"
+				e["clock"] = 0.0
+		"off":
+			# roars off up the road and away
+			rod["pos"] = (rod["pos"] as Vector2) + (rod["face"] as Vector2) * minf(float(e["clock"]) * 4.0, 7.0) * delta
+			if float(e["clock"]) > 5.0:
+				rod["gone"] = true
+				e["t"] = minf(float(e["t"]), 0.3)
 
 
 ## The group riders (traffic gives them room like the band).

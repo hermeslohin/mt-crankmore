@@ -736,7 +736,7 @@ const VIEWER_HOUR := {"fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon":
 func _debug_viewer() -> void:
 	viewer = {"backup": FileAccess.get_file_as_string(Game.SAVE_PATH), "i": -1, "status": "",
 		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
-			"soapbox", "group_ride", "fire", "ambulance", "crime", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]
+			"soapbox", "group_ride", "fire", "ambulance", "crime", "bike_theft", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]
 			+ city.events.all_kinds()}
 	_start_game()
 	Game.toast.emit("EVENT VIEWER: ] or N for the next event, [ or P to go back, R to run it again", Color(1.0, 0.85, 0.3))
@@ -779,6 +779,8 @@ func _viewer_go(i: int) -> void:
 			where = "Rewind Video"
 		"crime":
 			where = "Bank"
+		"bike_theft":
+			where = "Spokes"
 	if where != "":
 		for b in city.buildings:
 			if str(b.get("name", "")).contains(where) and int(b.get("road", -1)) >= 0:

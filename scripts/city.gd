@@ -2144,7 +2144,8 @@ func _update_cars(delta: float) -> void:
 		var f: Vector2 = c["fwd"]
 		var blocked := false
 		for o in cars:
-			if o == c or float(o.get("pull", 0.0)) > 0.5:
+			# (an emergency vehicle on its way to a scene gets past the queue: lights flashing, everyone makes way)
+			if o == c or float(o.get("pull", 0.0)) > 0.5 or c.has("park_s"):
 				continue
 			var need: float = float(c["hl"]) + float(o["hl"])
 			if not c.has("curve") and o["road"] == c["road"] and o["dir"] == c["dir"]:
@@ -2204,7 +2205,8 @@ func _update_cars(delta: float) -> void:
 			c["pull"] = move_toward(float(c.get("pull", 0.0)), 1.0 if to_go < 2.0 else 0.0, delta * 1.5)
 		elif float(c.get("pull", 0.0)) > 0.0:
 			c["pull"] = move_toward(float(c["pull"]), 0.0, delta)
-		if active and er_timer <= 0.0 and not c.get("hidden", false):
+		# (an emergency vehicle on a call goes round you rather than queueing behind)
+		if active and er_timer <= 0.0 and not c.get("hidden", false) and not c.has("park_s"):
 			var rel: Vector2 = rail_pos - c["pos"]
 			var ahead := rel.dot(f)
 			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction
@@ -2825,6 +2827,7 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 ## challenge_pos() says; the HUD shows the target watts and how it's going.
 const CHALLENGES := {
 	"thief": {"title": "CATCH THE THIEF", "pct": 1.10, "reward": 150, "gap": 12.0, "catch": 2.0, "lose": 45.0, "time": 80.0},
+	"bike_thief": {"title": "STOP THE BIKE THIEF", "pct": 1.30, "reward": 300, "gap": 14.0, "catch": 2.0, "lose": 55.0, "time": 100.0},
 	"dog": {"title": "CATCH THE DOG", "pct": 0.80, "reward": 50, "gap": 10.0, "catch": 1.5, "lose": 40.0, "time": 75.0},
 	"race": {"title": "BEAT THE HOT ROD", "pct": 1.20, "reward": 300, "dist": 110.0, "count": 3.0},
 	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 150.0, "count": 3.0},
@@ -2955,9 +2958,9 @@ func _end_challenge(won: bool) -> void:
 	if won:
 		Game.add_money(int(challenge["reward"]))
 		Game.save_game()
-		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "dog": "You caught the dog", "race": "You beat the hot rod", "kid_race": "You beat the kid"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
+		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "bike_thief": "You caught the bike thief", "dog": "You caught the dog", "race": "You beat the hot rod", "kid_race": "You beat the kid"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
 	else:
-		Game.toast.emit({"thief": "The thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!", "kid_race": "The kid beat you! Ouch."}[challenge["kind"]], Color(1.0, 0.6, 0.5))
+		Game.toast.emit({"thief": "The thief got away...", "bike_thief": "The bike thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!", "kid_race": "The kid beat you! Ouch."}[challenge["kind"]], Color(1.0, 0.6, 0.5))
 
 
 func _clock(t: float) -> String:

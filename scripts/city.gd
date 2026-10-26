@@ -1303,13 +1303,13 @@ func _draw_sprop(e: Dictionary, at: Vector2) -> void:
 			var vel: Vector2 = d * float(e["run"]) + Vector2(-d.y, d.x) * cos(u * TAU * 3.0) * 0.7 * TAU * 3.0
 			var sk := Sprites.cast(e, Sprites.skiers())
 			if sk != "":
-				Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0)
+				Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0, Color.WHITE, e)
 		"skater":
 			var a: float = e["a0"] + t_ * float(e["w"])
 			var tan := Vector2(-sin(a), cos(a)) * signf(e["w"])
 			var sd := Sprites.cast(e)   # townsfolk out skating, gliding in one stride
 			if sd != "":
-				Sprites.draw_person(self, "ped_%s_walk" % sd, b, tan, 0.25 + 0.25 * float(int(t_ * 0.8 + float(e["a0"]) * 3.0) % 2), 8.0)
+				Sprites.draw_person(self, "ped_%s_walk" % sd, b, tan, 0.25 + 0.25 * float(int(t_ * 0.8 + float(e["a0"]) * 3.0) % 2), 8.0, Color.WHITE, e)
 		"pumpkins":
 			for k in int(e["n"]):
 				Season.pumpkin(self, b + Vector2(k * 7.0 - (int(e["n"]) - 1) * 3.5, (k % 2) * 3.0), 1.3 if k == 0 else 0.9, int(e["sd"]) + k)
@@ -4040,7 +4040,7 @@ func _draw_ped(p: Dictionary) -> void:
 		Sprites.draw_cheer(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0)
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
 	else:
-		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0)
+		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0, Color.WHITE, p)
 	if float(p.get("say_t", 0.0)) > 0.0:
 		_label(p["say"], ground + Vector2(0, -52), 8, Color(0.85, 0.95, 1.0))
 
@@ -4099,8 +4099,8 @@ func _draw_car(c: Dictionary) -> void:
 	# a one-pixel bounce on the suspension while it drives, and the wheels turn with the distance driven
 	var at := Iso.to_screen(pos) + Vector2(0, -1 if moving and int(odo * 5.0) % 2 == 0 else 0)
 	var frame := int(odo * 6.0)
-	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame):
-		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame)
+	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame, c):
+		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame, c)
 	if not String(c["kind"]).contains("electric") and not String(c["kind"]).contains("carriage"):
 		# exhaust: little puffs from the back that drift up and fade, more when it pulls away
 		var rear: Vector2 = pos - fwd * hl

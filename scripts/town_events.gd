@@ -705,10 +705,10 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 				Sprites.draw_person(ci, "ped_%s_walk" % d, Vector2.ZERO, Vector2(1, 1), 0.0, 0.0)
 				ci.draw_set_transform(Vector2.ZERO)
 			elif anim == "run":
-				if not Sprites.draw_person(ci, "ped_%s_run" % d, ground, a["face"], ph, 12.0):
-					Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, 14.0)
+				if not Sprites.draw_person(ci, "ped_%s_run" % d, ground, a["face"], ph, 12.0, Color.WHITE, a):
+					Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, 14.0, Color.WHITE, a)
 			elif anim == "walk" and a.get("moving", false):
-				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, float(a.get("fps", 8.0)), a.get("tint", Color.WHITE))
+				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, float(a.get("fps", 8.0)), a.get("tint", Color.WHITE), a)
 			elif (anim == "spray" or anim == "work") and Sprites.draw_person(ci, "ped_%s_%s" % [d, anim], ground, a["face"], ph, 9.0):
 				pass
 			elif anim == "cheer" or anim == "perform":
@@ -717,7 +717,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			elif a.get("seated", false):   # sitting on the grass (movie night): just their top half shows over it
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, 7), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE))
 			else:   # standing about: shifting their weight now and then
-				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE))
+				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE), a)
 			if (d == "drummer" or d == "trumpeter" or d.begins_with("band_") or anim == "perform") and int(ph * 3.0 + float(a.get("row", 0)) * 0.5) % 2 == 0:
 				_note(ci, ground + Vector2(10, -46 - fmod(ph * 20.0, 14.0)))
 			if a.has("spray_to"):
@@ -768,7 +768,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			if not Sprites.draw_strip(ci, name, ground + Vector2(0, -lift), ph, 12.0 if a["anim"] == "run" else 8.0, true, flip):
 				Sprites.draw_strip(ci, "animal_%s_idle" % a["name"], ground + Vector2(0, -lift), ph, 8.0, true, flip)
 		"vehicle":
-			Sprites.draw_vehicle(ci, a["name"], ground, a["face"], Color.WHITE, int(ph * 6.0))
+			Sprites.draw_vehicle(ci, a["name"], ground, a["face"], Color.WHITE, int(ph * 6.0), a)
 		"ball":
 			var hop := absf(sin(ph * 9.0)) * 7.0
 			ci.draw_circle(ground, 2.5, Color(0, 0, 0, 0.25))

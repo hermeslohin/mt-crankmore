@@ -384,7 +384,7 @@ func _draw_skier(sk: Dictionary, p: Vector2, dir: Vector2, u: float) -> void:
 	var look := Sprites.cast(sk, ["ski_instructor"] if sk["design"] == "ski_instructor" else Sprites.skiers(sk["design"] == "skier_kid" and float(sk["lag"]) > 0.0))
 	if look == "":
 		return
-	Sprites.draw_person(race, "ped_%s_ski" % look, at, dir, t_ + float(sk["ph"]), 8.0, Color(1, 1, 1, a))
+	Sprites.draw_person(race, "ped_%s_ski" % look, at, dir, t_ + float(sk["ph"]), 8.0, Color(1, 1, 1, a), sk)
 
 
 ## [position, going up?, the lift] for every chair on every lift.

@@ -260,9 +260,11 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var col := clampi(int(fall_t * FALL_FPS), 0, frames - 1) if falling else posmod(int(floorf(phase / TAU * frames)), frames)
 	if throw_t >= 0.0:
 		col = clampi(int(throw_t * THROW_FPS), 0, frames - 1)
-	var src := Rect2(col * fw, dir_row(w) * fh, fw, fh)
 	var dst := Rect2((c - Vector2(fw * 0.5, fh - ANCHOR_UP)).round(), Vector2(fw, fh))
-	ci.draw_texture_rect_region(tex, dst, src)
+	var key := "%d/%s" % [ci.get_instance_id(), who]   # each rider is one of a kind in a scene
+	if not _rider_turns.has(key):
+		_rider_turns[key] = {}
+	_draw_turning(ci, tex, dst, col * fw, fw, fh, turn_rows(_rider_turns[key], w), Color.WHITE)
 	return true
 
 
@@ -320,30 +322,66 @@ static func _count_hops(tex: Texture2D) -> int:
 ## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets; columns are the frames
 ## of its driving animation, if it has one) with its middle on `at`, heading `w` (world direction), tinted by `tint`.
 ## `frame` picks the animation frame (it wraps).
-static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE, frame := 0) -> bool:
+## `state`: the vehicle's own dictionary, to keep its turning smooth (see turn_rows).
+static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE, frame := 0, state: Dictionary = {}) -> bool:
 	var tex := sheet(name)
 	if tex == null:
 		return false
 	var f := tex.get_height() / DIRS
 	var frames := maxi(1, tex.get_width() / f)
-	var src := Rect2(posmod(frame, frames) * f, dir_row(w) * f, f, f)
 	var dst := Rect2((at - Vector2(f * 0.5, f * 0.5 + VEHICLE_LIFT)).round(), Vector2(f, f))
-	ci.draw_texture_rect_region(tex, dst, src, tint)
+	_draw_turning(ci, tex, dst, posmod(frame, frames) * f, f, f, turn_rows(state, w), tint)
 	return true
 
 
 ## A person (art/<name>.png: 8 square rows of directions as in the rider sheets, frames across; see
 ## tools/import_sprite.gd people) standing with their feet on `at`, walking towards the world direction `w`. `t` is in
 ## seconds.
-static func draw_person(ci: CanvasItem, name: String, at: Vector2, w: Vector2, t: float, fps := 8.0, tint := Color.WHITE) -> bool:
+static func draw_person(ci: CanvasItem, name: String, at: Vector2, w: Vector2, t: float, fps := 8.0, tint := Color.WHITE, state: Dictionary = {}) -> bool:
 	var tex := outfit(name)
 	if tex == null:
 		return false
 	var f := tex.get_height() / DIRS
 	var frames := maxi(1, tex.get_width() / f)
-	var src := Rect2(posmod(int(t * fps), frames) * f, dir_row(w) * f, f, f)
-	ci.draw_texture_rect_region(tex, Rect2((at - Vector2(f * 0.5, f - STRIP_FEET_MARGIN)).round(), Vector2(f, f)), src, tint)
+	var dst := Rect2((at - Vector2(f * 0.5, f - STRIP_FEET_MARGIN)).round(), Vector2(f, f))
+	_draw_turning(ci, tex, dst, posmod(int(t * fps), frames) * f, f, f, turn_rows(state, w), tint)
 	return true
+
+
+## Smooth turning for anything drawn in the 8 directions. A view only changes once the heading is TURN_LAG past the
+## halfway point between two views (no flicker on a gentle curve), and then the new view fades in over the old one for
+## TURN_FADE seconds. `st` is the thing's own dictionary (its turn is kept there); empty means no smoothing.
+## Returns [view row, previous view row, how far the new one has faded in 0-1].
+const TURN_LAG := 0.12    # radians, about 7 degrees
+const TURN_FADE := 0.15   # seconds
+static var _rider_turns := {}
+
+
+static func turn_rows(st: Dictionary, w: Vector2) -> Array:
+	var want := dir_row(w)
+	if st.is_read_only():
+		return [want, want, 1.0]
+	var now := Time.get_ticks_msec() / 1000.0
+	if not st.has("_row"):
+		st["_row"] = want
+		st["_prev"] = want
+		st["_at"] = -10.0
+	var cur: int = st["_row"]
+	if want != cur and absf(angle_difference(cur * PI / 4.0, w.angle())) > PI / 8.0 + TURN_LAG:
+		st["_prev"] = cur
+		st["_row"] = want
+		st["_at"] = now
+	return [st["_row"], st["_prev"], clampf((now - float(st["_at"])) / TURN_FADE, 0.0, 1.0)]
+
+
+## One frame (column `x`) of an 8-row sheet in the view `rows` gives (see turn_rows): mid-turn, the new view over the
+## old one, fading in.
+static func _draw_turning(ci: CanvasItem, tex: Texture2D, dst: Rect2, x: float, fw: float, fh: float, rows: Array, tint: Color) -> void:
+	if float(rows[2]) < 1.0 and int(rows[1]) != int(rows[0]):
+		ci.draw_texture_rect_region(tex, dst, Rect2(x, int(rows[1]) * fh, fw, fh), tint)
+		ci.draw_texture_rect_region(tex, dst, Rect2(x, int(rows[0]) * fh, fw, fh), Color(tint.r, tint.g, tint.b, tint.a * float(rows[2])))
+	else:
+		ci.draw_texture_rect_region(tex, dst, Rect2(x, int(rows[0]) * fh, fw, fh), tint)
 
 
 ## A single picture (art/<name>.png) with the middle of its bottom edge on `at`, optionally mirrored left to right,

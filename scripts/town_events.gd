@@ -6,6 +6,11 @@ extends RefCounted
 ## away, a cat darting over the road and fire engines, ambulances and police cars racing past with their sirens on.
 ## There are also critters living in the parks and woods all the time (squirrels, rabbits, hedgehogs, foxes, cats, ...)
 ## that potter about and bolt when you ride close.
+## Every few minutes the whole Crankmore Marching Band parades round the Plaza Loop (see PARADE): the drum major
+## out in front, flags and batons, then the brass, woodwinds and drums, sousaphones at the back, in their own lane,
+## with the traffic queueing behind and the townsfolk cheering them on.
+## The crew at the Crankmore Heights construction site is always about: walking the site, stopping to work, calling
+## out to each other, and cheering when their pizza turns up (the site orders now and then; see City._post_order).
 ## Each happening is a handful of actors (people, animals, a parked vehicle, a ball or a balloon) that City sorts into
 ## its drawing like everything else (see actors()). Anything without art is skipped.
 
@@ -24,6 +29,27 @@ var events: Array = []         # {kind, t (seconds left), actors: [...], ...}
 var next_t := 6.0
 var t_ := 0.0
 var critters: Array = []
+var crew: Array = []          # the construction site's workers (see _step_crew)
+const CREW_SIZE := 4
+const CREW_LINES := ["*clang* *clang*", "Measure twice!", "Lunch yet?", "Watch your head!", "Hand me that wrench!",
+	"Pizza later?", "Easy... easy...", "Who ordered the anchovies?", "Hard hats on!", "BEEP BEEP BEEP"]
+var parade_t := randf_range(60.0, 150.0)   # seconds until the band next marches
+const PARADE_EVERY := [300.0, 540.0]
+const PARADE_SPEED := 0.75     # m/s, a brisk march
+const PARADE_LAPS := 2.0
+const PARADE_ROW := 0.85       # m between rows
+## The band, front to back, one row per line (three across, or one); designs without art are left out.
+const PARADE := [
+	["band_major"],
+	["band_flag", "band_baton", "band_flag"],
+	["trumpeter", "trumpeter", "trumpeter"],
+	["band_trombone", "band_trombone", "band_trombone"],
+	["band_clarinet", "band_sax", "band_clarinet"],
+	["drummer", "drummer", "drummer"],
+	["band_bass_drum", "band_cymbals", "band_bass_drum"],
+	["band_sousaphone", "band_sousaphone", "band_sousaphone"],
+]
+const PARADE_SHOUTS := ["Go band!", "Woo!", "76 trombones!", "Encore!", "Ba-dum-tss!", "Strike up the band!", "Bravo!"]
 const CRITTERS := ["squirrel", "squirrel", "rabbit", "rabbit", "chipmunk", "hedgehog", "raccoon", "skunk", "fox", "town_cat_ginger",
 	"town_dog_corgi", "town_pigeon", "town_pigeon", "marmot"]
 const CRITTER_COUNT := 18
@@ -117,12 +143,21 @@ func _step_critters(delta: float) -> void:
 						a["wait"] = randf_range(2.0, 6.0)
 
 
+## Where the marching band is, for the traffic to stop for (empty when it isn't out).
+func parade_spots() -> Array:
+	for e in events:
+		if e["kind"] == "parade":
+			return e["actors"].map(func(a): return a["pos"])
+	return []
+
+
 ## Every actor of every happening, to be sorted and drawn with the rest of the town.
 func actors() -> Array:
 	var out: Array = []
 	for a in critters:
 		if not a.get("gone", false):
 			out.append(a)
+	out.append_array(crew)
 	for e in events:
 		for a in e["actors"]:
 			if not a.get("gone", false):
@@ -135,8 +170,14 @@ func update(delta: float) -> void:
 	if critters.is_empty() and t_ < 1.0:
 		_spawn_critters()
 	_step_critters(delta)
+	_step_crew(delta)
+	parade_t -= delta
+	if parade_t <= 0.0 and city.active:
+		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1])
+		if not events.any(func(e): return e["kind"] == "parade"):
+			_start_parade()
 	next_t -= delta
-	if next_t <= 0.0 and events.size() < MAX_LIVE and city.active:
+	if next_t <= 0.0 and events.filter(func(e): return e["kind"] != "parade").size() < MAX_LIVE and city.active:
 		next_t = randf_range(GAP_MIN, GAP_MAX)
 		_start(_pick_kind())
 	for i in range(events.size() - 1, -1, -1):
@@ -219,7 +260,7 @@ func _design() -> String:
 
 
 func _person(pos: Vector2, design: String, face: Vector2) -> Dictionary:
-	return {"type": "person", "design": design, "pos": pos, "face": face, "anim": "walk", "phase": randf() * 3.0, "moving": false}
+	return {"type": "person", "design": design, "pos": pos, "face": face, "anim": "walk", "phase": randf() * 3.0, "moving": false, "label_t": 0.0}
 
 
 ## Starts a happening of `kind` ("crowd", "dog", "pigeons", ...) near the player (also used by the events debug mode).
@@ -232,6 +273,9 @@ func _start(kind: String) -> void:
 		return
 	if kind == "siren":
 		_start_siren()
+		return
+	if kind == "parade":
+		_start_parade(city.p_pos)
 		return
 	var sp := _spot()
 	if sp.is_empty():
@@ -346,6 +390,105 @@ func _start_siren() -> void:
 	events.append({"kind": "siren", "t": 25.0, "actors": [], "car": c})
 
 
+## The marching band sets off round the Plaza Loop, in the right-hand lane, starting where the player will see it
+## (`near`: the point on the loop closest to it), else anywhere.
+## Walking spots for the crew: just outside the construction lot's two near sides, in view.
+func _crew_spot(b: Dictionary) -> Vector2:
+	var pos: Vector2 = b["pos"]
+	var size: Vector2 = b["size"]
+	if randf() < 0.5:
+		return Vector2(pos.x + size.x + 0.35, pos.y + randf_range(0.3, size.y - 0.2))
+	return Vector2(pos.x + randf_range(0.3, size.x - 0.2), pos.y + size.y + 0.35)
+
+
+func _step_crew(delta: float) -> void:
+	var site := -1
+	for i in city.buildings.size():
+		if city.buildings[i]["kind"] == "site":
+			site = i
+	if site < 0 or not _has("ped_construction_walk"):
+		return
+	var b: Dictionary = city.buildings[site]
+	if crew.is_empty():
+		for k in CREW_SIZE:
+			var a := _person(_crew_spot(b), "construction", Vector2(1, 1))
+			a["anim"] = "idle"
+			a["wait"] = randf_range(0.0, 5.0)
+			crew.append(a)
+	for a in crew:
+		a["phase"] = float(a["phase"]) + delta
+		a["label_t"] = maxf(0.0, float(a.get("label_t", 0.0)) - delta)
+		if float(a.get("lunch", 0.0)) > 0.0:
+			a["lunch"] -= delta
+			a["anim"] = "cheer"
+			a["moving"] = false
+			continue
+		if a.get("moving", false):
+			var to: Vector2 = a["to"] - a["pos"]
+			if to.length() < 0.05:
+				a["moving"] = false
+				a["anim"] = "idle"
+				a["wait"] = randf_range(3.0, 9.0)
+			else:
+				a["pos"] += to.normalized() * minf(to.length(), 0.6 * delta)
+				a["face"] = to.normalized()
+				a["anim"] = "walk"
+			continue
+		a["wait"] = float(a["wait"]) - delta
+		if a["wait"] <= 0.0:
+			a["to"] = _crew_spot(b)
+			a["moving"] = true
+		elif a["label_t"] <= 0.0 and randf() < delta * 0.06:
+			a["label"] = CREW_LINES.pick_random()
+			a["label_t"] = 2.2
+
+
+## The crew's pizza has arrived: everyone downs tools and cheers.
+func crew_lunch() -> void:
+	for a in crew:
+		a["lunch"] = 4.0
+		a["moving"] = false
+	if not crew.is_empty():
+		crew[0]["label"] = ["PIZZA'S HERE!", "LUNCH BREAK!", "Finally!", "Extra cheese, nice!"].pick_random()
+		crew[0]["label_t"] = 3.0
+
+
+func _start_parade(near_p := Vector2.INF) -> void:
+	var rows: Array = []
+	for row in PARADE:
+		var have: Array = row.filter(func(d): return _has("ped_%s_walk" % d))
+		if not have.is_empty():
+			rows.append(have)
+	if rows.size() < 4:
+		return
+	var r: Dictionary = city.roads[0]
+	var s := randf() * float(r["len"])
+	if near_p != Vector2.INF:
+		var best := 1e9
+		var q := 0.0
+		while q < float(r["len"]):
+			var d: float = (city._road_at(r, q)[0] as Vector2).distance_to(near_p)
+			if d < best:
+				best = d
+				s = q
+			q += 0.5
+	var dir := 1.0 if randf() < 0.5 else -1.0
+	var e := {"kind": "parade", "t": PARADE_LAPS * float(r["len"]) / PARADE_SPEED, "actors": [], "road": 0, "s": s, "dir": dir}
+	for ri in rows.size():
+		var row: Array = rows[ri]
+		for k in row.size():
+			var a := _person(Vector2.ZERO, row[k], Vector2.RIGHT)
+			a["row"] = ri
+			a["lat"] = 0.55 if row.size() == 1 else 0.2 + 0.35 * k   # across the lane, from the middle line out
+			a["moving"] = true
+			a["band"] = true
+			a["phase"] = 0.0   # in step
+			e["actors"].append(a)
+	events.append(e)
+	_step(e, 0.0)
+	Game.toast.emit("The Crankmore Marching Band is parading round the plaza!", Color(1.0, 0.85, 0.35))
+
+
 func _end(e: Dictionary) -> void:
 	if e["kind"] == "siren":
 		city.cars.erase(e["car"])
@@ -412,6 +555,23 @@ func _step(e: Dictionary, delta: float) -> void:
 		"cat":
 			for a in e["actors"]:
 				_walk_to(a, delta)
+		"parade":
+			var r: Dictionary = city.roads[e["road"]]
+			e["s"] = city._wrap_s(r, float(e["s"]) + float(e["dir"]) * PARADE_SPEED * delta)
+			for a in e["actors"]:
+				var s: float = city._wrap_s(r, float(e["s"]) - float(e["dir"]) * float(a["row"]) * PARADE_ROW)
+				var at: Array = city._road_at(r, s)
+				var f: Vector2 = at[1] * float(e["dir"])
+				a["pos"] = at[0] + Vector2(-f.y, f.x) * float(a["lat"])
+				a["face"] = f
+				a["anim"] = "walk"
+			# townsfolk along the way stop and cheer
+			var head: Vector2 = e["actors"][0]["pos"]
+			for q in city.peds:
+				if q["cheer"] <= 0.0 and q["cool"] <= 0.0 and (q["pos"] as Vector2).distance_to(head) < 3.0:
+					q["cool"] = randf_range(12.0, 20.0)
+					q["cheer"] = 3.0
+					q["shout"] = PARADE_SHOUTS.pick_random()
 		"band":
 			var r: Dictionary = city.roads[e["road"]]
 			e["s"] = city._wrap_s(r, float(e["s"]) + float(e["dir"]) * 0.45 * delta)
@@ -500,7 +660,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground, ph)
 			else:   # standing about: shifting their weight now and then
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0)
-			if (d == "drummer" or d == "trumpeter" or anim == "perform") and int(ph * 3.0) % 2 == 0:
+			if (d == "drummer" or d == "trumpeter" or d.begins_with("band_") or anim == "perform") and int(ph * 3.0 + float(a.get("row", 0)) * 0.5) % 2 == 0:
 				_note(ci, ground + Vector2(10, -46 - fmod(ph * 20.0, 14.0)))
 		"animal":
 			var flip := Iso.to_screen(a["face"]).x < 0.0

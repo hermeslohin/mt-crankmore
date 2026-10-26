@@ -167,8 +167,10 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	var frames := maxi(1, tex.get_width() / fh)
 	var src := Rect2(posmod(int(t * fps), frames) * fh, 0, fh, fh)
 	var tl := (at - Vector2(fh * 0.5, fh - STRIP_FEET_MARGIN if feet else fh * 0.5)).round()
-	var dst := Rect2(tl + Vector2(fh, 0), Vector2(-fh, fh)) if flip else Rect2(tl, Vector2(fh, fh))
-	ci.draw_texture_rect_region(tex, dst, src, tint)
+	if flip:
+		_mirrored(ci, tl.x + fh * 0.5, func(): ci.draw_texture_rect_region(tex, Rect2(tl, Vector2(fh, fh)), src, tint))
+	else:
+		ci.draw_texture_rect_region(tex, Rect2(tl, Vector2(fh, fh)), src, tint)
 	return true
 
 
@@ -243,6 +245,16 @@ static func draw_image(ci: CanvasItem, name: String, at: Vector2, flip := false,
 	var w := float(tex.get_width()) * scale
 	var h := float(tex.get_height()) * scale
 	var top_left := (at - Vector2(w * 0.5, h)).round()
-	var rect := Rect2(top_left + Vector2(w, 0.0), Vector2(-w, h)) if flip else Rect2(top_left, Vector2(w, h))
-	ci.draw_texture_rect(tex, rect, false, Color(1, 1, 1, alpha))
+	if flip:
+		_mirrored(ci, top_left.x + w * 0.5, func(): ci.draw_texture_rect(tex, Rect2(top_left, Vector2(w, h)), false, Color(1, 1, 1, alpha)))
+	else:
+		ci.draw_texture_rect(tex, Rect2(top_left, Vector2(w, h)), false, Color(1, 1, 1, alpha))
 	return true
+
+
+## Runs `fn` (some drawing) mirrored left to right about the vertical line x = `mid`. (A negative-width rect doesn't
+## mirror in place, it lands a whole width to one side.)
+static func _mirrored(ci: CanvasItem, mid: float, fn: Callable) -> void:
+	ci.draw_set_transform(Vector2(2.0 * mid, 0.0), 0.0, Vector2(-1.0, 1.0))
+	fn.call()
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

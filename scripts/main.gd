@@ -637,7 +637,7 @@ func _debug_events() -> void:
 	city.events.near = 2.5
 	city.events.far = 5.0
 	city.events.next_t = 999.0
-	for kind in ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren"]:
+	for kind in ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade"]:
 		city.events.events.clear()
 		city.events.start(kind)
 		print("event %s: %s" % [kind, "started" if not city.events.events.is_empty() else "skipped (no art or no spot)"])

@@ -115,6 +115,8 @@ var tree_chunks: Dictionary = {}   # Vector2i(chunk) -> trees, so drawing only v
 const CHUNK := 8
 var props: Array = []
 var spots: Array = []     # delivery destinations
+var site_spot := -1       # the construction site's delivery spot (its crew orders pizza now and then)
+const SITE_ORDER_CHANCE := 0.15
 var shops: Array = []     # pizza shops
 var zones: Array = []     # interactive doors
 var cars: Array = []
@@ -736,6 +738,9 @@ func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color =
 			b["col"] = Color(0.6, 0.42, 0.3)
 			b["roof"] = Color(0.3, 0.32, 0.42)
 			b["roof_h"] = 18.0
+		"site":
+			b["h"] = 48.0
+			b["col"] = Color(0.75, 0.45, 0.3)
 		"townhall":
 			b["h"] = 52.0
 			b["col"] = Color(0.95, 0.9, 0.78)
@@ -749,7 +754,9 @@ func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color =
 		for x in range(int(pos.x), int(pos.x + size.x)):
 			solid[y * N + x] = 1
 			reserved[y * N + x] = 2
-	if kind in ["shop", "hotel", "chalet", "condo"]:
+	if kind == "site":
+		site_spot = spots.size()
+	if kind in ["shop", "hotel", "chalet", "condo", "site"]:
 		spots.append({"pos": lot["door"], "name": b["name"], "b": idx, "road": lot["road"], "s": lot["s"]})
 	return idx
 
@@ -780,6 +787,7 @@ func _place_specials() -> void:
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
 		["townhall", "Mt. Crankmore Town Hall", PLAZA + Vector2(9, -9), Vector2(3, 3)],
+		["site", "Crankmore Heights", Vector2(46, 66), Vector2(3, 3)],
 	]
 	var pizza_i := 0
 	for sp in specials:
@@ -1969,6 +1977,7 @@ func _update_cars(delta: float) -> void:
 		j_claim[ji]["cars"] = j_claim[ji]["cars"].filter(func(h): return cars.has(h) and (int(h.get("claim", -1)) == ji or (h["pos"] as Vector2).distance_to(jp) < 1.4))
 		if j_claim[ji]["cars"].is_empty():
 			j_claim.erase(ji)
+	var band: Array = events.parade_spots() if events != null else []
 	for c in cars:
 		var r: Dictionary = roads[c["road"]]
 		if c["wait"] > 0.0:
@@ -1998,6 +2007,13 @@ func _update_cars(delta: float) -> void:
 		c["stall"] = float(c.get("stall", 0.0)) + delta if blocked and target <= 0.0 else 0.0
 		if c["stall"] > 3.0:
 			target = 0.6
+		# the marching band has the road: wait for it to go by
+		for q in band:
+			var rel: Vector2 = q - c["pos"]
+			var ahead := rel.dot(f)
+			if ahead > -0.2 and ahead < 1.3 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.75:
+				target = 0.0
+				break
 		if not c.has("curve"):
 			var nj := _car_next_j(c, r, 9.0)
 			var ji: int = nj[0]
@@ -2328,6 +2344,8 @@ func _update_rivals(delta: float) -> void:
 					if not o.is_empty():
 						o["state"] = "done"
 						rival_score[i] += 1
+						if int(o["dest"]) == site_spot and events != null:
+							events.crew_lunch()
 						if randf() < 0.4:
 							Talk.say(i, "rival_delivered")
 					r["state"] = "idle"
@@ -2420,11 +2438,20 @@ func _post_order() -> void:
 			break
 		d = randi() % spots.size()
 		dist = shops[s]["window"].distance_to(spots[d]["pos"])
+	# now and then it's the construction crew's lunch break
+	var crew := site_spot >= 0 and randf() < SITE_ORDER_CHANCE and not orders.any(func(q): return q["dest"] == site_spot and q["state"] != "done")
+	if crew:
+		d = site_spot
+		dist = shops[s]["window"].distance_to(spots[d]["pos"])
 	var o := {"id": next_order_id, "shop": s, "dest": d, "pay": 14 + int(dist * 0.8) + randi() % 8,
 		"state": "open", "rival": -1, "age": 0.0, "t_left": 0.0, "t_total": 0.0, "quality": 1.0}
 	next_order_id += 1
 	orders.append(o)
-	Game.toast.emit("RING RING!  %s: $%d to %s!" % [shops[s]["name"], o["pay"], spots[d]["name"]], Color(1.0, 0.85, 0.3))
+	if crew:
+		o["pay"] += 10   # a big order: pizzas for the whole crew
+		Game.toast.emit("RING RING!  Hungry builders! %s: $%d to the %s site!" % [shops[s]["name"], o["pay"], spots[d]["name"]], Color(1.0, 0.85, 0.3))
+	else:
+		Game.toast.emit("RING RING!  %s: $%d to %s!" % [shops[s]["name"], o["pay"], spots[d]["name"]], Color(1.0, 0.85, 0.3))
 	var hunters := 0
 	var idx := range(Talk.rivals.size())
 	idx.shuffle()
@@ -2489,6 +2516,8 @@ func _deliver() -> void:
 	Game.add_money(base + tip)
 	Game.deliveries += 1
 	Game.toast.emit("DELIVERED!  $%d + $%d tip" % [base, tip], Color(0.4, 1.0, 0.5))
+	if int(carry["dest"]) == site_spot and events != null:
+		events.crew_lunch()
 	carry["state"] = "done"
 	carry = {}
 	Game.save_game()
@@ -3185,7 +3214,7 @@ func _draw_building(b: Dictionary) -> void:
 	_draw_building_inner(b)
 	Iso.fade = 1.0
 	var kind: String = b["kind"]
-	var always := kind in ["pizza", "bike", "er", "race", "gondola", "townhall"]
+	var always := kind in ["pizza", "bike", "er", "race", "gondola", "townhall", "site"]
 	var center: Vector2 = b["pos"] + b["size"] * 0.5
 	if always or (active and p_pos.distance_to(center) < 7.0) or kind == "hotel":
 		var col := Color(1.0, 0.95, 0.5) if always else Color(1, 1, 1)
@@ -3209,6 +3238,8 @@ func _building_art(b: Dictionary) -> String:
 			art = "building_gondola_base"
 		"townhall":
 			art = "building_town_hall"
+		"site":
+			art = "building_construction_site"
 		"pizza", "bike", "shop", "hotel", "condo":
 			art = "building_" + _shop_slug(str(b["name"]).trim_suffix(" II"))
 		"chalet":

@@ -502,7 +502,7 @@ func _draw_devil(pz: Dictionary, running: bool) -> void:
 		if int(t_ * 1.5) % 3 == 0:
 			_shout(at + Vector2(0, -58), ["ALLEZ ALLEZ!", "GO GO GO!", "DIG DEEP!", "FASTER!"][int(t_ / 2.0) % 4], Color(1.0, 0.35, 0.3))
 	else:
-		Sprites.draw_strip(race, "ped_fan_devil_cheer", at, t_, 10.0)
+		Sprites.draw_cheer(race, "ped_fan_devil_cheer", at, t_)
 
 
 func _draw_train_car(p: Vector2, loco: bool) -> void:

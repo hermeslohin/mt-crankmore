@@ -496,8 +496,8 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			if anim == "walk" and a.get("moving", false):
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, 8.0)
 			elif anim == "cheer" or anim == "perform":
-				if not Sprites.draw_strip(ci, "ped_%s_%s" % [d, anim], ground, ph, 10.0):
-					Sprites.draw_strip(ci, "ped_%s_cheer" % d, ground, ph, 10.0)
+				if anim == "cheer" or not Sprites.draw_strip(ci, "ped_%s_perform" % d, ground, ph, 10.0):
+					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground, ph)
 			else:   # standing about: shifting their weight now and then
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0)
 			if (d == "drummer" or d == "trumpeter" or anim == "perform") and int(ph * 3.0) % 2 == 0:

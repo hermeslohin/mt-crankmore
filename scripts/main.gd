@@ -816,6 +816,11 @@ func _debug_shot() -> void:
 		for p in city.props:
 			if p["kind"] == "tube" or str(p.get("art", "")) in ["basketball_hoop", "skate_ramp"]:
 				spots.append(p["pos"])
+	elif OS.get_environment("PIZZA_AT") == "edges":   # the buildings out by the edge of the map
+		for b in city.buildings:
+			var c: Vector2 = b["pos"] + b["size"] * 0.5
+			if minf(minf(c.x, c.y), minf(city.N - c.x, city.N - c.y)) < 22.0:
+				spots.append(c)
 	elif OS.get_environment("PIZZA_AT") == "shops":
 		for k in 3:
 			city._post_order()

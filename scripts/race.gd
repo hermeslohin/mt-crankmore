@@ -2160,7 +2160,7 @@ func _draw_deco(e: Dictionary) -> void:
 		"fan":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			var design: String = e["design"] if e.has("design") else Sprites.pedestrians()[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.pedestrians().size()]
-			Sprites.draw_strip(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37, 10.0)
+			Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
 		"skier":
@@ -2192,7 +2192,7 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(e["pos"], e["z"])
 			Sprites.draw_image(self, "scenery_picnic_red" if int((e["pos"] as Vector2).x) % 2 == 0 else "scenery_picnic_blue", b + Vector2(0, 12))
 			for side in [-1.0, 1.0]:   # two spectators sitting by the blanket, waving
-				Sprites.draw_strip(self, "ped_%s_cheer" % Sprites.pedestrians()[(int((e["pos"] as Vector2).x) + (0 if side > 0 else 3)) % Sprites.pedestrians().size()], b + Vector2(side * 22.0, 8), t_ + side, 10.0)
+				Sprites.draw_cheer(self, "ped_%s_cheer" % Sprites.pedestrians()[(int((e["pos"] as Vector2).x) + (0 if side > 0 else 3)) % Sprites.pedestrians().size()], b + Vector2(side * 22.0, 8), t_ + side)
 		"kite":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			var ph: float = e["ph"]

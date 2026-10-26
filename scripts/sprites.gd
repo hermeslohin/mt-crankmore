@@ -172,6 +172,39 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	return true
 
 
+const CHEER_FPS := 6.5   # a cheering person's jump (art/ped_<design>_cheer.png): about one hop every 1.2 s
+static var _hops := {}    # cheer texture -> hops in one loop of its frames
+
+
+## A cheering, jumping person (a ped_<design>_cheer strip). Some sheets hop twice in one loop; those play at half
+## speed so everyone jumps at about the same, unhurried pace.
+static func draw_cheer(ci: CanvasItem, name: String, at: Vector2, t: float) -> bool:
+	var tex := outfit(name)
+	if tex == null:
+		return false
+	if not _hops.has(tex):
+		_hops[tex] = _count_hops(tex)
+	return draw_strip(ci, name, at, t, CHEER_FPS / float(_hops[tex]))
+
+
+## Times the feet leave the ground in one loop of a strip (at least 1).
+static func _count_hops(tex: Texture2D) -> int:
+	var img := tex.get_image()
+	if img == null:
+		return 1
+	var fh := img.get_height()
+	var frames := maxi(1, img.get_width() / fh)
+	var feet: Array = []
+	for k in frames:
+		feet.append(img.get_region(Rect2i(k * fh, 0, fh, fh)).get_used_rect().end.y)
+	var ground: int = feet.max()
+	var hops := 0
+	for k in frames:
+		if ground - int(feet[k]) >= 3 and ground - int(feet[k - 1]) < 3:
+			hops += 1
+	return maxi(1, hops)
+
+
 ## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets; columns are the frames
 ## of its driving animation, if it has one) with its middle on `at`, heading `w` (world direction), tinted by `tint`.
 ## `frame` picks the animation frame (it wraps).

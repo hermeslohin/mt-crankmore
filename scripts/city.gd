@@ -911,7 +911,7 @@ func _place_nature() -> void:
 					var lp: Vector2 = p + n * side * (ROAD_HW + 0.55)
 					var ix := int(lp.x)
 					var iy := int(lp.y)
-					if ix >= 0 and iy >= 0 and ix < N and iy < N and reserved[iy * N + ix] != 2:
+					if ix >= 0 and iy >= 0 and ix < N and iy < N and reserved[iy * N + ix] != 2 and _road_dist(lp) > ROAD_HW + 0.45:
 						props.append({"kind": "lamp", "pos": lp})
 			s += 3.5
 	# beach umbrellas on the west shore
@@ -961,10 +961,12 @@ func _place_nineties() -> void:
 	for b in buildings:
 		var kind: String = b["kind"]
 		if kind == "chalet" and sr.randf() < 0.3:
-			var dp: Vector2 = b["pos"] + Vector2(b["size"].x + 0.35, 0.35)
-			if _kerb_free(dp, taken, 0.0):
-				props.append({"kind": "90s", "art": "satellite_dish", "pos": dp, "flip": sr.randf() < 0.5})
-				taken.append(dp)
+			# in the yard beside the chalet, on whichever side is clear of the road
+			for dp in [b["pos"] + Vector2(b["size"].x + 0.35, 0.35), b["pos"] + Vector2(0.35, b["size"].y + 0.35), b["pos"] + Vector2(-0.35, 0.35)]:
+				if _kerb_free(dp, taken, ROAD_HW + 0.9):
+					props.append({"kind": "90s", "art": "satellite_dish", "pos": dp, "flip": sr.randf() < 0.5})
+					taken.append(dp)
+					break
 			continue
 		if not kind in ["shop", "pizza", "bike"] or int(b.get("road", -1)) < 0:
 			continue
@@ -1014,12 +1016,21 @@ func _kerb_free(p: Vector2, taken: Array, road_min: float) -> bool:
 	if ix < 0 or iy < 0 or ix >= N or iy >= N:
 		return false
 	var i := iy * N + ix
-	if reserved[i] == 2 or solid[i] != 0 or road_d[i] < road_min or tiles[i] == T.WATER:
+	if reserved[i] == 2 or solid[i] != 0 or road_d[i] < road_min or tiles[i] == T.WATER or _road_dist(p) < road_min:
 		return false
 	for q in taken:
 		if q.distance_squared_to(p) < 0.8:
 			return false
 	return true
+
+
+## Distance from `p` to the middle of the nearest road (exact, unlike road_d, which is per tile).
+func _road_dist(p: Vector2) -> float:
+	var best := 99.0
+	for r in roads:
+		for q in r["pts"]:
+			best = minf(best, p.distance_to(q))
+	return best
 
 
 func _season_spots(sr: RandomNumberGenerator, n: int, rmin: float, rmax: float, road_max: float) -> Array:
@@ -1937,79 +1948,196 @@ func _leave_er() -> void:
 	Game.save_game()
 
 
+## Cars take turns through a junction: the first to reach it claims it (cars right behind it in the same lane follow
+## it through) and the others wait at the line until it is clear. Turning cars follow a curve from their lane into the new one (CAR_TURN either side of the junction),
+## slowing down for it, and everyone keeps a gap to whatever is right in front of them, on any road.
+const CAR_TURN := 1.6        # m before and after a junction a turning car spends on its curve
+const CAR_TURN_V := 1.3      # m/s around a corner
+const CAR_STOP := 2.0        # m from a busy junction's middle where cars wait their turn
+const CAR_BRAKE := 3.0       # m/s² when slowing for a corner or a junction
+var j_claim := {}            # junction -> {"cars": the cars crossing it, "from": [road, dir] they came in on}
+
+
 func _update_cars(delta: float) -> void:
+	for ji in j_claim.keys():
+		var jp: Vector2 = junctions[ji]["pos"]
+		j_claim[ji]["cars"] = j_claim[ji]["cars"].filter(func(h): return cars.has(h) and (int(h.get("claim", -1)) == ji or (h["pos"] as Vector2).distance_to(jp) < 1.4))
+		if j_claim[ji]["cars"].is_empty():
+			j_claim.erase(ji)
 	for c in cars:
 		var r: Dictionary = roads[c["road"]]
 		if c["wait"] > 0.0:
 			c["wait"] -= delta
 			continue
 		var target: float = c["max"]
+		var f: Vector2 = c["fwd"]
+		var blocked := false
 		for o in cars:
-			if o == c or o["road"] != c["road"] or o["dir"] != c["dir"]:
+			if o == c:
 				continue
-			var gap: float = (o["s"] - c["s"]) * c["dir"]
-			if r["closed"]:
-				gap = fposmod(gap, float(r["len"]))
 			var need: float = float(c["hl"]) + float(o["hl"])
-			if gap > 0.0 and gap < 2.2 + need:
-				target = minf(target, 0.0 if gap < 1.2 + need else float(o["speed"]))
+			if not c.has("curve") and o["road"] == c["road"] and o["dir"] == c["dir"]:
+				var gap: float = (o["s"] - c["s"]) * c["dir"]
+				if r["closed"]:
+					gap = fposmod(gap, float(r["len"]))
+				if gap > 0.0 and gap < 2.2 + need:
+					target = minf(target, 0.0 if gap < 1.2 + need else float(o["speed"]))
+					continue
+			# anything right in front: a car that turned in ahead, one crossing the junction
+			var rel: Vector2 = o["pos"] - c["pos"]
+			var ahead := rel.dot(f)
+			if ahead > 0.0 and ahead < 1.0 + need and absf(rel.dot(Vector2(-f.y, f.x))) < 0.55 and (o["fwd"] as Vector2).dot(f) > -0.5:
+				target = minf(target, 0.0 if ahead < 0.4 + need else float(o["speed"]))
+				blocked = true
+		# stuck nose to nose for a while (it happens on a tight corner): creep past
+		c["stall"] = float(c.get("stall", 0.0)) + delta if blocked and target <= 0.0 else 0.0
+		if c["stall"] > 3.0:
+			target = 0.6
+		if not c.has("curve"):
+			var nj := _car_next_j(c, r, 9.0)
+			var ji: int = nj[0]
+			if ji >= 0:
+				var d: float = nj[1]
+				if int(c.get("plan_j", -1)) != ji:
+					c["plan_j"] = ji
+					c["plan"] = _car_plan(c, ji, r)
+				if not (c["plan"] as Dictionary).is_empty():
+					target = minf(target, sqrt(CAR_TURN_V * CAR_TURN_V + 2.0 * CAR_BRAKE * maxf(0.0, d - CAR_TURN)))
+				if int(c.get("claim", -1)) != ji and not c.get("siren", false):
+					var room: float = d - CAR_STOP - float(c["hl"])
+					var held: Dictionary = j_claim.get(ji, {})
+					var lane := [c["road"], c["dir"]]
+					if not held.is_empty() and held["from"] != lane and float(c.get("held", 0.0)) < 6.0 and room > -0.4:
+						target = minf(target, sqrt(2.0 * CAR_BRAKE * maxf(0.0, room - 0.2)))
+						c["held"] = float(c.get("held", 0.0)) + delta
+					elif room < 0.8:
+						if held.is_empty():
+							j_claim[ji] = {"cars": [c], "from": lane}
+						else:
+							held["cars"].append(c)
+						c["claim"] = ji
+						c["held"] = 0.0
 		if active and er_timer <= 0.0:
 			var rel: Vector2 = rail_pos - c["pos"]
-			var f: Vector2 = c["fwd"]
 			var ahead := rel.dot(f)
 			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction
 			if ahead > 0.0 and ahead < 2.4 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.8 and f.dot(p_fwd) > 0.5:
 				target = 0.0
-		c["speed"] = move_toward(c["speed"], target, 4.0 * delta)
+		c["speed"] = move_toward(c["speed"], target, (4.0 if target > c["speed"] else 2.0 * CAR_BRAKE) * delta)
 		var moved: float = c["speed"] * delta
 		c["odo"] = float(c.get("odo", randf() * 10.0)) + moved   # distance driven: turns the wheels, bounces the body
+		if c.has("curve"):
+			_car_curve_step(c, moved)
+			continue
 		var s0: float = c["s"]
 		c["s"] = _wrap_s(r, s0 + c["dir"] * moved)
 		_car_junctions(c, r, s0, moved)
-		var was: Vector2 = c["pos"]
-		var was_f: Vector2 = c["fwd"]
-		_car_pose(c)
-		c["blend"] = maxf(0.0, float(c.get("blend", 0.0)) - delta)
-		if c["blend"] > 0.0:
-			# ease across lanes after a turn instead of jumping
-			c["pos"] = was.lerp(c["pos"], 1.0 - exp(-9.0 * delta))
-			c["fwd"] = was_f.slerp(c["fwd"], 1.0 - exp(-9.0 * delta)).normalized()
+		if not c.has("curve"):
+			_car_pose(c)
+		# through and clear of the junction it claimed
+		if int(c.get("claim", -1)) >= 0 and not c.has("curve"):
+			var jp: Vector2 = junctions[c["claim"]]["pos"]
+			if (jp - (c["pos"] as Vector2)).dot(c["fwd"]) < -0.3:
+				c["claim"] = -1
 
 
-## Cars drive through junctions: at the end of a road they must pick an exit, elsewhere they sometimes turn off.
-## Only as a last resort (no way out at all) do they stop and turn around.
-func _car_junctions(c: Dictionary, r: Dictionary, s0: float, moved: float) -> void:
-	var ri: int = c["road"]
-	var length: float = r["len"]
-	for e in road_js[ri]:
-		var ji: int = e[1]
-		if ji == int(c.get("last_j", -1)):
+## The next junction ahead of a car on its road within `reach` m: [junction, distance], or [-1, 0].
+func _car_next_j(c: Dictionary, r: Dictionary, reach: float) -> Array:
+	var best := -1
+	var best_d := reach
+	for e in road_js[c["road"]]:
+		if int(e[1]) == int(c.get("last_j", -1)):
 			continue
-		var d: float = (float(e[0]) - s0) * float(c["dir"])
+		var d: float = (float(e[0]) - float(c["s"])) * float(c["dir"])
 		if r["closed"]:
-			d = fposmod(d, length)
-		if d < 0.0 or d > moved + 0.001:
-			continue
-		var at_end: bool = not r["closed"] and (float(e[0]) < 0.6 or float(e[0]) > length - 0.6)
-		c["last_j"] = ji
-		if not at_end and randf() < 0.55:
-			return
-		var opts := _options(ji, ri, c["dir"])
-		if not at_end:
-			opts = opts.filter(func(o): return o["road"] != ri)
-		if opts.is_empty():
-			break
-		var o: Dictionary = opts.pick_random()
-		c["road"] = o["road"]
-		c["s"] = o["s"]
-		c["dir"] = o["dir"]
-		c["blend"] = 0.8
+			d = fposmod(d, float(r["len"]))
+		if d >= -0.05 and d < best_d:
+			best_d = d
+			best = e[1]
+	return [best, best_d] if best >= 0 else [-1, 0.0]
+
+
+## What a car will do at the junction ahead: {} to drive straight on, else the exit it turns into. At the end of a
+## road it has to turn; elsewhere it sometimes does.
+func _car_plan(c: Dictionary, ji: int, r: Dictionary) -> Dictionary:
+	var ri: int = c["road"]
+	var ls := _link_s(ji, ri)
+	var at_end: bool = not r["closed"] and (ls < 0.6 or ls > float(r["len"]) - 0.6)
+	if not at_end and randf() < 0.55:
+		return {}
+	var opts := _options(ji, ri, c["dir"])
+	if not at_end:
+		opts = opts.filter(func(o): return o["road"] != ri)
+	return {} if opts.is_empty() else opts.pick_random()
+
+
+## At CAR_TURN from the junction a turning car leaves its road for a curve into its exit; driving straight on, it
+## just carries on. With no way out at all it turns around at the end of the road.
+func _car_junctions(c: Dictionary, r: Dictionary, s0: float, moved: float) -> void:
+	var nj := _car_next_j(c, r, CAR_TURN)
+	var ji: int = nj[0]
+	if ji >= 0 and int(c.get("plan_j", -1)) == ji:
+		var o: Dictionary = c["plan"]
+		if o.is_empty():
+			if float(nj[1]) < 0.05:
+				c["last_j"] = ji
+		else:
+			c["last_j"] = ji
+			var nr: Dictionary = roads[o["road"]]
+			var s_end := _wrap_s(nr, float(o["s"]) + float(o["dir"]) * CAR_TURN)
+			_start_curve(c, o["road"], s_end, o["dir"])
 		return
-	if not r["closed"] and (c["s"] >= length - 0.01 or c["s"] <= 0.01):
-		c["dir"] = -c["dir"]
-		c["wait"] = 1.0
-		c["speed"] = 0.0
+	if not r["closed"] and (c["s"] >= float(r["len"]) - 0.01 or c["s"] <= 0.01):
+		# a dead end: swing round into the other lane
+		c["wait"] = 0.6
 		c["last_j"] = -1
+		_start_curve(c, c["road"], c["s"], -float(c["dir"]))
+
+
+## Puts a car on a curve (quadratic, through the point where its lane and the new lane meet) that ends on `road` at
+## `s`, heading `dir`. Its road, s and dir are already the new ones, so cars on that road queue behind it.
+func _start_curve(c: Dictionary, road: int, s: float, dir: float) -> void:
+	var a: Vector2 = c["pos"]
+	var f1: Vector2 = c["fwd"]
+	var at := _road_at(roads[road], s)
+	var f2: Vector2 = at[1] * dir
+	var e: Vector2 = at[0] + Vector2(-f2.y, f2.x) * 0.5
+	var k: Vector2
+	var den := f1.cross(f2)
+	if absf(den) > 0.3:
+		k = a + f1 * clampf((e - a).cross(f2) / den, 0.0, 4.0)
+	else:   # straight ahead, or a U-turn: swing out in front
+		k = (a + e) * 0.5 + f1 * (0.3 if f1.dot(f2) > 0.0 else 1.2)
+	var length := 0.0
+	var prev := a
+	for i in range(1, 11):
+		var q := _bezier(a, k, e, i / 10.0)
+		length += prev.distance_to(q)
+		prev = q
+	c["curve"] = {"a": a, "k": k, "e": e, "len": maxf(length, 0.1), "u": 0.0}
+	c["road"] = road
+	c["s"] = s
+	c["dir"] = dir
+
+
+func _bezier(a: Vector2, k: Vector2, e: Vector2, u: float) -> Vector2:
+	return a.lerp(k, u).lerp(k.lerp(e, u), u)
+
+
+func _car_curve_step(c: Dictionary, moved: float) -> void:
+	var cv: Dictionary = c["curve"]
+	cv["u"] = minf(1.0, float(cv["u"]) + moved / float(cv["len"]))
+	var u: float = cv["u"]
+	var a: Vector2 = cv["a"]
+	var k: Vector2 = cv["k"]
+	var e: Vector2 = cv["e"]
+	c["pos"] = _bezier(a, k, e, u)
+	var tan := (k - a) * (1.0 - u) + (e - k) * u
+	if tan.length() > 0.001:
+		c["fwd"] = tan.normalized()
+	if u >= 1.0:
+		c.erase("curve")
+		_car_pose(c)
 
 
 func _update_life(delta: float) -> void:
@@ -2164,6 +2292,8 @@ func _update_rivals(delta: float) -> void:
 					r["idle"] = randf_range(1.0, 4.0)
 
 
+const RIVAL_CUT := 0.6   # tiles: how far a rival cuts the corners of its route
+
 ## Moves a rival along its path. Returns true when the path is finished.
 ## Rivals cruise at 75% of their FTP, so they slow down on climbs and fly down the other side just like you.
 func _follow(r: Dictionary, delta: float) -> bool:
@@ -2181,13 +2311,17 @@ func _follow(r: Dictionary, delta: float) -> bool:
 	while not path.is_empty() and step > 0.0:
 		var target: Vector2 = path[0]
 		var to: Vector2 = target - r["pos"]
+		if path.size() > 1 and to.length() < RIVAL_CUT:
+			path.pop_front()   # round the corner: head for the next point already
+			continue
 		if to.length() <= step:
 			r["pos"] = target
 			step -= to.length()
 			path.pop_front()
 		else:
 			r["pos"] += to.normalized() * step
-			r["head"] = to.angle()
+			# lean into the new heading over a short distance instead of snapping to it
+			r["head"] = lerp_angle(r["head"], to.angle(), 1.0 - exp(-step * 5.0))
 			step = 0.0
 	return path.is_empty()
 
@@ -3288,7 +3422,7 @@ func _draw_ped(p: Dictionary) -> void:
 	var look := int(p.get("look", int(absf(p["pos"].x * 7.0 + p["pos"].y * 3.0)))) % Sprites.pedestrians().size()
 	var design: String = Sprites.pedestrians()[look]
 	if cheering:
-		Sprites.draw_strip(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0, 10.0)
+		Sprites.draw_cheer(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0)
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
 	elif p["giver"] and p["gcool"] <= 0.0:
 		# holding a power-up gift out over the road

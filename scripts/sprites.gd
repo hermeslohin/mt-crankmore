@@ -109,6 +109,14 @@ static func sheet_name(who: String) -> String:
 	return "bike_" + (player_sheet if who == "YOU" else who.to_lower())
 
 
+const THROW_FPS := 14.0   # the pizza-frisbee throw (art/bike_<rider>_throw[_boxed].png), played once
+static var _throws: Dictionary = {}   # sheet name -> msec the rider started throwing
+
+## Starts `who`'s pizza-throwing animation ("YOU" or a rival's short name); draw_rider plays it once through.
+static func start_throw(who: String) -> void:
+	_throws[sheet_name(who)] = Time.get_ticks_msec()
+
+
 ## Draws the rider + bike. `c` = ground contact on screen, `w` = world heading. `boxed`: riding around town with the
 ## delivery bag (off in races). `fall_t` >= 0 plays the wipe-out, that many seconds in. Returns false (drawing
 ## nothing) when there is no art for this rider.
@@ -116,16 +124,28 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var falling := fall_t >= 0.0
 	var base := sheet_name(who) + ("_fall" if falling else "")
 	var tex: Texture2D = null
-	for suffix in (["_pizza", "_boxed", ""] if has_pizza else (["_boxed", ""] if boxed else [""])):
-		tex = outfit(base + suffix)
-		if tex != null:
-			break
+	# mid-throw: the throw sheet (bag on the rack in town, plain bike in races), once through, then back to riding
+	var throw_t := -1.0
+	if not falling and _throws.has(base):
+		throw_t = (Time.get_ticks_msec() - int(_throws[base])) / 1000.0
+		tex = outfit(base + ("_throw_boxed" if boxed else "_throw"))
+		if tex == null or throw_t >= float(tex.get_width() / (tex.get_height() / DIRS)) / THROW_FPS:
+			tex = null
+			throw_t = -1.0
+			_throws.erase(base)
+	if tex == null:
+		for suffix in (["_pizza", "_boxed", ""] if has_pizza else (["_boxed", ""] if boxed else [""])):
+			tex = outfit(base + suffix)
+			if tex != null:
+				break
 	if tex == null:
 		return false
 	var fh := tex.get_height() / DIRS
 	var fw := fh
 	var frames := maxi(1, tex.get_width() / fw)
 	var col := clampi(int(fall_t * FALL_FPS), 0, frames - 1) if falling else posmod(int(floorf(phase / TAU * frames)), frames)
+	if throw_t >= 0.0:
+		col = clampi(int(throw_t * THROW_FPS), 0, frames - 1)
 	var src := Rect2(col * fw, dir_row(w) * fh, fw, fh)
 	var dst := Rect2((c - Vector2(fw * 0.5, fh - ANCHOR_UP)).round(), Vector2(fw, fh))
 	ci.draw_texture_rect_region(tex, dst, src)

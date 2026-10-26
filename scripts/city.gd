@@ -2479,6 +2479,7 @@ func _use_powerup(who: int) -> bool:
 					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
 				return false
 			frisbees.append({"from": who, "to": v, "u": 0.0})
+			Sprites.start_throw("YOU" if who < 0 else str(Talk.rivals[who]["short"]))
 			if who < 0:
 				player_bubble = {"text": "Pizza frisbee!", "t": 1.5}
 		"socks":

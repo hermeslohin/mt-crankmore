@@ -1499,6 +1499,7 @@ func _use_powerup(k: int) -> bool:
 					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
 				return false
 			frisbees.append({"from": k, "to": v, "u": 0.0})
+			Sprites.start_throw("YOU" if r["player"] else str(r["short"]))
 		"socks":
 			r["socks"] = PowerUps.SOCKS_TIME
 			_pop(k, "FIRE SOCKS!", PowerUps.col(kind))

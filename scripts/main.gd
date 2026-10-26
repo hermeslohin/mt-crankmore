@@ -10,6 +10,7 @@ var race: Node2D
 var hud: Control
 var title_t := 0.0
 var shot_at := Vector2.INF   # dev helper: camera pinned on a world point for screenshots
+var viewer := {}             # dev helper: the event viewer (PIZZA_DEBUG=eventviewer), see _debug_viewer
 
 
 func _ready() -> void:
@@ -106,6 +107,8 @@ func _ready() -> void:
 			_debug_ride()
 		"events":
 			_debug_events()
+		"eventviewer":
+			_debug_viewer()
 		"wipeout":
 			_debug_wipeout()
 		"animals":
@@ -158,12 +161,33 @@ func _notification(what: int) -> void:
 ## Quitting (the title screen's Quit or closing the window) saves the game. The ride isn't posted: it stays saved
 ## until you post it from the Strava menu or the pause menu.
 func _quit() -> void:
+	if not viewer.is_empty():
+		# the event viewer never keeps what happened: the save goes back as it was
+		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(viewer["backup"])
+		f.close()
+		get_tree().quit()
+		return
 	Game.save_game()
 	get_tree().quit()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
+	if not viewer.is_empty() and k != null and k.pressed and not k.echo:
+		match k.keycode:
+			KEY_BRACKETRIGHT, KEY_N, KEY_PAGEDOWN:
+				_viewer_go(int(viewer["i"]) + 1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_BRACKETLEFT, KEY_P, KEY_PAGEUP:
+				_viewer_go(int(viewer["i"]) - 1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_R:
+				_viewer_go(int(viewer["i"]))
+				get_viewport().set_input_as_handled()
+				return
 	if k != null and k.pressed and not k.echo and (k.keycode == KEY_F11 or (k.keycode == KEY_ENTER and k.alt_pressed)):
 		var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -668,6 +692,98 @@ func _debug_events() -> void:
 		f.store_string(backup)
 		f.close()
 	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=eventviewer (or tools/event_viewer.sh) is the event viewer: ride around town and step
+## through every happening, call-out and challenge one at a time with ] / N (next), [ / P (back) and R (again).
+## Each starts right by you, in the season and at the time of day it needs, at its place (the town hall, the lake...)
+## if it has one. Your save is put back as it was when you quit.
+const VIEWER_SEASON := {"snowball_fight": "winter", "sledding": "winter", "tree_lighting": "winter", "egg_hunt": "spring",
+	"duck_crossing": "spring", "volleyball": "summer", "fishing": "summer", "lemonade": "summer", "trick_or_treat": "fall",
+	"hayride": "fall", "harvest_festival": "fall"}
+const VIEWER_HOUR := {"fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
+
+func _debug_viewer() -> void:
+	viewer = {"backup": FileAccess.get_file_as_string(Game.SAVE_PATH), "i": -1, "status": "",
+		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
+			"soapbox", "group_ride", "fire", "ambulance", "crime", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint"]
+			+ city.events.all_kinds()}
+	_start_game()
+	Game.toast.emit("EVENT VIEWER: ] or N for the next event, [ or P to go back, R to run it again", Color(1.0, 0.85, 0.3))
+
+
+func _viewer_go(i: int) -> void:
+	var kinds: Array = viewer["kinds"]
+	i = posmod(i, kinds.size())
+	viewer["i"] = i
+	var kind: String = kinds[i]
+	# clear the stage: whatever was going on, any challenge, the clocks for anything else
+	for e in city.events.events:
+		city.events._end(e)
+	city.events.events.clear()
+	city.challenge = {}
+	city.outage_t = 0.0
+	city.events.next_t = 1e9
+	city.events.parade_t = 1e9
+	city.events.happen_t = 1e9
+	city.events.gulls_t = 1e9
+	city.events.kid_t = 1e9
+	for k in city.events.SPECIALS:
+		city.events.special_t[k] = 1e9
+	for k in city.events.CHAOS:
+		city.events.chaos_t[k] = 1e9
+	city.events.fw_done = true
+	city.climb_t = 1e9
+	Season.set_choice(VIEWER_SEASON.get(kind, "auto"))
+	Skies.hour = VIEWER_HOUR.get(kind, 12.0)
+	# go where it happens
+	var where := ""
+	match kind:
+		"wedding":
+			where = "Town Hall"
+		"arcade_queue":
+			where = "Pixel Palace"
+		"video_rush":
+			where = "Rewind Video"
+		"crime":
+			where = "Bank"
+	if where != "":
+		for b in city.buildings:
+			if str(b.get("name", "")).contains(where) and int(b.get("road", -1)) >= 0:
+				city.place_on({"road": b["road"], "s": float(b["s"]) + 3.0})
+				break
+	elif kind in ["parade", "parade_float", "flash_mob", "tree_lighting"]:
+		city.place_on({"road": 0, "s": 2.0})
+	elif kind in ["fishing", "volleyball"]:
+		city.place_on({"road": 1, "s": 20.0})
+	elif kind == "eating_contest":
+		city.place_on(city.shops[0])
+	match kind:
+		"pizza_rush":
+			city.orders.clear()
+			for _try in 40:
+				city._post_order()
+				if not city.orders.is_empty() and city.orders[-1].has("rush"):
+					break
+				city.orders.clear()
+			if not city.orders.is_empty():
+				city._take_order(city.orders[-1])
+		"hill_sprint":
+			city.climb_t = 0.0
+			city._update_climbs(0.0)
+		"seagulls":
+			if city.carry.is_empty():
+				city._post_order()
+				city._take_order(city.orders[-1])
+			city.events.start(kind)
+		_:
+			city.p_speed = maxf(city.p_speed, 1.5)   # a hot rod or a kid only races you on the move
+			for _try in 8:   # some need the right bit of road nearby: try a few spots
+				city.events.start(kind)
+				if not city.events.events.is_empty():
+					break
+	var on: bool = not city.events.events.is_empty() or not city.challenge.is_empty()
+	viewer["status"] = "%d/%d  %s%s" % [i + 1, kinds.size(), kind, "" if on else "  (couldn't start here - ride somewhere else and press R)"]
 
 
 func _debug_wipeout() -> void:

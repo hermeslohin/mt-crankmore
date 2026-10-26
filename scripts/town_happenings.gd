@@ -19,7 +19,9 @@ const CHAOS := {"outage": [7200.0, 14400.0], "cart": [7200.0, 14400.0], "hydrant
 const GULLS_EVERY := [1500.0, 2100.0]  # seagulls: every half hour or so (when you've a pizza on board)
 const KID_RACE_EVERY := [240.0, 480.0]  # a kid on a BMX wants a race (60% of your FTP wins $20)
 const TOWN := ["parade_float", "market", "car_wash", "wedding", "flash_mob", "cows", "hot_air_balloon", "movie_night",
-	"arcade_queue", "video_rush", "eating_contest"]
+	"arcade_queue", "video_rush", "eating_contest", "fun_run"]
+const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual", "norm_woman_tracksuit", "norm_man_shorts", "cyclist_fan"]
+const RUN_LEN := 18.0                  # tiles of road closed for a fun run
 const SEASONAL := {"winter": ["snowball_fight", "sledding", "tree_lighting"], "spring": ["egg_hunt", "duck_crossing"],
 	"summer": ["volleyball", "fishing", "lemonade"], "fall": ["trick_or_treat", "hayride", "harvest_festival"]}
 const KIDS := ["kid", "bucket_hat_kid", "skater_kid", "norm_boy_kid", "scout", "norm_teen_girl", "norm_teen_boy"]
@@ -219,6 +221,8 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			_fx(e, cpos, _draw_suds.bind(cpos))
 		"wedding":
 			var b := _named_near("Town Hall", 25.0)
+			if b.is_empty():
+				return false
 			e["t"] = 70.0
 			e["stage"] = "rice"
 			var door: Vector2 = b["door"]
@@ -290,6 +294,8 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			_say(e["actors"][2], ["Shhh!", "Pass the popcorn!", "It's starting!"].pick_random(), 2.5)
 		"arcade_queue", "video_rush":
 			var b := _named_near("Pixel Palace" if kind == "arcade_queue" else "Rewind Video", 25.0)
+			if b.is_empty():
+				return false
 			e["t"] = 60.0
 			e["b"] = b
 			var side := _door_side(b)
@@ -302,6 +308,8 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["lines"] = lines
 		"eating_contest":
 			var sh := _pizza_near()
+			if sh.is_empty():
+				return false
 			e["t"] = 70.0
 			var b: Dictionary = city.buildings[sh["b"]]
 			var side := _door_side(b)
@@ -316,6 +324,30 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 				var f := _extra(e, table + ((kerb[0] as Vector2) - (b["door"] as Vector2)).normalized() * 1.0 + (kerb[1] as Vector2) * (k - 1.5) * 0.7, table)
 				f["anim"] = "cheer"
 			Game.toast.emit("Pizza-eating contest at %s!" % str(sh["name"]), Color(1.0, 0.75, 0.3))
+		"fun_run":
+			# a stretch of road closed for a fun run: barriers at both ends, four runners, people cheering. You can
+			# still ride through; cars wait at the barriers.
+			var r: Dictionary = city.roads[sp[1]]
+			var dir := 1.0 if r["closed"] or float(sp[2]) < float(r["len"]) - RUN_LEN - 2.0 else -1.0
+			if not r["closed"] and (float(sp[2]) + dir * (RUN_LEN + 1.0) < 0.5 or float(sp[2]) + dir * (RUN_LEN + 1.0) > float(r["len"]) - 0.5):
+				return false
+			e["t"] = 75.0
+			e["dir"] = dir
+			e["s0"] = float(sp[2])
+			for k in 4:
+				var rn := _extra(e, pos, pos, "", RUNNERS)
+				rn["runner"] = k
+				rn["run_s"] = -k * 0.6
+				rn["pace"] = randf_range(1.5, 2.0)
+				rn["anim"] = "walk"
+				rn["moving"] = true
+				rn["fps"] = 14.0
+			for k in 4:
+				var q: Array = _kerb(sp[1], float(sp[2]) + dir * (3.0 + k * 4.0), float(sp[3]) * (1.0 if k % 2 == 0 else -1.0))
+				var fan := _extra(e, q[0], (q[0] as Vector2) - (q[1] as Vector2).orthogonal() * float(sp[3]))
+				fan["anim"] = "cheer"
+			_fx(e, pos, _draw_closure.bind(e))
+			Game.toast.emit("Road closed for the Crankmore Fun Run!", Color(0.5, 0.9, 1.0))
 		# ---- seasons ----
 		"snowball_fight":
 			e["t"] = 60.0
@@ -788,6 +820,28 @@ func _step(e: Dictionary, delta: float) -> void:
 					a["face"] = w[1]
 					if a["label_t"] <= 0.0 and randf() < delta * 0.1:
 						_say(a, ["Boo!", "Wheee!", "Spooky!", "Hold on to your hats!"].pick_random(), 1.5)
+		"fun_run":
+			var r: Dictionary = city.roads[e["road"]]
+			var all_in := true
+			for a in e["actors"]:
+				if a.has("runner"):
+					a["run_s"] = float(a["run_s"]) + float(a["pace"]) * delta
+					var along := clampf(float(a["run_s"]), 0.0, RUN_LEN)
+					var at: Array = city._road_at(r, city._wrap_s(r, float(e["s0"]) + float(e["dir"]) * along))
+					var f: Vector2 = (at[1] as Vector2) * float(e["dir"])
+					a["pos"] = (at[0] as Vector2) + f.orthogonal() * ((int(a["runner"]) - 1.5) * 0.3)
+					a["face"] = f
+					if float(a["run_s"]) < RUN_LEN:
+						all_in = false
+						a["moving"] = true
+					else:
+						a["moving"] = false
+						a["anim"] = "cheer"
+					if a["label_t"] <= 0.0 and randf() < delta * 0.06:
+						_say(a, ["Keep going!", "Almost there!", "My legs!", "Personal best!", "Water!"].pick_random(), 1.6)
+			if all_in and e["stage"] == "":
+				e["stage"] = "done"
+				e["t"] = minf(float(e["t"]), 6.0)
 		"cart":
 			for a in e["actors"]:
 				if a["type"] == "cart":
@@ -864,6 +918,12 @@ func ride_spots() -> Array:
 						out.append(a["pos"])
 			"duck_crossing":
 				out.append((e["from"] as Vector2).lerp(e["to"], float(e.get("u", 0.0))))
+			"fun_run":
+				var r: Dictionary = city.roads[e["road"]]
+				for end in [-1.0, RUN_LEN + 1.0]:
+					var at: Array = city._road_at(r, city._wrap_s(r, float(e["s0"]) + float(e["dir"]) * end))
+					for lane in [-0.42, 0.42]:
+						out.append((at[0] as Vector2) + (at[1] as Vector2).orthogonal() * lane)
 	return out
 
 
@@ -1056,6 +1116,24 @@ func _draw_rod(ci: CanvasItem, a: Dictionary, ground: Vector2, f: Dictionary) ->
 func _draw_pumpkins(ci: CanvasItem, a: Dictionary, ground: Vector2, e: Dictionary) -> void:
 	for k in e["pumpkins"].size():
 		Season.pumpkin(ci, Iso.to_screen(e["pumpkins"][k]), 1.2, k * 7)
+
+
+## The fun run: barriers across both ends of the closed stretch and a finish banner.
+func _draw_closure(ci: CanvasItem, a: Dictionary, ground: Vector2, e: Dictionary) -> void:
+	var r: Dictionary = city.roads[e["road"]]
+	for end in [-1.0, RUN_LEN + 1.0]:
+		var at: Array = city._road_at(r, city._wrap_s(r, float(e["s0"]) + float(e["dir"]) * end))
+		var n: Vector2 = (at[1] as Vector2).orthogonal()
+		for k in 3:
+			var q := Iso.to_screen((at[0] as Vector2) + n * (k - 1) * 0.7)
+			ci.draw_line(q + Vector2(-5, 0), q + Vector2(-3, -9), Iso.OUTLINE, 1.0)
+			ci.draw_line(q + Vector2(5, 0), q + Vector2(3, -9), Iso.OUTLINE, 1.0)
+			ci.draw_rect(Rect2(q + Vector2(-7, -11), Vector2(14, 4)), Color(1.0, 0.5, 0.1))
+			ci.draw_rect(Rect2(q + Vector2(-4, -11), Vector2(3, 4)), Color.WHITE)
+			ci.draw_rect(Rect2(q + Vector2(2, -11), Vector2(3, 4)), Color.WHITE)
+		city._label("ROAD CLOSED", Iso.to_screen(at[0]) + Vector2(0, -20), 8, Color(1.0, 0.6, 0.2))
+	var fin: Array = city._road_at(r, city._wrap_s(r, float(e["s0"]) + float(e["dir"]) * RUN_LEN))
+	city._draw_line_banner(fin[0], (fin[1] as Vector2) * float(e["dir"]), "FINISH", Color(0.2, 0.5, 0.95))
 
 
 func _draw_flood(ci: CanvasItem, a: Dictionary, ground: Vector2, e: Dictionary) -> void:

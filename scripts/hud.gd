@@ -248,6 +248,13 @@ func _draw() -> void:
 			_draw_race_hud(w, h)
 	_draw_toasts(w)
 	_draw_feed(h)
+	if not main.viewer.is_empty():   # the event viewer's banner
+		var vt: String = "EVENT VIEWER   [ / ] or P / N to step, R again:   " + (str(main.viewer["status"]) if main.viewer["status"] != "" else "press ] to start")
+		var tw := font.get_string_size(vt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		var vr := Rect2(weehoo_rect().end.x + 8, 50, tw + 12, 14)
+		draw_rect(vr, Color(0.35, 0.1, 0.4, 0.92))
+		draw_rect(vr, Color(1.0, 0.85, 0.3), false, 1.0)
+		draw_string(font, vr.position + Vector2(6, 10), vt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1.0, 0.95, 0.7))
 
 
 func _draw_title(w: float, h: float) -> void:

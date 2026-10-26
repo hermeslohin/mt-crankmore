@@ -128,7 +128,11 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var throw_t := -1.0
 	if not falling and _throws.has(base):
 		throw_t = (Time.get_ticks_msec() - int(_throws[base])) / 1000.0
-		tex = outfit(base + ("_throw_boxed" if boxed else "_throw"))
+		var tn := base + ("_throw_boxed" if boxed else "_throw")
+		tex = outfit(tn)
+		# no winter throw for a rider in winter gear: don't flash back to summer clothes
+		if cold and sheet("winter_" + tn) == null and sheet("winter_" + base + ("_boxed" if boxed else "")) != null:
+			tex = null
 		if tex == null or throw_t >= float(tex.get_width() / (tex.get_height() / DIRS)) / THROW_FPS:
 			tex = null
 			throw_t = -1.0

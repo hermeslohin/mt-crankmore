@@ -809,6 +809,13 @@ func _debug_shot() -> void:
 		for b in city.buildings:
 			if b["kind"] == "townhall":
 				spots.append(b["door"])
+	elif OS.get_environment("PIZZA_AT") == "nineties":
+		for b in city.buildings:
+			if city.SHOP_90S.has(str(b.get("name", ""))):
+				spots.append(b["door"])
+		for p in city.props:
+			if p["kind"] == "tube" or str(p.get("art", "")) in ["basketball_hoop", "skate_ramp"]:
+				spots.append(p["pos"])
 	elif OS.get_environment("PIZZA_AT") == "shops":
 		for k in 3:
 			city._post_order()

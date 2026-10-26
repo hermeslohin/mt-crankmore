@@ -31,10 +31,12 @@ const NORMAL_DESIGNS := ["kid", "tourist", "grandpa", "lady", "teen", "grandma",
 	"norm_man_windbreaker", "norm_woman_cardigan", "norm_man_overalls", "norm_woman_tracksuit", "norm_man_bald_glasses",
 	"norm_woman_curly_hair", "norm_teen_skater_plain", "norm_man_fleece", "norm_woman_office", "norm_old_man_vest",
 	"norm_woman_ponytail_runner_casual", "norm_man_denim_jacket", "norm_woman_hat_scarf", "norm_boy_kid",
-	"norm_man_tall_thin", "norm_woman_short_hair"]
+	"norm_man_tall_thin", "norm_woman_short_hair",
+	"grunge_teen", "neon_windbreaker", "fanny_pack", "mullet_dad", "scrunchie_girl", "bucket_hat_kid", "pager_guy"]
 const CHARACTER_DESIGNS := ["jogger", "hiker", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician",
 	"baker", "cyclist_fan", "photographer", "mailman", "nurse", "dogwalker", "construction", "sweeper", "courier", "police",
-	"gardener", "newsboy", "crossing_guard", "barista", "scout", "balloon_vendor"]
+	"gardener", "newsboy", "crossing_guard", "barista", "scout", "balloon_vendor",
+	"rollerblader", "boombox", "walkman_jogger"]
 const PEDESTRIAN_DESIGNS := NORMAL_DESIGNS + CHARACTER_DESIGNS
 const NORMAL_WEIGHT := 4
 static var _peds: Array = []

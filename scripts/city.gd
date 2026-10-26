@@ -42,8 +42,8 @@ const MAX_TOWN_SPEED := 13.0                  # m/s cap on descents
 
 enum T { GRASS, PLAZA, SIDEWALK, SAND, WATER, FOREST }
 
-const SHOP_NAMES := ["Sushi Slope", "Ski & Board", "Brew Peak Cafe", "Gear Loft", "Poutine Hut", "Fudge Ridge", "Maple Mart",
-	"Gelato Glacier", "Bike Spa", "The Cozy Mug", "Alpine Outfitters", "Fondue Fondue", "Summit Souvenirs", "Bear Paw Bakery",
+const SHOP_NAMES := ["Sushi Slope", "Rewind Video", "Ski & Board", "Brew Peak Cafe", "Pixel Palace", "Gear Loft", "Poutine Hut",
+	"Track 9 Records", "Fudge Ridge", "Maple Mart", "Mega Mall", "Gelato Glacier", "Bike Spa", "The Cozy Mug", "Alpine Outfitters", "Fondue Fondue", "Summit Souvenirs", "Bear Paw Bakery",
 	"Marmot Books", "Crepe Escape", "Trailhead Tees", "Cinnamon Lodge", "The Tuning Shop", "Snowcone Shack", "Moose Juice Bar",
 	"Glacier Gallery", "Granola Goods", "Hot Tub Supply", "Pinecone Pottery", "Sunburn Shades", "Waffle Chalet", "Peak Pharmacy",
 	"Lazy Lake Tackle", "The Yodel Deli", "Kayak Corner", "Sweater Weather", "Candle Cabin", "The Taffy Tram"]
@@ -396,6 +396,7 @@ func _generate() -> void:
 			tree_chunks[key] = []
 		tree_chunks[key].append(t)
 	_place_season()
+	_place_nineties()
 
 
 func _spline(ctrl: Array, closed: bool, step: float = 0.5) -> PackedVector2Array:
@@ -941,6 +942,82 @@ func _open_spot(p: Vector2, road_max: float, taken: Array) -> bool:
 			return false
 	for q in taken:
 		if q.distance_squared_to(p) < 6.0:
+			return false
+	return true
+
+
+## The 90s on the high street: a payphone, paper box or vending machine by the shop doors, neon outside the pizza
+## places, CRTs and an arcade cabinet outside the video and games shops, inflatable tube men flailing outside a few
+## shops (always the mall), satellite dishes by the chalets, and a hoop and a skate ramp on the grass where kids hang out.
+const KERB_90S := ["payphone", "newspaper_box", "mailbox_blue", "vending_machine", "phone_booth", "bike_rack", "newspaper_box", "payphone"]
+const SHOP_90S := {"Rewind Video": ["crt_tv_stack", "neon_sign_open"], "Pixel Palace": ["arcade_cabinet", "neon_sign_open"],
+	"Track 9 Records": ["boombox", "neon_sign_open"], "Mega Mall": ["vending_machine", "payphone"]}
+
+func _place_nineties() -> void:
+	var sr := RandomNumberGenerator.new()
+	sr.seed = 1990
+	var taken: Array = props.map(func(e): return e["pos"])
+	var tubes := 0
+	for b in buildings:
+		var kind: String = b["kind"]
+		if kind == "chalet" and sr.randf() < 0.3:
+			var dp: Vector2 = b["pos"] + Vector2(b["size"].x + 0.35, 0.35)
+			if _kerb_free(dp, taken, 0.0):
+				props.append({"kind": "90s", "art": "satellite_dish", "pos": dp, "flip": sr.randf() < 0.5})
+				taken.append(dp)
+			continue
+		if not kind in ["shop", "pizza", "bike"] or int(b.get("road", -1)) < 0:
+			continue
+		var r: Dictionary = roads[b["road"]]
+		var at := _road_at(r, float(b["s"]))
+		var tv: Vector2 = at[1]
+		var sgn := signf(Vector2(-tv.y, tv.x).dot(Vector2(b["door"]) - Vector2(at[0])))
+		var name_: String = str(b.get("name", ""))
+		var arts: Array = []
+		if SHOP_90S.has(name_):
+			arts = SHOP_90S[name_].duplicate()
+		elif kind == "pizza":
+			arts = ["neon_sign_pizza"]
+		elif sr.randf() < 0.5:
+			arts = [KERB_90S[sr.randi() % KERB_90S.size()]]
+		# a tube man on the pavement beside the door, where the camera can see it (not behind the shop)
+		if kind == "shop" and int(b["face"]) <= 1 and (name_ == "Mega Mall" or (tubes < 4 and sr.randf() < 0.1)):
+			arts.append("tube")
+		var sides := [1.0, -1.0] if sr.randf() < 0.5 else [-1.0, 1.0]
+		for k in arts.size():
+			var ds: float = sides[k % 2] * (1.1 + 0.9 * float(k / 2))
+			var on := _road_at(r, clampf(float(b["s"]) + ds, 0.0, float(r["len"])))
+			var t2: Vector2 = on[1]
+			var pp: Vector2 = Vector2(on[0]) + Vector2(-t2.y, t2.x) * sgn * (ROAD_HW + 0.7)
+			if not _kerb_free(pp, taken, ROAD_HW + 0.5):
+				continue
+			if arts[k] == "tube":
+				props.append({"kind": "tube", "pos": pp, "ph": sr.randf() * 3.0})
+				tubes += 1
+			else:
+				props.append({"kind": "90s", "art": arts[k], "pos": pp, "flip": sr.randf() < 0.5})
+			taken.append(pp)
+	# the hangouts: a hoop with a boombox on the ground, a quarter pipe
+	var spots := _season_spots(sr, 2, 6.0, 30.0, 3.0)
+	if spots.size() > 0:
+		props.append({"kind": "90s", "art": "basketball_hoop", "pos": spots[0]})
+		props.append({"kind": "90s", "art": "boombox", "pos": spots[0] + Vector2(0.9, 0.6)})
+	if spots.size() > 1:
+		props.append({"kind": "90s", "art": "skate_ramp", "pos": spots[1], "flip": true})
+
+
+## A free bit of pavement or grass: in the town, off the road (at least `road_min` from its middle), not under a
+## building and not on top of other scenery.
+func _kerb_free(p: Vector2, taken: Array, road_min: float) -> bool:
+	var ix := floori(p.x)
+	var iy := floori(p.y)
+	if ix < 0 or iy < 0 or ix >= N or iy >= N:
+		return false
+	var i := iy * N + ix
+	if reserved[i] == 2 or solid[i] != 0 or road_d[i] < road_min or tiles[i] == T.WATER:
+		return false
+	for q in taken:
+		if q.distance_squared_to(p) < 0.8:
 			return false
 	return true
 
@@ -3197,6 +3274,10 @@ func _draw_prop(p: Dictionary) -> void:
 			Sprites.draw_image(self, "scenery_umbrella_%s" % UMBRELLA_ART[ci % UMBRELLA_ART.size()], base + Vector2(0, 8))
 		"fountain":
 			Sprites.draw_image(self, "scenery_fountain", Iso.to_screen(PLAZA) + Vector2(0, 30))
+		"90s":
+			Sprites.draw_image(self, "scenery_90s_" + str(p["art"]), base, bool(p.get("flip", false)))
+		"tube":
+			Sprites.draw_strip(self, "scenery_tube_man", base, t_ + float(p["ph"]), 9.0)
 
 
 func _draw_ped(p: Dictionary) -> void:

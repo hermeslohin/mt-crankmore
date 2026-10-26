@@ -21,6 +21,8 @@ const FIXED_GEAR := 9     # the fixie's one and only gear
 
 ## Shifter buttons: LS1 = easier, RS1 = harder.
 const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}
+const SHIFT_HOLD := 1.0       # seconds a shifter (or key) is held before it starts shifting again by itself
+const SHIFT_REPEAT := 0.5     # then one more gear every this many seconds
 
 ## Controller button name -> game action.
 const BUTTON_ACTIONS := {
@@ -68,6 +70,9 @@ var _ping_clock := 0.0
 var _autostart_clock := 1.5
 
 var _held: Dictionary = {}
+var _rep_dir := 0             # the shifter being held: -1 easier, 1 harder, 0 none
+var _rep_t := 0.0             # how long it's been held
+var _rep_next := SHIFT_HOLD   # when the next repeat shift is due
 var _pressed_frame: Dictionary = {}   # action -> process frame it was pressed in
 var _release_later: Array = []         # releases that arrived in the same frame as their press
 var _grade_sent := 999.0
@@ -268,6 +273,7 @@ func _process(delta: float) -> void:
 		shift(1)
 	if Input.is_action_just_pressed("shift_down"):
 		shift(-1)
+	_shift_repeat(delta)
 	shift_flash = maxf(0.0, shift_flash - delta)
 	_grade_clock += delta
 
@@ -342,6 +348,26 @@ func gear_ratio(g: int = gear) -> float:
 	if g <= START_GEAR:
 		return pow(EASIEST, float(START_GEAR - g) / (START_GEAR - 1))
 	return pow(HARDEST, float(g - START_GEAR) / (GEARS - START_GEAR))
+
+
+## Holding a shifter (the controller's LS1 / RS1 or the shift keys) keeps shifting: once more after SHIFT_HOLD, then
+## every SHIFT_REPEAT until it's let go. (The first shift happens on the press itself.)
+func _shift_repeat(delta: float) -> void:
+	var live := Time.get_ticks_msec() - last_msg_ms < 600   # the controller's buttons only count while it's talking
+	var dir := 0
+	if Input.is_action_pressed("shift_up") or (live and pressed_names.has("RS1")):
+		dir += 1
+	if Input.is_action_pressed("shift_down") or (live and pressed_names.has("LS1")):
+		dir -= 1
+	if dir == 0 or dir != _rep_dir:
+		_rep_dir = dir
+		_rep_t = 0.0
+		_rep_next = SHIFT_HOLD
+		return
+	_rep_t += delta
+	if _rep_t >= _rep_next:
+		_rep_next += SHIFT_REPEAT
+		shift(dir)
 
 
 func shift(step: int) -> void:

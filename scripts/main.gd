@@ -38,6 +38,12 @@ func _ready() -> void:
 	var night := preload("res://scripts/night.gd").new()
 	night.source = func(): return city.night_lights() if mode == Mode.CITY else race.night_lights() if mode == Mode.RACE else []
 	dusk.add_child(night)
+	var fx_layer := CanvasLayer.new()   # fireworks, bright over the dark
+	fx_layer.layer = 7
+	add_child(fx_layer)
+	var fx := preload("res://scripts/sky_fx.gd").new()
+	fx.city = city
+	fx_layer.add_child(fx)
 	var layer := CanvasLayer.new()
 	layer.layer = 10
 	add_child(layer)
@@ -625,7 +631,7 @@ func _debug_seasons() -> void:
 
 ## Dev helper: PIZZA_DEBUG=wipeout [PIZZA_OUT=dir] knocks the player and the first rival down (a frisbee-style hit), then
 ## runs the player over with a car, saving a screenshot at several moments of each wipe-out animation.
-## Dev helper: PIZZA_DEBUG=events [PIZZA_OUT=dir] sets off every kind of town happening (see TownEvents) right next to
+## Dev helper: PIZZA_DEBUG=events [PIZZA_OUT=dir] [PIZZA_EVENTS=fire,crime,...] sets off every kind of town happening (see TownEvents) right next to
 ## the player and saves a screenshot of each. The player's save file is put back afterwards.
 func _debug_events() -> void:
 	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
@@ -637,12 +643,22 @@ func _debug_events() -> void:
 	city.events.near = 2.5
 	city.events.far = 5.0
 	city.events.next_t = 999.0
-	for kind in ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade"]:
+	var kinds: Array = ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade", "soapbox", "group_ride", "fire", "ambulance", "crime", "fireworks"]
+	if OS.has_environment("PIZZA_EVENTS"):   # just these (comma separated)
+		kinds = Array(OS.get_environment("PIZZA_EVENTS").split(",", false))
+	for kind in kinds:
 		city.events.events.clear()
 		city.events.start(kind)
 		print("event %s: %s" % [kind, "started" if not city.events.events.is_empty() else "skipped (no art or no spot)"])
-		await get_tree().create_timer(1.2).timeout
+		# the call-outs take a while to get going: wait for the truck / ambulance / police car
+		await get_tree().create_timer({"fire": 9.0, "ambulance": 9.0, "crime": 6.0, "fireworks": 5.0, "group_ride": 2.0}.get(kind, 1.2)).timeout
 		cam.position = city.cam_target()
+		if not city.events.events.is_empty():   # look at where it's happening (the fire, the robber)
+			var ev: Dictionary = city.events.events[0]
+			var focus: Vector2 = (ev["b"]["pos"] + ev["b"]["size"] * 0.5) if ev.has("b") else ev["actors"][1]["pos"] if kind == "crime" else Vector2.INF
+			if focus != Vector2.INF:
+				cam.position = Iso.to_screen(focus, 12.0 + Iso.ground_z(focus))
+				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/event_%s.png" % [out, kind])
 	if backup != "":

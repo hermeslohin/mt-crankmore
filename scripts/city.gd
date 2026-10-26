@@ -1451,7 +1451,7 @@ func _spawn_cars() -> void:
 func _car_pose(c: Dictionary) -> void:
 	var at := _road_at(roads[c["road"]], c["s"])
 	var fwd: Vector2 = at[1] * c["dir"]
-	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * 0.5
+	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * (0.5 + 0.45 * float(c.get("pull", 0.0)))   # pulled over onto the kerb
 	c["fwd"] = fwd
 
 
@@ -1626,6 +1626,8 @@ func _update_player(delta: float) -> void:
 
 	if invuln <= 0.0:
 		for c in cars:
+			if c.get("hidden", false):
+				continue
 			var rel: Vector2 = rail_pos - c["pos"]
 			var f: Vector2 = c["fwd"]
 			if absf(rel.dot(f)) < float(c["hl"]) + CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(c["hw"]) + CAR_HIT_R:
@@ -1977,7 +1979,7 @@ func _update_cars(delta: float) -> void:
 		j_claim[ji]["cars"] = j_claim[ji]["cars"].filter(func(h): return cars.has(h) and (int(h.get("claim", -1)) == ji or (h["pos"] as Vector2).distance_to(jp) < 1.4))
 		if j_claim[ji]["cars"].is_empty():
 			j_claim.erase(ji)
-	var band: Array = events.parade_spots() if events != null else []
+	var band: Array = (events.parade_spots() + events.ride_spots()) if events != null else []   # the band and group rides have the road
 	for c in cars:
 		var r: Dictionary = roads[c["road"]]
 		if c["wait"] > 0.0:
@@ -1987,7 +1989,7 @@ func _update_cars(delta: float) -> void:
 		var f: Vector2 = c["fwd"]
 		var blocked := false
 		for o in cars:
-			if o == c:
+			if o == c or float(o.get("pull", 0.0)) > 0.5:
 				continue
 			var need: float = float(c["hl"]) + float(o["hl"])
 			if not c.has("curve") and o["road"] == c["road"] and o["dir"] == c["dir"]:
@@ -2038,7 +2040,16 @@ func _update_cars(delta: float) -> void:
 							held["cars"].append(c)
 						c["claim"] = ji
 						c["held"] = 0.0
-		if active and er_timer <= 0.0:
+		if c.has("park_s"):
+			# an emergency vehicle stopping at the scene, pulling over onto the kerb as it gets there
+			var to_go: float = (float(c["park_s"]) - float(c["s"])) * float(c["dir"])
+			if r["closed"]:
+				to_go = fposmod(to_go + 1.0, float(r["len"])) - 1.0
+			target = minf(target, sqrt(2.0 * CAR_BRAKE * maxf(0.0, to_go - 0.05)))
+			c["pull"] = move_toward(float(c.get("pull", 0.0)), 1.0 if to_go < 2.0 else 0.0, delta * 1.5)
+		elif float(c.get("pull", 0.0)) > 0.0:
+			c["pull"] = move_toward(float(c["pull"]), 0.0, delta)
+		if active and er_timer <= 0.0 and not c.get("hidden", false):
 			var rel: Vector2 = rail_pos - c["pos"]
 			var ahead := rel.dot(f)
 			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction
@@ -2082,6 +2093,8 @@ func _car_next_j(c: Dictionary, r: Dictionary, reach: float) -> Array:
 ## road it has to turn; elsewhere it sometimes does.
 func _car_plan(c: Dictionary, ji: int, r: Dictionary) -> Dictionary:
 	var ri: int = c["road"]
+	if c.has("park_s") and not (not r["closed"] and absf(_link_s(ji, ri) - (float(r["len"]) if c["dir"] > 0.0 else 0.0)) < 0.6):
+		return {}   # heading for the scene: straight on
 	var ls := _link_s(ji, ri)
 	var at_end: bool = not r["closed"] and (ls < 0.6 or ls > float(r["len"]) - 0.6)
 	if not at_end and randf() < 0.55:
@@ -2190,10 +2203,13 @@ func night_lights() -> Array:
 		var on := clampf((dark - 0.3) * 3.0, 0.0, 1.0)
 		for c in cars:
 			var f: Vector2 = c["fwd"]
-			out.append([Iso.to_screen(c["pos"] + f * (float(c["hl"]) + 0.9)), 30.0, 0.75 * on])
+			if not c.get("hidden", false):
+				out.append([Iso.to_screen(c["pos"] + f * (float(c["hl"]) + 0.9)), 30.0, 0.75 * on])
 		out.append([Iso.to_screen(p_pos + p_fwd * 0.7), 26.0, 0.7 * on])
 		for r in rival_state:
 			out.append([Iso.to_screen(r["pos"] + Vector2.from_angle(r["head"]) * 0.6), 20.0, 0.55 * on])
+	if events != null:
+		out.append_array(events.flash_lights())
 	Iso.terrain_on = was
 	return out
 
@@ -2831,7 +2847,7 @@ func _draw_world() -> void:
 				if tv.has_point(Iso.to_screen(t["pos"])):
 					items.append([t["pos"].x + t["pos"].y, 1, t])
 	for c in cars:
-		if tv.has_point(Iso.to_screen(c["pos"])):
+		if not c.get("hidden", false) and tv.has_point(Iso.to_screen(c["pos"])):
 			items.append([c["pos"].x + c["pos"].y, 2, c])
 	for i in rival_state.size():
 		var r: Dictionary = rival_state[i]

@@ -134,6 +134,7 @@ https://github.com/hermeslohin/mt-crankmore/releases
   * *Winter*: snow everywhere, snow on the roofs and pines, bare trees, falling snow, a frozen lake with skaters, a frozen fountain, snowmen, skiers on the hills, townsfolk in bobble hats carrying their skis, and wreaths on the lamp posts. The rivals have something to say about every season.
 * **Day and night, rain and snow**: a whole day goes by every hour of play. The light turns orange at dusk and blue at night; street lamps line every road and come on one by one as it gets dark (and go off at dawn), casting pools of light, and cars and bikes ride with their lights on. In spring, summer and fall it rains now and then for 5 to 10 minutes under grey skies; in winter a light snow is always falling, with a heavy snowfall every few minutes.
 * **The Crankmore Marching Band**: every few minutes the whole band (drum major, flags and baton twirler, trumpets, trombones, clarinets and sax, snare drums, bass drums and cymbals, sousaphones) parades twice round the Plaza Loop in its lane; the traffic waits behind it and the townsfolk cheer.
+* **Happenings**: besides the small stuff (crowds, dogs, buskers, ice-cream vans...), bigger things come round every few minutes: a soapbox orator ranting about pineapple on pizza or flattening the mountain while the crowd heckles; the Crankmore Wheelers out on a group ride, two by two; a fire on a roof, with the fire brigade pulling up and hosing it down; someone hurt on the pavement and an ambulance with paramedics; a robbery, with a burglar running from a shop and a cop on his heels (ride into him to stop him for a $25 reward), and the police car taking him away. Once a night there are fireworks.
 * **Crankmore Heights**: a building going up west of the plaza, scaffolding, crane and all, with a crew in hard hats working the site. Now and then the builders phone in a big pizza order, and down tools to cheer when it arrives.
 * **Townsfolk**: people stroll the pavements all over the village and cheer you on as you ride past.
 * **Rivals**: up to eight AI bikers (Cryptic Carl, Super Sarah, Cadence Carla, Wheelie Wanda, Gear Grinder Gus, Margherita Maya, Tubeless Tony, Karate Kim; the first three ride by default) chase the same orders and will snag them if they reach the window first. They talk trash constantly (family-friendly).
@@ -193,6 +194,7 @@ scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
 scripts/season.gd         autoload: the current season, its colours and seasonal drawing helpers
 scripts/sky.gd            autoload (Skies): time of day and the weather (rain spells, snowfalls)
+scripts/sky_fx.gd         fireworks, drawn over the dark
 scripts/night.gd          the dark at night and the pools of light from lamps, headlights and bike lights
 scripts/weather.gd        falling snow, rain, leaves and petals
 scripts/ride_log.gd       autoload: records the ride (samples, screenshots) and writes it as TCX

@@ -768,7 +768,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			if not Sprites.draw_strip(ci, name, ground + Vector2(0, -lift), ph, 12.0 if a["anim"] == "run" else 8.0, true, flip):
 				Sprites.draw_strip(ci, "animal_%s_idle" % a["name"], ground + Vector2(0, -lift), ph, 8.0, true, flip)
 		"vehicle":
-			Sprites.draw_vehicle(ci, a["name"], ground, a["face"], Color.WHITE, int(ph * 6.0), true, city.CAR_SCALE)
+			Sprites.draw_vehicle(ci, a["name"], ground, a["face"], Color.WHITE, int(ph * 6.0))
 		"ball":
 			var hop := absf(sin(ph * 9.0)) * 7.0
 			ci.draw_circle(ground, 2.5, Color(0, 0, 0, 0.25))

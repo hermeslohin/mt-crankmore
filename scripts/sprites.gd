@@ -320,32 +320,15 @@ static func _count_hops(tex: Texture2D) -> int:
 ## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets; columns are the frames
 ## of its driving animation, if it has one) with its middle on `at`, heading `w` (world direction), tinted by `tint`.
 ## `frame` picks the animation frame (it wraps).
-## `on_road`: lay a diagonal view along the road. The sprites' diagonals are drawn at 45 degrees, but a road along the
-## town's grid runs at the isometric 2:1 slope on screen, so a car on it looked crooked; those rows are sheared to
-## the road's slope about the car's middle (the straight-up/down and sideways rows already line up). `scale` shrinks
-## it about the same point.
-static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE, frame := 0, on_road := false, scale := 1.0) -> bool:
+static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE, frame := 0) -> bool:
 	var tex := sheet(name)
 	if tex == null:
 		return false
 	var f := tex.get_height() / DIRS
 	var frames := maxi(1, tex.get_width() / f)
-	var row := dir_row(w)
-	var src := Rect2(posmod(frame, frames) * f, row * f, f, f)
+	var src := Rect2(posmod(frame, frames) * f, dir_row(w) * f, f, f)
 	var dst := Rect2((at - Vector2(f * 0.5, f * 0.5 + VEHICLE_LIFT)).round(), Vector2(f, f))
-	if not on_road and scale == 1.0:
-		ci.draw_texture_rect_region(tex, dst, src, tint)
-		return true
-	# rows 0 and 4 (world +x / -x) run down-right / up-left on screen, rows 2 and 6 (world +y / -y) down-left / up-right
-	var k := 0.0
-	if on_road:
-		k = -0.5 if row == 0 or row == 4 else (0.5 if row == 2 or row == 6 else 0.0)
-	var c := (at - Vector2(0, VEHICLE_LIFT)).round()
-	var xf := Transform2D(Vector2(scale, k * scale), Vector2(0, scale), Vector2.ZERO)
-	xf.origin = c - xf.basis_xform(c)
-	ci.draw_set_transform_matrix(xf)
 	ci.draw_texture_rect_region(tex, dst, src, tint)
-	ci.draw_set_transform_matrix(Transform2D.IDENTITY)
 	return true
 
 

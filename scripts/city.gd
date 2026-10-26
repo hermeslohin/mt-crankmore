@@ -18,7 +18,7 @@ const TILES_PER_MS := 0.45
 ## Overall pace of the town (rider, rivals, traffic). 0.7 = 30% slower than the original tuning.
 const PACE := 0.7
 const CAR_HIT_R := 0.14
-const CAR_SCALE := 0.85     # cars drawn a bit smaller than their art, so two lanes and a bike fit the road
+const CAR_BODY := 0.85      # the part of a car's sprite that's actually car (the rest is air): what can hit you
 const CAR_LANE := 0.42      # a car's distance from the middle of the road
 const BIKE_LANE := 0.95
 const ROAD_HW := 1.0
@@ -1754,8 +1754,8 @@ func _update_player(delta: float) -> void:
 				continue
 			var rel: Vector2 = rail_pos - c["pos"]
 			var f: Vector2 = c["fwd"]
-			# the car's body as drawn (CAR_SCALE), so riding past one in your lane is a near miss, not a crash
-			if absf(rel.dot(f)) < float(c["hl"]) * CAR_SCALE + CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(c["hw"]) * CAR_SCALE + CAR_HIT_R * 0.5:
+			# the car's body (CAR_BODY), so riding past one in your lane is a near miss, not a crash
+			if absf(rel.dot(f)) < float(c["hl"]) * CAR_BODY + CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(c["hw"]) * CAR_BODY + CAR_HIT_R * 0.5:
 				_hit_by_car(c)
 				break
 
@@ -4099,8 +4099,8 @@ func _draw_car(c: Dictionary) -> void:
 	# a one-pixel bounce on the suspension while it drives, and the wheels turn with the distance driven
 	var at := Iso.to_screen(pos) + Vector2(0, -1 if moving and int(odo * 5.0) % 2 == 0 else 0)
 	var frame := int(odo * 6.0)
-	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame, true, CAR_SCALE):
-		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame, true, CAR_SCALE)
+	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame):
+		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame)
 	if not String(c["kind"]).contains("electric") and not String(c["kind"]).contains("carriage"):
 		# exhaust: little puffs from the back that drift up and fade, more when it pulls away
 		var rear: Vector2 = pos - fwd * hl

@@ -411,7 +411,7 @@ func _gear_text() -> String:
 
 ## Where the WEEHOO sits (top left) and, on its pixel-art shell (art/ui_weehoo_shell.png), the window the live
 ## display is drawn into. Without the shell art it's drawn as a plain case of WEEHOO_SIZE.
-const WEEHOO_POS := Vector2(4, 4)
+const WEEHOO_POS := Vector2(-16, -15)   # the shell art has a transparent margin (the case starts at 21, 20): this puts the case 5 px from the corner
 const WEEHOO_SIZE := Vector2(192, 288)
 const WEEHOO_SCREEN := Rect2(33, 46, 126, 176)
 

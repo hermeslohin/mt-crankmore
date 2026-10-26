@@ -17,7 +17,8 @@ extends TownEvents
 const EVERY := [60.0, 120.0]          # seconds between happenings
 const CHAOS := {"outage": [7200.0, 14400.0], "cart": [7200.0, 14400.0], "hydrant": [7200.0, 14400.0]}
 const GULLS_EVERY := [1500.0, 2100.0]  # seagulls: every half hour or so (when you've a pizza on board)
-const KID_RACE_EVERY := [240.0, 480.0]  # a kid on a BMX wants a race (60% of your FTP wins $20)
+const KID_RACE_EVERY := [240.0, 480.0]
+const SANTA_EVERY := [7200.0, 14400.0]   # Santa flies over on a winter night every few hours and drops you a present  # a kid on a BMX wants a race (60% of your FTP wins $20)
 const TOWN := ["parade_float", "market", "car_wash", "wedding", "flash_mob", "cows", "hot_air_balloon", "movie_night",
 	"arcade_queue", "video_rush", "eating_contest", "fun_run", "mountain_rescue"]
 const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual", "norm_woman_tracksuit", "norm_man_shorts", "cyclist_fan"]
@@ -32,6 +33,7 @@ var happen_t := randf_range(40.0, 80.0)
 var chaos_t := {}
 var gulls_t := randf_range(GULLS_EVERY[0], GULLS_EVERY[1])
 var kid_t := randf_range(90.0, KID_RACE_EVERY[1])
+var santa_t := randf_range(SANTA_EVERY[0] * 0.25, SANTA_EVERY[1])
 var recent: Array = []                 # the last few kinds, so it doesn't repeat itself
 
 
@@ -42,6 +44,7 @@ static func all_kinds() -> Array:
 	out.append_array(CHAOS.keys())
 	out.append("seagulls")
 	out.append("kid_race")
+	out.append("santa")
 	return out
 
 
@@ -68,6 +71,10 @@ func update(delta: float) -> void:
 		if chaos_t[k] <= 0.0 and _fits(k):
 			chaos_t[k] = randf_range(CHAOS[k][0], CHAOS[k][1])
 			_start(k)
+	santa_t -= delta
+	if santa_t <= 0.0 and Season.current == "winter" and Skies.dark() > 0.6:
+		santa_t = randf_range(SANTA_EVERY[0], SANTA_EVERY[1])
+		_start("santa")
 	kid_t -= delta
 	if kid_t <= 0.0 and city.challenge.is_empty() and city.p_speed > 0.5:
 		kid_t = randf_range(KID_RACE_EVERY[0], KID_RACE_EVERY[1])
@@ -189,7 +196,7 @@ func _fx(e: Dictionary, q: Vector2, fn: Callable) -> Dictionary:
 
 func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 	var needs_spot := not kind in ["parade_float", "flash_mob", "tree_lighting", "wedding", "arcade_queue", "video_rush",
-		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race", "mountain_rescue", "zombie_kids"]
+		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race", "mountain_rescue", "zombie_kids", "santa"]
 	if needs_spot and sp.is_empty():
 		return false
 	var pos: Vector2 = e.get("pos", city.p_pos)
@@ -466,6 +473,20 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			var kid := _extra(e, pos - across * 0.9, pos + across, "", KIDS)
 			_say(kid, "Lemonade! 25 cents!", 3.0)
 			e["stand"] = pos
+		"santa":
+			# Santa's sleigh crosses the night sky and drops a present on a parachute just ahead of you: ride over it to
+			# unwrap a Hoofy Bike (or, if you have one, some cash). The sky part is drawn by draw_sky, over the dark.
+			e["t"] = 90.0
+			e["stage"] = "fly"
+			var land: Vector2 = city._rail_ahead(5.0, city.ROAD_HW + 0.5)[0]
+			e["land"] = land
+			var base: Vector2 = Iso.to_screen(city.p_pos, Iso.ground_z(city.p_pos))
+			e["sky_y"] = base.y - 175.0
+			e["x0"] = base.x - 560.0
+			e["x"] = e["x0"]
+			e["drop_x"] = Iso.to_screen(land, Iso.ground_z(land)).x - 60.0
+			e["fall"] = -1.0
+			Game.toast.emit("Ho ho ho! Look up!", Color(1.0, 0.3, 0.3))
 		"zombie_kids":
 			# kids in zombie costumes lurch out after you: half your FTP gets you away (City.CHALLENGES "zombies")
 			if not city.start_challenge("zombies"):
@@ -956,6 +977,30 @@ func _step(e: Dictionary, delta: float) -> void:
 			elif c["state"] == "lost" and not e.get("said", false):
 				e["said"] = true
 				_say(kid, ["HA! Beat you!", "Too slow, pizza person!", "Woo-hoo! I win!"].pick_random(), 3.0)
+		"santa":
+			e["x"] = float(e["x"]) + 190.0 * delta
+			if float(e["fall"]) < 0.0 and float(e["x"]) >= float(e["drop_x"]):
+				e["fall"] = 0.0   # present away!
+				e["from"] = Vector2(float(e["x"]) + 20.0, float(e["sky_y"]) + 30.0)
+			if float(e["fall"]) >= 0.0 and e["stage"] == "fly":
+				e["fall"] = float(e["fall"]) + delta / 3.5
+				if float(e["fall"]) >= 1.0:
+					e["stage"] = "landed"
+					var gift := _image(e, e["land"], "scenery_present_big")
+					gift["gift"] = true
+			if e["stage"] == "landed" and riding and p.distance_to(e["land"]) < 1.4:
+				e["stage"] = "opened"
+				for a in e["actors"]:
+					if a.get("gift", false):
+						a["gone"] = true
+				if Game.give_bike(Game.HOOFY):
+					Game.toast.emit("A HOOFY BIKE from Santa! You're riding it now (switch bikes in the pause menu: My bikes).", Color(1.0, 0.35, 0.35))
+				else:
+					Game.add_money(100)
+					Game.save_game()
+					Game.toast.emit("Santa's present: $100! (You've already got the Hoofy Bike.)", Color(1.0, 0.35, 0.35))
+				city.player_bubble = {"text": "Thanks, Santa!", "t": 2.5}
+				e["t"] = minf(float(e["t"]), 2.0)
 		"zombie_kids":
 			var c: Dictionary = city.challenge
 			if c.is_empty() or c["kind"] != "zombies" or c["state"] in ["won", "lost"]:
@@ -1045,9 +1090,52 @@ func ride_spots() -> Array:
 	return out
 
 
+## Santa's sleigh and the present floating down on its parachute, in the sky over the dark (sky_fx.gd).
+func draw_sky(ci: CanvasItem) -> void:
+	super.draw_sky(ci)
+	for e in events:
+		if e["kind"] != "santa":
+			continue
+		var at := Vector2(float(e["x"]), float(e["sky_y"]) + sin(float(e["clock"]) * 2.0) * 4.0)
+		var tex := Sprites.sheet("santa_sleigh_fly")
+		if tex != null:
+			var fh := float(tex.get_height())
+			var fw := fh * 2.0
+			var n := maxi(1, int(tex.get_width() / fw))
+			var f := int(float(e["clock"]) * 10.0) % n
+			ci.draw_texture_rect_region(tex, Rect2(at - Vector2(fw, fh) * 0.5, Vector2(fw, fh)), Rect2(f * fw, 0, fw, fh))
+		else:   # no art: a red sleigh and a line of reindeer, the leader's nose glowing
+			ci.draw_rect(Rect2(at + Vector2(-24, -6), Vector2(30, 12)), Color(0.85, 0.12, 0.12))
+			ci.draw_circle(at + Vector2(-12, -12), 6.0, Color(0.85, 0.12, 0.12))
+			ci.draw_circle(at + Vector2(-12, -18), 4.0, Color(0.98, 0.85, 0.75))
+			for k in 4:
+				var d := at + Vector2(16 + k * 16, -2 + sin(float(e["clock"]) * 9.0 + k) * 2.0)
+				ci.draw_rect(Rect2(d + Vector2(-6, -4), Vector2(12, 6)), Color(0.5, 0.32, 0.18))
+				ci.draw_line(d + Vector2(-4, 2), d + Vector2(-6, 7), Color(0.4, 0.25, 0.12), 1.0)
+				ci.draw_line(d + Vector2(4, 2), d + Vector2(6, 7), Color(0.4, 0.25, 0.12), 1.0)
+				if k == 3:
+					ci.draw_circle(d + Vector2(7, -3), 2.0, Color(1.0, 0.2, 0.2))
+		if fmod(float(e["clock"]), 2.0) < 1.0:
+			ci.draw_string(ThemeDB.fallback_font, at + Vector2(-30, -30), "HO HO HO!", HORIZONTAL_ALIGNMENT_CENTER, 60.0, 9, Color(1.0, 0.95, 0.95))
+		# the present on its way down
+		var u := float(e["fall"])
+		if u >= 0.0 and u < 1.0:
+			var land: Vector2 = Iso.to_screen(e["land"], Iso.ground_z(e["land"]))
+			var q: Vector2 = (e["from"] as Vector2).lerp(land, u * u * 0.3 + u * 0.7) + Vector2(sin(u * 9.0) * 6.0, 0)
+			if not Sprites.draw_image(ci, "scenery_parachute_present", q):
+				ci.draw_arc(q + Vector2(0, -26), 12.0, PI, TAU, 10, Color(1, 1, 1), 2.0)
+				ci.draw_line(q + Vector2(-12, -26), q + Vector2(-4, -8), Color(0.9, 0.9, 0.9), 1.0)
+				ci.draw_line(q + Vector2(12, -26), q + Vector2(4, -8), Color(0.9, 0.9, 0.9), 1.0)
+				ci.draw_rect(Rect2(q + Vector2(-6, -9), Vector2(12, 9)), Color(0.85, 0.15, 0.15))
+				ci.draw_rect(Rect2(q + Vector2(-1, -9), Vector2(2, 9)), Color(1.0, 0.85, 0.2))
+
+
 ## Extra light at night: the movie screen and the lit Christmas tree.
 func flash_lights() -> Array:
 	var out: Array = super.flash_lights()
+	for e in events:
+		if e["kind"] == "santa" and e["stage"] == "landed":
+			out.append([Iso.to_screen(e["land"]), 60.0, 0.9])   # the present glowing in the snow
 	for e in events:
 		for a in e["actors"]:
 			if a.get("screen", false):

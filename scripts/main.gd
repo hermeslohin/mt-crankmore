@@ -472,11 +472,33 @@ func _open_pause() -> void:
 		return {"title": "Paused", "sub": "Money: $%d    Deliveries: %d    Races won: %d" % [Game.money, Game.deliveries, Game.race_wins],
 			"items": [
 				{"label": "Resume", "fn": func(): hud.close_menu(); on_menu_closed()},
+				{"label": "My bikes", "fn": _open_garage, "detail": "Riding the %s. Pick any bike you own." % Game.bike()["name"]},
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
 				_season_item(),
 				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
 				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
 			]})
+
+
+## The garage: every bike you own, the one you're riding marked; pick one to ride it.
+func _open_garage() -> void:
+	hud.open_menu(func():
+		var items: Array = []
+		for i in Game.owned:
+			var b: Dictionary = Game.bikes[i]
+			var riding: bool = i == Game.equipped
+			var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
+			var hp_now: float = Game.hp.get(i, 0.0)
+			items.append({"label": ("%s   [riding]" if riding else "%s") % b["name"], "enabled": not riding,
+				"fn": func():
+					Game.equipped = i
+					Game.save_game()
+					Game.toast.emit("Now riding the %s" % b["name"], Color(0.5, 1.0, 0.6))
+					_open_garage(),
+				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"],
+					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"]]})
+		items.append({"label": "Back", "fn": _open_pause, "detail": ""})
+		return {"title": "My bikes", "sub": "%d bike%s in the garage. Riding: %s" % [Game.owned.size(), "" if Game.owned.size() == 1 else "s", Game.bike()["name"]], "items": items})
 
 
 ## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
@@ -519,6 +541,8 @@ func _bike_shop_menu() -> Dictionary:
 	for i in order:
 		var b: Dictionary = Game.bikes[i]
 		var owned := Game.owned.has(i)
+		if b.get("gift", false) and not owned:
+			continue   # not for sale
 		var label := ""
 		var enabled := true
 		var fn := func(): pass
@@ -730,8 +754,8 @@ func _debug_events() -> void:
 ## if it has one. Your save is put back as it was when you quit.
 const VIEWER_SEASON := {"snowball_fight": "winter", "sledding": "winter", "tree_lighting": "winter", "egg_hunt": "spring",
 	"duck_crossing": "spring", "volleyball": "summer", "fishing": "summer", "lemonade": "summer", "trick_or_treat": "fall",
-	"hayride": "fall", "harvest_festival": "fall", "zombie_kids": "fall"}
-const VIEWER_HOUR := {"fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
+	"hayride": "fall", "harvest_festival": "fall", "zombie_kids": "fall", "santa": "winter"}
+const VIEWER_HOUR := {"santa": 22.0, "fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
 
 func _debug_viewer() -> void:
 	viewer = {"backup": FileAccess.get_file_as_string(Game.SAVE_PATH), "i": -1, "status": "",

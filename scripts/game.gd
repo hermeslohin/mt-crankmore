@@ -38,7 +38,11 @@ var bikes: Array = [
 	# "fixed": one gear (Trainer.FIXED_GEAR), no shifting and no brakes
 	{"name": "Fixie", "price": 2000, "mass": 8.6, "cda": 0.36, "crr": 0.006, "hp": 95.0, "gravel": 1.1, "turn": 1.1, "fixed": true,
 		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome."},
+	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
+	{"name": "Hoofy Bike", "price": 0, "gift": true, "mass": 16.5, "cda": 0.49, "crr": 0.0115, "hp": 70.0, "gravel": 0.95, "turn": 0.9,
+		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
 ]
+const HOOFY := 6   # the Hoofy Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
@@ -133,6 +137,17 @@ func buy_bike(i: int) -> bool:
 	if money < price or owned.has(i):
 		return false
 	add_money(-price)
+	owned.append(i)
+	hp[i] = bikes[i]["hp"]
+	equipped = i
+	save_game()
+	return true
+
+
+## A bike given for free (Santa's present): yours, fresh, and ridden away. False if you already have it.
+func give_bike(i: int) -> bool:
+	if owned.has(i):
+		return false
 	owned.append(i)
 	hp[i] = bikes[i]["hp"]
 	equipped = i

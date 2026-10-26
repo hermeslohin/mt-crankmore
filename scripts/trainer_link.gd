@@ -15,8 +15,8 @@ const TX_PORT := 9872
 
 const GEARS := 21
 const START_GEAR := 11
-const EASIEST := 0.33    # gear 1, ratio to gear 11
-const HARDEST := 2.55    # gear 21
+const EASIEST := 0.27    # gear 1, ratio to gear 11 (the range, hardest over easiest, is about 11.6x)
+const HARDEST := 3.12    # gear 21
 const FIXED_GEAR := 9     # the fixie's one and only gear
 
 ## Shifter buttons: LS1 = easier, RS1 = harder.

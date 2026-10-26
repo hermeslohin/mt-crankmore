@@ -7,9 +7,9 @@ extends Node2D
 signal finished(result: Dictionary)
 
 const COURSES := [
-	{"name": "Foothill Gravel Grind", "length": 6000.0, "grade": 0.04, "roll": 1.3, "entry": 40, "prize": 500, "seed": 7,
+	{"name": "Foothill Gravel Grind", "length": 6000.0, "grade": 0.04, "roll": 1.3, "entry": 40, "prize": 500, "seed": 7, "tunnels": 1,
 		"blurb": "6 km of rolling gravel switchbacks with jumps, creek crossings and fallen trees, about 20 minutes for the front of the pack. Full of squirrels. And deer. And a bear or two."},
-	{"name": "Summit Gravel Showdown", "length": 4400.0, "grade": 0.065, "roll": 1.2, "entry": 100, "prize": 1200, "seed": 21,
+	{"name": "Summit Gravel Showdown", "length": 4400.0, "grade": 0.065, "roll": 1.2, "entry": 100, "prize": 1200, "seed": 21, "tunnels": 2,
 		"blurb": "4.4 km of steep gravel to the top of Mt. Crankmore with ramps up to 12%, short plunges, logs and bears, about 20 minutes. Legends are made here. So are blisters."},
 	# "bump": gentle rollers on top of the base grade; "flowers": a valley of flower meadows instead of a mountain;
 	# "profile": [metres, grade] stretches replacing the base grade, levelled so the finish is as high as the start
@@ -19,7 +19,7 @@ const COURSES := [
 		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: gentle climbs, easy dips and flat stretches, finishing back where you started, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
 ]
 const MAX_GRADE := 0.12
-const MIN_GRADE := -0.07
+const MIN_GRADE := -0.09
 const M_PER_TILE := 3.3       # metres of road per tile (the town is about 3.2), so speeds look the same
 const PX_PER_M := 12.0        # screen lift per metre of height
 const LEG_GAP := 16.0         # tiles between switchback legs
@@ -87,6 +87,11 @@ var idle_t := 0.0                     # seconds the finished player has been sto
 var last_swap := {}
 var lead_clock := 0.0
 var t_ := 0.0
+var road_leg := PackedInt32Array()    # which switchback leg each road sample is on (-1 = in a hairpin)
+var hairpins: Array = []              # {s, i0, i1, left, n, c, called}
+var tunnels: Array = []               # {s0, s1, i0, i1, a (roof opacity), called}
+var ramps: Array = []                 # steep climbs and fast descents {s0, s1, g, called}
+var snow_called := false
 
 
 func _ready() -> void:
@@ -111,6 +116,7 @@ func setup(course_id: int) -> void:
 	rng.seed = int(course["seed"])
 	_build_road(rng)
 	_build_streams(rng)
+	_build_tunnels(rng)
 	_build_terrain()
 	_build_features(rng)
 	_build_flora(rng)
@@ -130,6 +136,12 @@ func setup(course_id: int) -> void:
 	kick_t = 0.0
 	lead_clock = 0.0
 	last_swap.clear()
+	snow_called = false
+	for t in tunnels:
+		t["called"] = false
+		t["a"] = 1.0
+	for r in ramps:
+		r["called"] = false
 	bubbles.clear()
 	pops.clear()
 	player_finish_time = 0.0
@@ -191,6 +203,7 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 	for i in M:
 		var tng := (pts[mini(i + 1, M - 1)] - pts[maxi(i - 1, 0)]).normalized()
 		nrm[i] = Vector2(-tng.y, tng.x)
+	road_leg = sample_leg
 	# rolling profile: long climbs broken up by short plunges and steep kickers
 	ds_m = road_len / float(M - 1)
 	var g0: float = course["grade"]
@@ -198,12 +211,16 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 	var p0 := rng.randf() * TAU
 	var p1 := rng.randf() * TAU
 	var p2 := rng.randf() * TAU
+	# a mountain gets a random run of climbs, ramps, flats and drops instead of the same rolling wave
+	var prof: Array = [] if course.has("profile") else _random_profile(rng, length, g0)
 	var e := 0.0
 	var lo := 0.0
 	for i in M:
 		var s := i * ds_m
 		s_m[i] = s
 		var g := g0 * (1.0 + amp * sin(TAU * s / 650.0 + p0) + 0.45 * amp * sin(TAU * s / 230.0 + p1) + 0.25 * sin(TAU * s / 97.0 + p2))
+		if not prof.is_empty():
+			g = _profile_grade(prof, s) + 0.012 * sin(TAU * s / 71.0 + p2) + 0.008 * sin(TAU * s / 29.0 + p0)
 		if course.has("profile"):
 			g = _profile_grade(course["profile"], s)
 		g += float(course.get("bump", 0.0)) * (sin(TAU * s / 420.0 + p1) + 0.4 * sin(TAU * s / 160.0 + p2))
@@ -225,6 +242,16 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 	for i in M:
 		elev[i] -= lo
 		gain = maxf(gain, elev[i])
+	# the hairpins (runs of samples that are on no leg), to warn about
+	hairpins.clear()
+	var run := -1
+	for i in M:
+		if road_leg[i] < 0 and run < 0:
+			run = i
+		elif road_leg[i] >= 0 and run >= 0:
+			hairpins.append({"s": s_m[(run + i) / 2], "i0": run, "i1": i - 1, "left": road_leg[run - 1] % 2 == 0 if run > 0 else true,
+				"n": hairpins.size() + 1, "c": (pts[run] + pts[i - 1]) * 0.5, "dx": 1.0 if road_leg[run - 1] % 2 == 0 else -1.0, "called": false})
+			run = -1
 	vz = PX_PER_M
 	# terrain grid around the switchbacks
 	ox = -int(HAIRPIN_R) - 14
@@ -249,6 +276,65 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 			elif a[c] < -1.0e8:
 				a[c] = a[c - 1]
 		leg_elev.append(a)
+
+
+## A random [metres, grade] profile for a mountain: climbs, steep ramps, flats, descents and plunges in a random order
+## and of random lengths, with the climbs scaled so the course gains about `g0` * its length overall.
+func _random_profile(rng: RandomNumberGenerator, length: float, g0: float) -> Array:
+	var segs: Array = []
+	var total := 0.0
+	var last := ""
+	var ramp_w := 0.03 + g0 * 1.0
+	while total < length + 300.0:
+		var r := rng.randf()
+		var kind := "climb"
+		if r < 0.46:
+			kind = "climb"
+		elif r < 0.46 + ramp_w:
+			kind = "ramp"
+		elif r < 0.58 + ramp_w:
+			kind = "flat"
+		elif r < 0.78 + ramp_w:
+			kind = "descent"
+		else:
+			kind = "plunge"
+		if kind == last and rng.randf() < 0.7:
+			continue
+		var m := 100.0
+		var g := 0.0
+		match kind:
+			"climb":
+				m = rng.randf_range(110.0, 430.0)
+				g = g0 * rng.randf_range(0.6, 1.8)
+			"ramp":
+				m = rng.randf_range(60.0, 170.0)
+				g = rng.randf_range(0.085, 0.12)
+			"flat":
+				m = rng.randf_range(60.0, 220.0)
+				g = rng.randf_range(-0.008, 0.016)
+			"descent":
+				m = rng.randf_range(100.0, 380.0)
+				g = -rng.randf_range(0.015, 0.045)
+			"plunge":
+				m = rng.randf_range(40.0, 110.0)
+				g = -rng.randf_range(0.05, 0.085)
+		segs.append([m, g, kind])
+		total += m
+		last = kind
+	# scale the climbs (not the drops) until the mean grade over the course is g0
+	for _pass in 6:
+		var sum := 0.0
+		var n := 0
+		var x := 0.0
+		while x < length:
+			sum += clampf(_profile_grade(segs, x), MIN_GRADE, MAX_GRADE)
+			n += 1
+			x += 10.0
+		var k := clampf(g0 / maxf(sum / n, 0.005), 0.8, 1.25)
+		for sg in segs:
+			if sg[2] == "climb":
+				sg[1] = clampf(float(sg[1]) * k, 0.01, 0.105)
+	return segs
 
 
 ## Grade (fraction) at `s` metres along a [metres, grade] profile, eased over 40 m either side of each change.
@@ -391,6 +477,9 @@ func _build_terrain() -> void:
 			if course.get("flowers", false):
 				f = 0.0              # a valley: no snow or scree, and much less forest
 				b -= 1.5
+			var cover := _snow_cover(x, y, f)
+			if cover > 0.5:
+				kind = 4
 			if f > 0.975:
 				col = Color(0.96, 0.97, 1.0)
 			elif f > 0.93:
@@ -409,10 +498,21 @@ func _build_terrain() -> void:
 			var sh := 1.0 + clampf(((z10 - z00) + (z11 - z01) + (z01 - z00) + (z11 - z10)) * 0.004, -0.35, 0.35)
 			if kind == 3:
 				col = col.lerp(Season.SNOW, 0.65) if Season.bare() else col
-			else:
+			elif kind != 4:
 				col = Season.ground(col)
+			if cover > 0.0:
+				col = col.lerp(Color(0.93, 0.96, 1.0), cover * 0.92)
 			cell_col[j * gw + i] = Iso.shade(col, sh)
 			cell_kind[j * gw + i] = kind
+
+
+## How snowy the mountain is at (x, y) at height fraction `f` (0..1): the snow line wanders, so there are patches
+## below it and bare rock sticking out above, in every season.
+func _snow_cover(x: float, y: float, f: float) -> float:
+	if course.get("flowers", false):
+		return 0.0
+	var edge := 0.58 + 0.06 * sin(x * 0.31 + y * 0.23) + 0.05 * sin(x * 0.13 - y * 0.37) + 0.03 * sin(x * 0.7 + y * 0.9)
+	return smoothstep(edge - 0.07, edge + 0.04, f)
 
 
 ## Terrain height (px) anywhere, bilinear over the corner grid.
@@ -438,7 +538,16 @@ func _rd(p: Vector2) -> float:
 	return lerpf(lerpf(rdist[i], rdist[i + 1], tx), lerpf(rdist[i + gw + 1], rdist[i + gw + 2], tx), ty)
 
 
+func _in_tunnel(s: float, gap: float = 0.0) -> bool:
+	for t in tunnels:
+		if s > float(t["s0"]) - gap and s < float(t["s1"]) + gap:
+			return true
+	return false
+
+
 func _clear_of(s: float, gap: float, kind: String = "") -> bool:
+	if _in_tunnel(s, gap):
+		return false
 	for ob in obstacles:
 		if (kind == "" or ob["kind"] == kind) and absf(float(ob["s"]) - s) < gap:
 			return false
@@ -510,9 +619,226 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	while km < length - 60.0:
 		_put_static(2, {"kind": "sign", "s": km, "label": "%.1f km" % (km / 1000.0)}, [])
 		km += 500.0
+	_build_course_signs(rng)
 	for k in 18:
 		_put_fan(rng.randf_range(0.0, 30.0) if k < 9 else length - rng.randf_range(0.0, 30.0),
 			(1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(1.1, 2.4), rng)
+
+
+## Tunnels bored through the hillside along a straight stretch of a few of the middle legs.
+func _build_tunnels(rng: RandomNumberGenerator) -> void:
+	tunnels.clear()
+	var length: float = course["length"]
+	var legs: Array = range(1, legs_n - 1)
+	for q in range(legs.size() - 1, 0, -1):
+		legs.push_back(legs.pop_at(rng.randi() % (q + 1)))
+	var want := int(course.get("tunnels", 0))
+	for k in legs:
+		if tunnels.size() >= want:
+			break
+		var ia := -1
+		var ib := -1
+		for i in M:
+			if road_leg[i] == k:
+				if ia < 0:
+					ia = i
+				ib = i
+		var n := int(rng.randf_range(80.0, 110.0) / ds_m)
+		if ia < 0 or ib - ia < n + 120:
+			continue
+		var i0 := ia + int((ib - ia - n) * rng.randf_range(0.3, 0.6))
+		var s0 := s_m[i0]
+		var s1 := s_m[i0 + n]
+		if s0 < 300.0 or s1 > length - 220.0:
+			continue
+		var ok := true
+		for t in tunnels:
+			ok = ok and (absf(float(t["s0"]) - s0) > 500.0)
+		if ok:
+			tunnels.append({"s0": s0, "s1": s1, "i0": i0, "i1": i0 + n, "a": 1.0, "called": false})
+
+
+## The mound over a tunnel: a hillside strip along the road, drawn over the road (so riders vanish into it unless it is
+## see-through), with a stone portal at the end the camera sees.
+const TUN_PROFILE := [[-1.9, 0.0], [-1.6, 34.0], [-0.95, 50.0], [0.0, 56.0], [0.95, 50.0], [1.6, 34.0], [1.9, 0.0]]
+const TUN_SHADE := [0.72, 0.86, 1.08, 1.04, 0.9, 0.7]
+const TUN_STEP := 4   # road samples per piece
+
+
+func _tun_p(i: int, lat: float, z: float) -> Vector2:
+	return Iso.to_screen(pts[i] + nrm[i] * lat, elev[i] * vz + z)
+
+
+func _draw_tunnel_piece(it: Dictionary) -> void:
+	var t: Dictionary = tunnels[int(it["t"])]
+	var a: float = t["a"]
+	var ia: int = it["ia"]
+	var ib: int = it["ib"]
+	var cover: float = it["cover"]
+	var grass := Color(0.36, 0.58, 0.3).lerp(Color(0.56, 0.6, 0.34), clampf(float(ia) / float(M) * 1.5, 0.0, 1.0))
+	var base := grass.lerp(Color(0.94, 0.96, 1.0), cover * 0.95)
+	for k in 6:
+		var col := Iso.shade(base, TUN_SHADE[k] * (0.97 + 0.06 * float((ia / TUN_STEP) % 2)))
+		col.a = a
+		var q := PackedVector2Array([_tun_p(ia, TUN_PROFILE[k][0], TUN_PROFILE[k][1]), _tun_p(ib, TUN_PROFILE[k][0], TUN_PROFILE[k][1]),
+			_tun_p(ib, TUN_PROFILE[k + 1][0], TUN_PROFILE[k + 1][1]), _tun_p(ia, TUN_PROFILE[k + 1][0], TUN_PROFILE[k + 1][1])])
+		draw_colored_polygon(q, col)
+	if a < 0.95:   # inside: it is dim, with a lamp every few metres
+		var gloom := PackedVector2Array([_tun_p(ia, -0.95, 1.0), _tun_p(ib, -0.95, 1.0), _tun_p(ib, 0.95, 1.0), _tun_p(ia, 0.95, 1.0)])
+		draw_colored_polygon(gloom, Color(0.02, 0.02, 0.1, 0.5 * (1.0 - a)))
+		var lamp := _tun_p(ia, 0.0, 46.0)
+		draw_circle(lamp, 9.0, Color(1.0, 0.85, 0.4, 0.12 * (1.0 - a)))
+		draw_circle(lamp, 3.0, Color(1.0, 0.9, 0.5, 0.9 * (1.0 - a)))
+	if it.get("portal", false):
+		var stone := Color(0.55, 0.52, 0.5)
+		var edge := Color(0.14, 0.12, 0.14)
+		var pa := lerpf(a, 1.0, 0.5)
+		var outer := PackedVector2Array()
+		for pr in TUN_PROFILE:
+			outer.append(_tun_p(ib if it["at_b"] else ia, pr[0], pr[1]))
+		draw_colored_polygon(outer, Color(stone.r, stone.g, stone.b, pa))
+		var j: int = ib if it["at_b"] else ia
+		var ring := PackedVector2Array()
+		for pr in [[-1.25, 0.0], [-1.25, 27.0], [-0.75, 41.0], [0.0, 45.0], [0.75, 41.0], [1.25, 27.0], [1.25, 0.0]]:
+			ring.append(_tun_p(j, pr[0], pr[1]))
+		draw_colored_polygon(ring, Color(0.72, 0.69, 0.66, pa))
+		var hole := PackedVector2Array()
+		for pr in [[-0.95, 0.0], [-0.95, 24.0], [-0.55, 36.0], [0.0, 39.0], [0.55, 36.0], [0.95, 24.0], [0.95, 0.0]]:
+			hole.append(_tun_p(j, pr[0], pr[1]))
+		draw_colored_polygon(hole, Color(0.03, 0.03, 0.06, 0.85 * pa))
+		draw_polyline(outer, Color(edge.r, edge.g, edge.b, pa), 1.0)
+		draw_polyline(hole, Color(edge.r, edge.g, edge.b, pa), 1.0)
+		draw_circle(_tun_p(j, 0.0, 49.0), 2.0, Color(1.0, 0.85, 0.35, pa))
+
+
+## Signs along the climb that tell you what is coming: hairpins, tunnels, steep ramps, descents and the snow line,
+## chevron boards round the outside of every hairpin, and the tunnel mounds themselves.
+func _build_course_signs(rng: RandomNumberGenerator) -> void:
+	var length: float = course["length"]
+	# steep ramps and fast descents
+	ramps.clear()
+	var i := 0
+	while i < M and s_m[i] < length - 40.0:
+		var steep := grade_a[i] >= 0.088
+		var drop := grade_a[i] <= -0.06
+		if steep or drop:
+			var j := i
+			while j < M - 1 and (grade_a[j + 1] >= 0.088 if steep else grade_a[j + 1] <= -0.06):
+				j += 1
+			if s_m[j] - s_m[i] >= 60.0 and s_m[i] > 80.0 and not _in_tunnel(s_m[i], 30.0):
+				var gm := 0.0
+				for q in range(i, j + 1):
+					gm = maxf(gm, absf(grade_a[q]))
+				ramps.append({"s0": s_m[i], "s1": s_m[j], "g": gm, "up": steep, "called": false})
+			i = j + 1
+		else:
+			i += 1
+	# the boards, hairpins and tunnels first, so they are never crowded out
+	var boards: Array = []
+	for h in hairpins:
+		boards.append({"s": float(h["s"]) - 105.0, "icon": "left" if h["left"] else "right", "l1": "HAIRPIN", "l2": "%d of %d" % [h["n"], hairpins.size()]})
+	for t in tunnels:
+		boards.append({"s": float(t["s0"]) - 105.0, "icon": "tunnel", "l1": "TUNNEL", "l2": "%d m" % int(float(t["s1"]) - float(t["s0"]))})
+	var placed: Array = []
+	for b in boards:
+		placed.append(float(b["s"]))
+	var extra: Array = []
+	for r in ramps:
+		extra.append({"s": float(r["s0"]) - 40.0, "icon": "up" if r["up"] else "down", "l1": "STEEP" if r["up"] else "DROP", "l2": "%d%%" % roundi(float(r["g"]) * 100.0)})
+	# where the snow starts
+	var snow_s := -1.0
+	for q in M:
+		if s_m[q] > 60.0 and s_m[q] < length and _snow_cover(pts[q].x, pts[q].y, elev[q] * vz / peak) > 0.5:
+			snow_s = s_m[q]
+			break
+	if snow_s > 0.0:
+		extra.append({"s": snow_s - 10.0, "icon": "snow", "l1": "SNOW", "l2": "LINE"})
+	for b in extra:
+		var ok := float(b["s"]) > 30.0
+		for ps in placed:
+			ok = ok and absf(float(ps) - float(b["s"])) > 70.0
+		if ok and not _in_tunnel(float(b["s"]), 5.0):
+			boards.append(b)
+			placed.append(float(b["s"]))
+	for b in boards:
+		if float(b["s"]) < 30.0:
+			continue
+		var pz := _pose(float(b["s"]), 0.0)
+		var n: Vector2 = pz["n"]
+		var side := 1.0 if n.y >= 0.0 else -1.0
+		b["kind"] = "board"
+		b["side"] = side
+		_put_static(2, b, [])
+	# chevrons round the outside of each hairpin
+	for h in hairpins:
+		var c: Vector2 = h["c"]
+		var dx: float = h["dx"]
+		for fr in [0.18, 0.34, 0.5, 0.66, 0.82]:
+			var a: float = PI * fr
+			var dirv := Vector2(sin(a) * dx, cos(a))
+			var p := c + dirv * (HAIRPIN_R + 1.5)
+			var tv := Vector2(cos(a) * dx, -sin(a))
+			_put_static(2, {"kind": "chevron", "pos": p, "z": _tz(p), "tan": tv, "s": float(h["s"])}, [])
+	# the tunnel mounds: one piece per few road samples, in the bucket just after the riders on it
+	for ti in tunnels.size():
+		var t: Dictionary = tunnels[ti]
+		var i0: int = t["i0"]
+		var i1: int = t["i1"]
+		var at_b := pts[i1].x > pts[i0].x   # the end with the larger x faces the camera
+		var q := i0
+		while q < i1:
+			var qb := mini(q + TUN_STEP, i1)
+			var far := pts[qb] if pts[qb].x > pts[q].x else pts[q]
+			var cover := _snow_cover(far.x, far.y, elev[q] * vz / peak)
+			var portal := (qb == i1 and at_b) or (q == i0 and not at_b)
+			_put_static(6, {"kind": "tunnel", "t": ti, "ia": q, "ib": qb, "cover": cover, "portal": portal, "at_b": qb == i1 and at_b, "pos": far + Vector2(1.6, 0.0)}, [])
+			q = qb
+
+
+func _draw_board(e: Dictionary) -> void:
+	var pz: Dictionary = e["pz"]
+	var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 1.45 * float(e["side"]), pz["z"])
+	var ink := Color(0.1, 0.1, 0.15)
+	var yellow := Color(1.0, 0.82, 0.12)
+	draw_line(b + Vector2(-16, 0), b + Vector2(-16, -14), ink, 2.0)
+	draw_line(b + Vector2(16, 0), b + Vector2(16, -14), ink, 2.0)
+	var r := Rect2(b + Vector2(-33, -38), Vector2(66, 25))
+	draw_rect(Rect2(r.position + Vector2(1, 1), r.size), Color(0, 0, 0, 0.3))
+	draw_rect(r, ink)
+	draw_rect(r.grow(-1.5), yellow if e["icon"] != "snow" else Color(0.85, 0.93, 1.0))
+	var ic := b + Vector2(-20, -25)
+	match e["icon"]:
+		"left", "right":
+			var m := -1.0 if e["icon"] == "left" else 1.0   # a U-turn arrow bending to that side
+			draw_polyline(PackedVector2Array([ic + Vector2(-m * 4, 7), ic + Vector2(-m * 4, -2), ic + Vector2(-m * 2, -5), ic + Vector2(m * 2, -5),
+				ic + Vector2(m * 4, -2), ic + Vector2(m * 4, 4)]), ink, 2.0)
+			draw_colored_polygon(PackedVector2Array([ic + Vector2(m * 4, 8), ic + Vector2(m * 7, 3), ic + Vector2(m * 1, 3)]), ink)
+		"up", "down":
+			var m := -1.0 if e["icon"] == "up" else 1.0
+			draw_colored_polygon(PackedVector2Array([ic + Vector2(-8, m * 5), ic + Vector2(8, m * 5), ic + Vector2(0, -m * 6)]), ink)
+			draw_colored_polygon(PackedVector2Array([ic + Vector2(-5, m * 4), ic + Vector2(5, m * 4), ic + Vector2(0, -m * 2)]), Color(1.0, 0.45, 0.1))
+		"tunnel":
+			draw_polyline(PackedVector2Array([ic + Vector2(-7, 7), ic + Vector2(-7, -1), ic + Vector2(-4, -5), ic + Vector2(4, -5), ic + Vector2(7, -1), ic + Vector2(7, 7)]), ink, 2.0)
+			draw_rect(Rect2(ic + Vector2(-3, 0), Vector2(6, 7)), ink)
+		"snow":
+			for a in 3:
+				var d := Vector2.from_angle(a * PI / 3.0) * 7.0
+				draw_line(ic - d, ic + d, Color(0.2, 0.4, 0.8), 1.5)
+	draw_string(font, b + Vector2(-9, -29), e["l1"], HORIZONTAL_ALIGNMENT_LEFT, -1, 7, ink)
+	draw_string(font, b + Vector2(-9, -19), e["l2"], HORIZONTAL_ALIGNMENT_LEFT, -1, 7, ink)
+
+
+func _draw_chevron(e: Dictionary) -> void:
+	var b := Iso.to_screen(e["pos"], e["z"])
+	var ink := Color(0.1, 0.1, 0.15)
+	draw_line(b, b + Vector2(0, -12), ink, 2.0)
+	var r := Rect2(b + Vector2(-7, -30), Vector2(14, 18))
+	draw_rect(r, ink)
+	draw_rect(r.grow(-1.0), Color(1.0, 0.82, 0.12))
+	var tdir := (Iso.to_screen((e["pos"] as Vector2) + (e["tan"] as Vector2) * 0.2, e["z"]) - b).normalized()
+	var perp := Vector2(-tdir.y, tdir.x)
+	var bc := b + Vector2(0, -21)
+	draw_polyline(PackedVector2Array([bc - tdir * 3.0 + perp * 4.0, bc + tdir * 3.0, bc - tdir * 3.0 - perp * 4.0]), ink, 2.0)
 
 
 func _put_fan(s: float, off: float, rng: RandomNumberGenerator) -> void:
@@ -550,6 +876,7 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 				chance *= 0.3
 			if f > 0.9:
 				chance = 0.0
+			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
 			if _rd(p) < 2.0 or _stream_d(x, y) < 1.0:
 				continue
@@ -560,9 +887,11 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 					kind = 3 if r2 < 0.3 else 4
 				elif r2 < 0.04:
 					kind = 5
-				_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.8, 1.4), "kind": kind}, [])
-			elif roll < chance + (0.09 if f > 0.85 else 0.015):
-				_put_static(3, {"pos": p, "z": z, "size": rng.randf_range(0.6, 1.5), "h": rng.randi()}, [])
+				if snow and kind != 5:
+					kind = 0 if kind != 1 else 1   # only firs hold on up here
+				_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.8, 1.4), "kind": kind, "snow": snow}, [])
+			elif roll < chance + (0.09 if f > 0.85 else 0.04 if snow else 0.015):
+				_put_static(3, {"pos": p, "z": z, "size": rng.randf_range(0.6, 1.5), "h": rng.randi(), "snow": snow}, [])
 
 
 func _build_stream_geometry() -> void:
@@ -613,7 +942,8 @@ func _build_road_geometry() -> void:
 			var f := fposmod(i * 0.618 + k * 0.29, 1.0)
 			var lat := fposmod(i * 0.377 + k * 0.53, 1.0) * 1.0 - 0.5
 			pebbles.append(Iso.to_screen(pa.lerp(pb, f) + ua * lat, lerpf(za, zb, f) + 0.6))
-		road_segs.append({"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2)})
+		var snow := _snow_cover(pa.x, pa.y, elev[i] * vz / peak)
+		road_segs.append({"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2), "snow": snow})
 		var d := _diag((pa + pb) * 0.5)
 		if not road_buckets.has(d):
 			road_buckets[d] = []
@@ -671,7 +1001,7 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 		for q in group:
 			var ss := s + rng.randf_range(-6.0, 6.0)
 			var p: Vector2 = _pose(ss, side * rng.randf_range(1.8, 4.2))["pos"]
-			if _rd(p) < 1.4:
+			if _rd(p) < 1.4 or _in_tunnel(ss, 14.0):
 				continue
 			animals.append({"kind": kind, "pos": p, "home": p, "s": ss, "side": side, "state": "idle", "t": rng.randf() * 3.0,
 				"face": 1.0 if rng.randf() < 0.5 else -1.0, "vel": Vector2.ZERO, "phase": rng.randf() * TAU, "run": false,
@@ -748,6 +1078,38 @@ func _build_riders() -> void:
 # Pose helpers
 # ---------------------------------------------------------------------
 
+## Heads-up for the player: tunnels go see-through while you are in them, and toasts call out hairpins, tunnels, steep
+## ramps, descents and the snow line before you get there.
+func _course_notices(delta: float) -> void:
+	if riders.is_empty():
+		return
+	var s: float = riders[0]["s"]
+	for t in tunnels:
+		var inside: bool = s > float(t["s0"]) - 12.0 and s < float(t["s1"]) + 6.0
+		t["a"] = move_toward(float(t["a"]), 0.3 if inside else 1.0, delta * 2.5)
+		if not t["called"] and s > float(t["s0"]) - 120.0 and s < float(t["s0"]):
+			t["called"] = true
+			Game.toast.emit("TUNNEL ahead: %d m of dark road, lights on!" % int(float(t["s1"]) - float(t["s0"])), Color(1.0, 0.85, 0.4))
+	if countdown > 0.0 or over:
+		return
+	for h in hairpins:
+		if not h["called"] and s > float(h["s"]) - 120.0 and s < float(h["s"]):
+			h["called"] = true
+			Game.toast.emit("SWITCHBACK %d of %d: sharp %s ahead!" % [h["n"], hairpins.size(), "LEFT" if h["left"] else "RIGHT"], Color(1.0, 0.9, 0.2))
+	for r in ramps:
+		if not r["called"] and s > float(r["s0"]) - 45.0 and s < float(r["s0"]):
+			r["called"] = true
+			if r["up"]:
+				Game.toast.emit("STEEP RAMP: %d%% for %d m. Dig in!" % [roundi(float(r["g"]) * 100.0), int(float(r["s1"]) - float(r["s0"]))], Color(1.0, 0.5, 0.2))
+			else:
+				Game.toast.emit("FAST DROP: %d%% downhill. Let it fly!" % roundi(float(r["g"]) * 100.0), Color(0.5, 0.9, 1.0))
+	if not snow_called:
+		var p: Vector2 = _pose(s, 0.0)["pos"]
+		if _snow_cover(p.x, p.y, _tz(p) / peak) > 0.5:
+			snow_called = true
+			Game.toast.emit("SNOW LINE! It is cold up here, even in summer.", Color(0.8, 0.92, 1.0))
+
+
 func _fi(s: float) -> float:
 	return clampf(s / ds_m, 0.0, M - 1.0)
 
@@ -818,6 +1180,7 @@ func _process(delta: float) -> void:
 		if pops[i]["t"] <= 0.0:
 			pops.remove_at(i)
 	kick_t = maxf(0.0, kick_t - delta)
+	_course_notices(delta)
 	var me: Dictionary = riders[0]
 	var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"]) + (0.06 if kick_t > 0.0 else 0.0) + (0.03 if me["wet"] else 0.0)
 	Trainer.send_grade(g * 100.0 if countdown <= 0.0 and not over else 0.0)
@@ -1349,6 +1712,19 @@ func debug_spots() -> Array:
 			if a["kind"] == want and (want != "deer" or a["cross"]):
 				out.append(float(a["s"]) - (2.0 if want == "bear" else (16.0 if want == "deer" else 4.0)))
 				break
+	for h in hairpins.slice(0, 1):
+		out.append(float(h["s"]) - 60.0)
+		out.append(float(h["s"]))
+	for t in tunnels.slice(0, 1):
+		out.append(float(t["s0"]) - 40.0)
+		out.append((float(t["s0"]) + float(t["s1"])) * 0.5)
+		out.append(float(t["s1"]) + 10.0)
+	for r in ramps.slice(0, 1):
+		out.append(float(r["s0"]) - 5.0)
+	for q in M:   # the first place with snow
+		if _snow_cover(pts[q].x, pts[q].y, elev[q] * vz / peak) > 0.6:
+			out.append(s_m[q] + 30.0)
+			break
 	out.append(float(course["length"]) - 25.0)
 	out.append(float(course["length"]) + 150.0)   # out on the run-out
 	return out
@@ -1451,10 +1827,11 @@ func _draw() -> void:
 				var e: PackedVector2Array = seg["edge"]
 				if not big.has_point(e[0]):
 					continue
-				draw_colored_polygon(e, Color(0.5, 0.42, 0.33))
-				draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52).lerp(Season.SNOW, 0.3 if Season.bare() else 0.0), seg["shade"]))
+				var sn: float = maxf(float(seg["snow"]) * 0.6, 0.3 if Season.bare() else 0.0)
+				draw_colored_polygon(e, Color(0.5, 0.42, 0.33).lerp(Color(0.7, 0.74, 0.8), sn))
+				draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52).lerp(Season.SNOW, sn), seg["shade"]))
 				for rut in seg["ruts"]:
-					draw_colored_polygon(rut, Color(0.6, 0.52, 0.42))
+					draw_colored_polygon(rut, Color(0.6, 0.52, 0.42).lerp(Color(0.62, 0.66, 0.74), sn))
 				var pi_ := 0
 				for pb in seg["pebbles"]:
 					draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
@@ -1474,6 +1851,7 @@ func _draw() -> void:
 					2: _draw_deco(it[1])
 					3: _draw_rock(it[1])
 					4: _draw_obstacle(it[1])
+					6: _draw_tunnel_piece(it[1])
 		if buckets.has(d):
 			for it in buckets[d]:
 				match it[0]:
@@ -1481,6 +1859,7 @@ func _draw() -> void:
 					1: _draw_animal(it[1])
 					2: _draw_giver(it[1], it[2])
 	_draw_birds(me_pos)
+	_draw_flurries(vr, _snow_cover(me_pos.x, me_pos.y, _tz(me_pos) / peak))
 	for fz in frisbees:
 		var ra: Dictionary = riders[int(fz["from"])]
 		var rb: Dictionary = riders[int(fz["to"])]
@@ -1515,6 +1894,19 @@ func _draw() -> void:
 		draw_string(font, c + Vector2(-150, -30), txt, HORIZONTAL_ALIGNMENT_CENTER, 300.0, sz, Color(1.0, 0.9, 0.2))
 
 
+## Snowflakes drifting across the screen once you are up in the snow.
+func _draw_flurries(vr: Rect2, cover: float) -> void:
+	if cover < 0.25:
+		return
+	var n := int(70.0 * cover)
+	for k in n:
+		var h := float((k * 7919) % 1000) / 1000.0
+		var h2 := float((k * 104729) % 997) / 997.0
+		var x := fposmod(h * vr.size.x + t_ * (10.0 + 14.0 * h2) + sin(t_ * 0.8 + k) * 12.0, vr.size.x)
+		var y := fposmod(h2 * vr.size.y + t_ * (22.0 + 30.0 * h), vr.size.y)
+		draw_rect(Rect2(vr.position + Vector2(x, y), Vector2(2, 2) if k % 3 == 0 else Vector2(1, 1)), Color(1, 1, 1, 0.55 + 0.35 * h))
+
+
 func _diag(p: Vector2) -> int:
 	return clampi(floori(p.x - ox) + floori(p.y - oy), 0, gw + gh - 2)
 
@@ -1536,12 +1928,17 @@ func _draw_sky(vr: Rect2) -> void:
 func _cell_detail(i: int, j: int, center: Vector2, kind: int, col: Color) -> void:
 	var h := ((i * 73856093) ^ (j * 19349663)) & 0x7fffffff
 	var o := Vector2(float(h % 17) - 8.0, float((h >> 5) % 9) - 4.0)
-	if Season.bare():
+	if Season.bare() and kind != 4:
 		if kind != 3 and h % 3 == 0:   # sparkles on the snow
 			draw_rect(Rect2(center + o, Vector2(1, 1)), Color(1, 1, 1))
 		if kind != 3:
 			return
 	match kind:
+		4:
+			if h % 4 == 0:   # sparkles and wind-blown drifts
+				draw_rect(Rect2(center + o, Vector2(1, 1)), Color(1, 1, 1))
+			if h % 7 == 0:
+				draw_line(center - o, center - o + Vector2(5, 1), Iso.shade(col, 0.9), 1.0)
 		1:
 			if Season.is_("fall") and h % 2 == 0:
 				draw_rect(Rect2(center - o, Vector2(2, 1)), Season.FALL_LEAVES[(h >> 3) % 4])
@@ -1581,11 +1978,11 @@ func _flowers(center: Vector2, h: int) -> void:
 
 func _draw_tree(t: Dictionary) -> void:
 	var base := Iso.to_screen(t["pos"], t["z"])
-	Flora.tree(self, base, t["s"], {1: "pine_light", 3: "oak", 4: "birch", 5: "snag"}.get(int(t["kind"]), "pine"))
+	Flora.tree(self, base, t["s"], {1: "pine_light", 3: "oak", 4: "birch", 5: "snag"}.get(int(t["kind"]), "pine"), t.get("snow", false))
 
 
 func _draw_rock(r: Dictionary) -> void:
-	Flora.rock(self, Iso.to_screen(r["pos"], r["z"]), r["size"], r["h"])
+	Flora.rock(self, Iso.to_screen(r["pos"], r["z"]), r["size"], r["h"], r.get("snow", false))
 
 
 func _draw_deco(e: Dictionary) -> void:
@@ -1602,6 +1999,10 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 1.1, pz["z"])
 			Sprites.draw_image(self, "scenery_sign_marker", b)
 			draw_string(font, b + Vector2(-24, -33), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 48.0, 8, Color(0.1, 0.1, 0.15))
+		"board":
+			_draw_board(e)
+		"chevron":
+			_draw_chevron(e)
 		"warn":
 			var pz: Dictionary = e["pz"]
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))

@@ -820,6 +820,7 @@ func _debug_race_shot() -> void:
 		gmax = maxf(gmax, g)
 	print("COURSE %s: %.0f m, gain %.0f m, grade %+.1f%% to %+.1f%%, %d obstacles" % [race.course["name"], race.course["length"],
 		race.gain, gmin * 100.0, gmax * 100.0, race.obstacles.size()])
+	print("  %d hairpins, %d tunnels, %d steep/drop stretches" % [race.hairpins.size(), race.tunnels.size(), race.ramps.size()])
 	var spots: Array = race.debug_spots()
 	for k in spots.size():
 		race.debug_place(spots[k])

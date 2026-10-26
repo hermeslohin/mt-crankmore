@@ -7,12 +7,13 @@ const TREE_SCALE := 0.9   # the pictures are drawn a little smaller than they we
 
 
 ## A tree of `species` ("pine", "pine_light", "oak", "birch", "snag") at `base`, `s` times its usual size:
-## snow-laden firs and bare trees in winter, blossom in spring, red and gold in fall.
-static func tree(ci: CanvasItem, base: Vector2, s: float, species: String) -> void:
+## snow-laden firs and bare trees in winter (or snow-laden firs wherever `snowy`: up the mountain), blossom in spring,
+## red and gold in fall.
+static func tree(ci: CanvasItem, base: Vector2, s: float, species: String, snowy := false) -> void:
 	var name := "scenery_snag_dead"
 	match species:
 		"pine", "pine_light":
-			name = "scenery_pine_snowy" if Season.bare() else ("scenery_pine_light" if species == "pine_light" else "scenery_pine_green")
+			name = "scenery_pine_snowy" if Season.bare() or snowy else ("scenery_pine_light" if species == "pine_light" else "scenery_pine_green")
 		"oak":
 			name = "scenery_oak_bare" if Season.bare() else ("scenery_oak_fall" if Season.is_("fall") else ("scenery_oak_blossom" if Season.is_("spring") else "scenery_oak_summer"))
 		"birch":
@@ -21,8 +22,8 @@ static func tree(ci: CanvasItem, base: Vector2, s: float, species: String) -> vo
 
 
 ## A boulder: `size` is its scale, `h` a hash that picks the look (some are mossy; all are snowy in winter).
-static func rock(ci: CanvasItem, base: Vector2, size: float, h: int) -> void:
-	var name := "scenery_rock_snowy" if Season.bare() else ("scenery_rock_mossy" if h % 4 == 0 else "scenery_rock_grey")
-	if size < 0.8 and not Season.bare():
+static func rock(ci: CanvasItem, base: Vector2, size: float, h: int, snowy := false) -> void:
+	var name := "scenery_rock_snowy" if Season.bare() or snowy else ("scenery_rock_mossy" if h % 4 == 0 else "scenery_rock_grey")
+	if size < 0.8 and not Season.bare() and not snowy:
 		name = "scenery_rock_small"
 	Sprites.draw_image(ci, name, base, h % 2 == 0, 1.0, clampf(size, 0.6, 1.4))

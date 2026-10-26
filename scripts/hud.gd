@@ -534,6 +534,17 @@ func _draw_race_profile(mr: Rect2) -> void:
 		pts.append(pr.position + Vector2(race.s_m[i] / length * pr.size.x, pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0)))
 	pts.append(pr.position + pr.size)
 	draw_colored_polygon(pts, Color(0.72, 0.62, 0.45))
+	# the snowy stretches get a white cap, tunnels a dark bar, hairpins a yellow tick
+	for i in range(0, race.M, 5):
+		if race.s_m[i] > length:
+			break
+		if race._snow_cover(race.pts[i].x, race.pts[i].y, race.elev[i] * race.vz / race.peak) > 0.5:
+			draw_rect(Rect2(floorf(pr.position.x + race.s_m[i] / length * pr.size.x), pr.position.y + pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0) - 1.0, 2, 2), Color(1, 1, 1))
+	for t in race.tunnels:
+		var tx: float = pr.position.x + float(t["s0"]) / length * pr.size.x
+		draw_rect(Rect2(floorf(tx), pr.position.y + pr.size.y - 7, maxf(2.0, floorf((float(t["s1"]) - float(t["s0"])) / length * pr.size.x)), 3), Color(0.15, 0.15, 0.25))
+	for h in race.hairpins:
+		draw_rect(Rect2(floorf(pr.position.x + float(h["s"]) / length * pr.size.x), pr.position.y + 1, 1, 4), Color(1.0, 0.85, 0.1))
 	# creeks, jumps and fallen trees on the profile
 	for ob in race.obstacles:
 		var ox: float = pr.position.x + float(ob["s"]) / length * pr.size.x

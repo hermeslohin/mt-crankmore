@@ -989,13 +989,13 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 		"sled":
 			var u: float = a.get("u", 0.0)
 			var alpha := clampf(minf(u, 1.0 - u) * 10.0, 0.0, 1.0)
-			if not Sprites.draw_vehicle(ci, "obj_sled_kid", ground, a["face"], Color(1, 1, 1, alpha)):
+			if not Sprites.draw_vehicle(ci, "obj_sled_kid", ground, a["face"], Color(1, 1, 1, alpha), 0, a):
 				var look := Sprites.cast(a["look"], KIDS)
 				if look != "":
 					ci.draw_rect(Rect2(ground + Vector2(-7, -3), Vector2(14, 4)), Color(0.8, 0.2, 0.15, alpha))
 					Sprites.draw_person(ci, "ped_%s_walk" % look, ground + Vector2(0, -3), a["face"], 0.0, 0.0, Color(1, 1, 1, alpha))
 		"cart":
-			if not Sprites.draw_vehicle(ci, "obj_shopping_cart", ground, Vector2.from_angle(float(a["spin"]))):
+			if not Sprites.draw_vehicle(ci, "obj_shopping_cart", ground, Vector2.from_angle(float(a["spin"])), Color.WHITE, 0, a):
 				ci.draw_rect(Rect2(ground + Vector2(-6, -10), Vector2(12, 8)), Color(0.75, 0.78, 0.82), false, 1.0)
 				ci.draw_line(ground + Vector2(-6, -10), ground + Vector2(-9, -14), Color(0.3, 0.3, 0.35), 1.0)
 				ci.draw_circle(ground + Vector2(-4, -1), 1.5, Iso.OUTLINE)

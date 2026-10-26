@@ -357,6 +357,15 @@ const TURN_FADE := 0.15   # seconds
 static var _rider_turns := {}
 
 
+## A lasting turn dictionary for something drawn by name with nowhere of its own to keep it (one of a kind in a
+## scene: the TV moto, the snowcat...), for draw_vehicle / draw_person's `state`.
+static func turn_state(key: String) -> Dictionary:
+	if not _named_turns.has(key):
+		_named_turns[key] = {}
+	return _named_turns[key]
+static var _named_turns := {}
+
+
 static func turn_rows(st: Dictionary, w: Vector2) -> Array:
 	var want := dir_row(w)
 	if st.is_read_only():

@@ -746,7 +746,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			_draw_fire(ci, a, ground, ph)
 		"stretcher":
 			var loaded: bool = a.get("load", false)
-			if not Sprites.draw_vehicle(ci, "obj_stretcher_patient" if loaded else "obj_stretcher_empty", ground, a["face"]):
+			if not Sprites.draw_vehicle(ci, "obj_stretcher_patient" if loaded else "obj_stretcher_empty", ground, a["face"], Color.WHITE, 0, a):
 				# no art: a little wheeled bed, red blanket on it when someone's aboard
 				var f: Vector2 = a["face"]
 				var n := Vector2(-f.y, f.x)

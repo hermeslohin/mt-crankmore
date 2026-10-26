@@ -3655,7 +3655,7 @@ func _draw_lake(vr: Rect2) -> void:
 		var p := LAKE + Vector2(cos(a), sin(a)) * _lake_r(a) * float(b["rf"])
 		var s := Iso.to_screen(p) + Vector2(0, sin(t_ * 2.0 + a) * 1.5)
 		var heading := Vector2(-sin(a), cos(a)) * signf(float(b["w"]))
-		Sprites.draw_vehicle(self, "obj_rowboat" if PIZZA_COLORS.find(b["col"]) % 2 == 0 else "obj_canoe", s, heading, Color.WHITE.lerp(b["col"], 0.25))
+		Sprites.draw_vehicle(self, "obj_rowboat" if PIZZA_COLORS.find(b["col"]) % 2 == 0 else "obj_canoe", s, heading, Color.WHITE.lerp(b["col"], 0.25), 0, b)
 
 
 func _draw_roads(vr: Rect2) -> void:

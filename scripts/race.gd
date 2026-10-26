@@ -620,6 +620,17 @@ func _build_road_geometry() -> void:
 		road_buckets[d].append(i)
 
 
+## What each kind of animal does (see _step_animals): the skittish ones bolt when a rider gets close, some dash across
+## the course, others stand and watch, and deer-like animals come in small herds.
+const FLEERS := ["deer", "fox", "squirrel", "rabbit", "elk", "wolf", "raccoon", "hedgehog", "chipmunk", "skunk"]
+const SMALL_FLEERS := ["squirrel", "rabbit", "hedgehog", "chipmunk", "skunk"]
+const CROSSERS := ["deer", "fox", "squirrel", "elk", "wolf", "raccoon"]
+const WATCHERS := {"goat": "MEHH!", "marmot": "EEP!", "moose": "HRRMPH", "bighorn": "BAAH!", "badger": "HISS!"}
+const HERDERS := ["deer", "goat", "elk", "bighorn"]
+const LITTLE := ["rabbit", "squirrel", "marmot", "hedgehog", "chipmunk", "skunk"]
+const FLEE_SPEED := {"deer": 4.0, "fox": 3.5, "rabbit": 3.0, "squirrel": 2.5, "elk": 4.0, "wolf": 3.8, "raccoon": 3.0, "hedgehog": 2.0, "chipmunk": 3.0, "skunk": 2.5}
+const CROSS_SPEED := {"deer": 4.5, "fox": 4.0, "squirrel": 3.0, "elk": 4.5, "wolf": 4.2, "raccoon": 3.4}
+
 ## Wildlife along the course. Deer, foxes and squirrels may dash across in front of you, bears give chase,
 ## goats and marmots watch from the rocks, moose wade by the creeks.
 func _build_animals(rng: RandomNumberGenerator) -> void:
@@ -634,23 +645,26 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 		if s - last_bear > 1200.0 and f < 0.85:
 			kind = "bear"
 		elif _near_ford(s, 45.0) and rng.randf() < 0.5:
-			kind = "moose"
+			kind = "moose" if rng.randf() < 0.5 else "elk"
 		elif f > 0.75:
-			kind = "goat" if r < 0.35 else ("marmot" if r < 0.65 else ("bear" if r < 0.8 else "deer"))
+			kind = "goat" if r < 0.25 else ("marmot" if r < 0.45 else ("bighorn" if r < 0.65 else ("badger" if r < 0.8 else ("bear" if r < 0.9 else "deer"))))
 		else:
-			for w in [["deer", 0.3], ["bear", 0.12], ["rabbit", 0.15], ["squirrel", 0.16], ["fox", 0.1], ["moose", 0.06], ["goat", 0.11]]:
+			for w in [["deer", 0.2], ["bear", 0.1], ["rabbit", 0.1], ["squirrel", 0.1], ["fox", 0.07], ["moose", 0.05], ["goat", 0.08], ["elk", 0.1],
+					["wolf", 0.05], ["raccoon", 0.05], ["hedgehog", 0.04], ["chipmunk", 0.04], ["skunk", 0.04]]:
 				r -= float(w[1])
 				if r <= 0.0:
 					kind = w[0]
 					break
 			if kind == "":
 				kind = "deer"
+		if Sprites.sheet("animal_%s_idle" % kind) == null:
+			kind = "deer"   # no art for this one (yet)
 		if kind == "bear":
 			last_bear = s
 		var group := 1
-		if kind in ["deer", "goat"]:
+		if kind in HERDERS:
 			group = rng.randi_range(1, 3)
-		elif kind in ["rabbit", "squirrel", "marmot"]:
+		elif kind in LITTLE:
 			group = rng.randi_range(1, 2)
 		var side := 1.0 if rng.randf() < 0.5 else -1.0
 		for q in group:
@@ -660,7 +674,7 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 				continue
 			animals.append({"kind": kind, "pos": p, "home": p, "s": ss, "side": side, "state": "idle", "t": rng.randf() * 3.0,
 				"face": 1.0 if rng.randf() < 0.5 else -1.0, "vel": Vector2.ZERO, "phase": rng.randf() * TAU, "run": false,
-				"cross": kind in ["deer", "fox", "squirrel"] and q == 0 and rng.randf() < 0.5, "stag": rng.randf() < 0.45,
+				"cross": kind in CROSSERS and q == 0 and rng.randf() < 0.5, "stag": rng.randf() < 0.45,
 				"dark": rng.randf() < 0.35, "done": false})
 		s += rng.randf_range(80.0, 150.0)
 
@@ -1124,10 +1138,10 @@ func _step_animals(delta: float) -> void:
 			"idle":
 				a["run"] = false
 				if not a["done"] and countdown <= 0.0:
-					if kind in ["deer", "fox", "squirrel", "rabbit"]:
+					if kind in FLEERS:
 						if a["cross"] and ds < 22.0 and ds > 2.0:
 							_animal_cross(a)
-						elif ds < (5.0 if kind in ["squirrel", "rabbit"] else 9.0) and ds > -3.0:
+						elif ds < (5.0 if kind in SMALL_FLEERS else 9.0) and ds > -3.0:
 							_animal_flee(a, 1.4)
 					elif kind == "bear" and ds < 4.0 and ds > -4.0 and not me["done"]:
 						a["state"] = "chase"
@@ -1137,9 +1151,9 @@ func _step_animals(delta: float) -> void:
 						_pop_at(a["pos"], "ROAR!", Color(1.0, 0.4, 0.3))
 						Game.toast.emit("BEAR! PEDAL!!", Color(1.0, 0.45, 0.3))
 						Talk.say_random("race_bear", true)
-					elif kind in ["goat", "marmot", "moose"] and absf(ds) < 6.0:
+					elif WATCHERS.has(kind) and absf(ds) < 6.0:
 						a["done"] = true
-						_pop_at(a["pos"], {"goat": "MEHH!", "marmot": "EEP!", "moose": "HRRMPH"}[kind], Color(1, 1, 1))
+						_pop_at(a["pos"], WATCHERS[kind], Color(1, 1, 1))
 				if a["state"] == "idle" and float(a["t"]) <= 0.0:
 					a["t"] = randf_range(2.0, 5.0)
 					var home: Vector2 = a["home"]
@@ -1203,24 +1217,24 @@ func _face(a: Dictionary, dir: Vector2) -> void:
 
 func _animal_cross(a: Dictionary) -> void:
 	var target: Vector2 = _pose(float(a["s"]) + 2.0, -float(a["side"]) * 3.2)["pos"]
-	var speed: float = {"deer": 4.5, "fox": 4.0, "squirrel": 3.0}.get(a["kind"], 3.5)
+	var speed: float = CROSS_SPEED.get(a["kind"], 3.5)
 	a["state"] = "cross"
 	a["vel"] = (target - a["pos"]).normalized() * speed
 	a["t"] = (a["pos"] as Vector2).distance_to(target) / speed
 	a["done"] = true
-	if a["kind"] == "deer":
-		_pop_at(a["pos"], "DEER!", Color(1.0, 0.85, 0.5))
+	if a["kind"] in ["deer", "elk"]:
+		_pop_at(a["pos"], "DEER!" if a["kind"] == "deer" else "ELK!", Color(1.0, 0.85, 0.5))
 		if randf() < 0.35:
 			Talk.say_random("race_wildlife")
-	elif a["kind"] == "fox":
-		_pop_at(a["pos"], "FOX!", Color(1.0, 0.6, 0.3))
+	elif a["kind"] in ["fox", "wolf"]:
+		_pop_at(a["pos"], "FOX!" if a["kind"] == "fox" else "WOLF!", Color(1.0, 0.6, 0.3))
 
 
 func _animal_flee(a: Dictionary, dur: float) -> void:
 	var away: Vector2 = _pose(a["s"], float(a["side"]))["n"] * float(a["side"])
 	if a["state"] == "cross":
 		away = (a["vel"] as Vector2).normalized()
-	var speed: float = {"deer": 4.0, "fox": 3.5, "rabbit": 3.0, "squirrel": 2.5}.get(a["kind"], 3.0)
+	var speed: float = FLEE_SPEED.get(a["kind"], 3.0)
 	a["state"] = "flee"
 	a["vel"] = (away + Vector2.from_angle(randf() * TAU) * 0.3).normalized() * speed
 	a["t"] = dur
@@ -1592,7 +1606,7 @@ func _draw_deco(e: Dictionary) -> void:
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))
 		"fan":
 			var b := Iso.to_screen(e["pos"], e["z"])
-			var design: String = Sprites.PEDESTRIANS[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.PEDESTRIANS.size()]
+			var design: String = Sprites.pedestrians()[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.pedestrians().size()]
 			Sprites.draw_strip(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37, 10.0)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
@@ -1623,7 +1637,7 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(e["pos"], e["z"])
 			Sprites.draw_image(self, "scenery_picnic_red" if int((e["pos"] as Vector2).x) % 2 == 0 else "scenery_picnic_blue", b + Vector2(0, 12))
 			for side in [-1.0, 1.0]:   # two spectators sitting by the blanket, waving
-				Sprites.draw_strip(self, "ped_%s_cheer" % Sprites.PEDESTRIANS[(int((e["pos"] as Vector2).x) + (0 if side > 0 else 3)) % Sprites.PEDESTRIANS.size()], b + Vector2(side * 22.0, 8), t_ + side, 10.0)
+				Sprites.draw_strip(self, "ped_%s_cheer" % Sprites.pedestrians()[(int((e["pos"] as Vector2).x) + (0 if side > 0 else 3)) % Sprites.pedestrians().size()], b + Vector2(side * 22.0, 8), t_ + side, 10.0)
 		"kite":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			var ph: float = e["ph"]
@@ -1681,7 +1695,8 @@ func _shadow(c: Vector2, w: float) -> void:
 
 
 ## Shadow width (px) under each animal, about its body length.
-const ANIMAL_SHADOW := {"bear": 24.0, "deer": 22.0, "moose": 26.0, "goat": 14.0, "marmot": 9.0, "rabbit": 9.0, "squirrel": 9.0, "fox": 17.0}
+const ANIMAL_SHADOW := {"bear": 24.0, "deer": 22.0, "moose": 26.0, "goat": 14.0, "marmot": 9.0, "rabbit": 9.0, "squirrel": 9.0, "fox": 17.0,
+	"elk": 26.0, "wolf": 18.0, "raccoon": 12.0, "hedgehog": 8.0, "chipmunk": 8.0, "skunk": 10.0, "bighorn": 18.0, "badger": 13.0}
 
 
 ## An animal from its sheets (art/animal_<kind>_idle.png and _run.png; the bear also _roar.png), facing right and
@@ -1694,7 +1709,7 @@ func _draw_animal(a: Dictionary) -> void:
 	if kind == "bear" and a["state"] == "roar":
 		look = "roar"
 	var tint := Color(0.5, 0.46, 0.46) if kind == "bear" and a["dark"] else Color.WHITE
-	_shadow(base, ANIMAL_SHADOW[kind])
+	_shadow(base, ANIMAL_SHADOW.get(kind, 14.0))
 	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t_ + float(a["phase"]), 14.0 if look == "run" else 8.0, true, float(a["face"]) < 0.0, tint)
 
 

@@ -21,8 +21,19 @@ const FALL_FPS := 10.0   # fall frames per second; the last frame is held while 
 const STRIP_FEET_MARGIN := 4.0   # pixels below the feet in a strip frame (see tools/import_sprite.gd)
 const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above its spot on the ground
 
-## The pedestrian designs (art/ped_<design>_walk.png and _cheer.png): the townsfolk, spectators and joggers.
-const PEDESTRIANS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady"]
+## Every pedestrian design there may be art for (art/ped_<design>_walk.png and _cheer.png): the townsfolk, spectators
+## and joggers. pedestrians() lists the ones that are actually there.
+const PEDESTRIAN_DESIGNS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician"]
+static var _peds: Array = []
+
+
+static func pedestrians() -> Array:
+	if _peds.is_empty():
+		_peds = PEDESTRIAN_DESIGNS.filter(func(d): return sheet("ped_%s_walk" % d) != null and sheet("ped_%s_cheer" % d) != null)
+		if _peds.is_empty():
+			_peds = ["kid"]
+	return _peds
+
 
 ## True in cold weather (see Season.cold): characters then use their winter sheets (art/winter_<name>.png: hat, gloves
 ## and a jacket) when there is one.
@@ -65,6 +76,7 @@ static func outfit(sheet_name: String) -> Texture2D:
 ## Forget loaded art (after new files were dropped in).
 static func reload() -> void:
 	_cache.clear()
+	_peds = []
 
 
 ## The row for a world heading (unit vector, world tiles).

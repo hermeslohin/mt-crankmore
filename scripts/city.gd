@@ -62,7 +62,12 @@ const VEHICLE_DIMS := {
 	"sedan_sports_red": [0.55, 0.3, 2.8, 3.8], "sedan_luxury_navy": [0.6, 0.3, 2.2, 3.0], "sedan_taxi": [0.55, 0.3, 2.4, 3.4],
 	"sedan_retro_teal": [0.5, 0.29, 2.0, 2.8], "sedan_police": [0.55, 0.3, 2.6, 3.6], "sedan_wagon_green": [0.6, 0.3, 2.0, 2.8],
 	"truck_pickup_red": [0.7, 0.32, 2.2, 3.0], "truck_snowplow": [0.85, 0.36, 1.8, 2.5], "truck_flatbed_green": [0.9, 0.34, 1.8, 2.5],
-	"van_camper": [0.65, 0.32, 2.0, 2.8], "van_ambulance": [0.65, 0.32, 2.4, 3.4]}
+	"van_camper": [0.65, 0.32, 2.0, 2.8], "van_ambulance": [0.65, 0.32, 2.4, 3.4],
+	"sedan_pink_convertible": [0.55, 0.3, 2.2, 3.2], "sedan_limo": [0.8, 0.3, 2.0, 2.8], "sedan_electric_lime": [0.5, 0.29, 2.4, 3.4],
+	"sedan_hotrod_orange": [0.55, 0.3, 3.0, 4.0], "sedan_beetle_yellow": [0.5, 0.29, 2.0, 2.8], "sedan_microcar_sky": [0.4, 0.26, 2.0, 3.0],
+	"truck_firetruck": [0.9, 0.36, 2.4, 3.2], "truck_garbage": [0.9, 0.36, 1.6, 2.2], "truck_icecream": [0.8, 0.34, 1.8, 2.4],
+	"truck_tow": [0.8, 0.34, 2.2, 3.0], "truck_tractor": [0.6, 0.32, 1.1, 1.7], "van_school_bus": [1.05, 0.36, 1.8, 2.4],
+	"van_mail": [0.65, 0.32, 2.2, 3.0], "van_foodtruck": [0.8, 0.34, 1.6, 2.2], "van_minivan_purple": [0.65, 0.32, 2.2, 3.0]}
 const PAINTED_VEHICLES := ["car", "truck"]
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]
 const ER_JOKES := [
@@ -1286,9 +1291,11 @@ func _route(from: Vector2, to: Vector2, off: Vector2) -> Array:
 
 func _spawn_cars() -> void:
 	# light traffic spread over the longer roads (about one car per 100 tiles of road)
-	var kinds := ["car", "sedan_sports_red", "truck", "sedan_taxi", "motorcycle", "van_camper", "sedan_luxury_navy", "truck_pickup_red",
-		"sedan_retro_teal", "car", "truck_snowplow", "sedan_police", "van_ambulance", "sedan_wagon_green", "truck_flatbed_green",
-		"motorcycle", "car", "sedan_taxi"]
+	# a random mix of every kind of vehicle that has art, different each game
+	var pool: Array = VEHICLE_DIMS.keys().filter(func(k): return Sprites.sheet("vehicle_%s" % k) != null)
+	var kinds: Array = []
+	for k in 24:
+		kinds.append(pool[randi() % pool.size()])
 	var long_roads: Array = []
 	for ri in roads.size():
 		if float(roads[ri]["len"]) > 25.0:
@@ -1330,7 +1337,7 @@ func _spawn_life() -> void:
 	for k in 16:
 		var a := randf() * TAU
 		peds.append({"pos": PLAZA + Vector2(cos(a), sin(a)) * randf_range(2.6, 6.0), "target": PLAZA, "col": shirts[k % shirts.size()],
-			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": k % Sprites.PEDESTRIANS.size(), "face": Vector2(1, 1),
+			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": k % Sprites.pedestrians().size(), "face": Vector2(1, 1),
 			"cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
 	# townsfolk strolling the pavements all over town
 	var made := 0
@@ -1349,7 +1356,7 @@ func _spawn_life() -> void:
 			continue
 		peds.append({"pos": pos, "road": ri, "s": ps, "dir": 1.0 if randf() < 0.5 else -1.0, "side": side, "speed": randf_range(0.4, 0.7),
 			"col": shirts[randi() % shirts.size()], "hair": hairs[randi() % hairs.size()], "skin": skins[randi() % skins.size()],
-			"t": randf_range(5.0, 20.0), "phase": randf() * TAU, "look": randi() % Sprites.PEDESTRIANS.size(), "face": Vector2(1, 1), "cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
+			"t": randf_range(5.0, 20.0), "phase": randf() * TAU, "look": randi() % Sprites.pedestrians().size(), "face": Vector2(1, 1), "cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
 		made += 1
 	# 1 in 8 of them hand out power-ups to whoever rides past
 	var idx := range(peds.size())
@@ -2800,7 +2807,7 @@ func _draw_building(b: Dictionary) -> void:
 		_label(b["name"], Iso.to_screen(center, b["h"] + b["roof_h"] + 14.0), 9 if always else 8, col)
 
 
-const CHALET_DESIGNS := 16   # art/building_chalet_01.png ... _16.png
+var _chalet_designs := 0   # how many art/building_chalet_NN.png there are (counted on first use)
 
 ## The picture for a building (art/building_*.png), or "" to draw it in code. Every named building has its own design;
 ## the chalets pick one of CHALET_DESIGNS. Cached in the building.
@@ -2818,7 +2825,11 @@ func _building_art(b: Dictionary) -> String:
 		"pizza", "bike", "shop", "hotel", "condo":
 			art = "building_" + _shop_slug(str(b["name"]).trim_suffix(" II"))
 		"chalet":
-			art = "building_chalet_%02d" % (1 + int(absf(float(b["key"])) * 13.0) % CHALET_DESIGNS)
+			if _chalet_designs == 0:
+				while Sprites.sheet("building_chalet_%02d" % (_chalet_designs + 1)) != null:
+					_chalet_designs += 1
+				_chalet_designs = maxi(_chalet_designs, 1)
+			art = "building_chalet_%02d" % (1 + int(absf(float(b["key"])) * 13.0) % _chalet_designs)
 	if art != "" and Sprites.sheet(art) == null:
 		art = ""
 	b["art"] = art
@@ -3056,8 +3067,8 @@ func _draw_ped(p: Dictionary) -> void:
 	var ground := Iso.to_screen(p["pos"])
 	var cheering: bool = p["cheer"] > 0.0
 	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
-	var look := int(p.get("look", int(absf(p["pos"].x * 7.0 + p["pos"].y * 3.0)))) % Sprites.PEDESTRIANS.size()
-	var design: String = Sprites.PEDESTRIANS[look]
+	var look := int(p.get("look", int(absf(p["pos"].x * 7.0 + p["pos"].y * 3.0)))) % Sprites.pedestrians().size()
+	var design: String = Sprites.pedestrians()[look]
 	if cheering:
 		Sprites.draw_strip(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0, 10.0)
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))

@@ -189,7 +189,10 @@ static func sheet(sheet_name: String) -> Texture2D:
 		if tex != null:
 			break
 	_cache[sheet_name] = tex
+	if tex != null:
+		_names[tex] = sheet_name
 	return tex
+static var _names := {}   # texture -> the sheet name it was loaded as
 
 
 ## The sheet for a person or rider: the winter version in cold weather if there is one, else the usual one.
@@ -204,6 +207,7 @@ static func outfit(sheet_name: String) -> Texture2D:
 ## Forget loaded art (after new files were dropped in).
 static func reload() -> void:
 	_roles.clear()
+	_turns.clear()
 	_everyone.clear()
 	_cache.clear()
 	_peds = []
@@ -353,7 +357,7 @@ static func draw_person(ci: CanvasItem, name: String, at: Vector2, w: Vector2, t
 ## TURN_FADE seconds. `st` is the thing's own dictionary (its turn is kept there); empty means no smoothing.
 ## Returns [view row, previous view row, how far the new one has faded in 0-1].
 const TURN_LAG := 0.12    # radians, about 7 degrees
-const TURN_FADE := 0.15   # seconds
+const TURN_FADE := 0.2    # seconds (a turn clip's 4 frames play over this too)
 static var _rider_turns := {}
 
 
@@ -364,6 +368,19 @@ static func turn_state(key: String) -> Dictionary:
 		_named_turns[key] = {}
 	return _named_turns[key]
 static var _named_turns := {}
+
+
+## The turn clip for a sheet (art/<name>_turn.png next to it), or null. Found by the name the sheet was loaded as, so
+## outfits (winter_...) and colour variants (_c2...) get theirs.
+static var _turns := {}
+static func _turn_sheet(tex: Texture2D) -> Texture2D:
+	if _turns.has(tex):
+		return _turns[tex]
+	var t: Texture2D = null
+	if _names.has(tex) and not str(_names[tex]).ends_with("_turn"):
+		t = sheet(str(_names[tex]) + "_turn")
+	_turns[tex] = t
+	return t
 
 
 static func turn_rows(st: Dictionary, w: Vector2) -> Array:
@@ -386,7 +403,22 @@ static func turn_rows(st: Dictionary, w: Vector2) -> Array:
 ## One frame (column `x`) of an 8-row sheet in the view `rows` gives (see turn_rows): mid-turn, the new view over the
 ## old one, fading in.
 static func _draw_turning(ci: CanvasItem, tex: Texture2D, dst: Rect2, x: float, fw: float, fh: float, rows: Array, tint: Color) -> void:
-	if float(rows[2]) < 1.0 and int(rows[1]) != int(rows[0]):
+	var from := int(rows[1])
+	var to := int(rows[0])
+	if float(rows[2]) < 1.0 and from != to:
+		# a turn clip (art/<sheet>_turn.png: row k turns from view k to view k+1, 4 in-between frames) when there is one,
+		# played backwards turning the other way
+		var turn := _turn_sheet(tex)
+		var step := posmod(to - from, DIRS)
+		if turn != null and (step == 1 or step == DIRS - 1):
+			var tf := float(turn.get_height() / DIRS)
+			var n := maxi(1, int(turn.get_width() / tf))
+			var i := mini(int(float(rows[2]) * n), n - 1)
+			var row := from if step == 1 else to
+			var col := i if step == 1 else n - 1 - i
+			var td := Rect2((dst.get_center() - Vector2(tf, tf) * 0.5).round(), Vector2(tf, tf)) if tf != dst.size.x else dst
+			ci.draw_texture_rect_region(turn, td, Rect2(col * tf, row * tf, tf, tf), tint)
+			return
 		ci.draw_texture_rect_region(tex, dst, Rect2(x, int(rows[1]) * fh, fw, fh), tint)
 		ci.draw_texture_rect_region(tex, dst, Rect2(x, int(rows[0]) * fh, fw, fh), Color(tint.r, tint.g, tint.b, tint.a * float(rows[2])))
 	else:

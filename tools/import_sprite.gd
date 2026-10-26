@@ -6,6 +6,10 @@ extends SceneTree
 ##     frame_NNN.png (and rotations/<direction>.png, which sets where the feet are). anchor=feet puts the feet at the
 ##     bottom centre of each frame (people), anchor=center the middle of the sprite at the frame's middle (a spinning
 ##     pizza). Output: art/<out name>.png, frames side by side, square.
+##   godot --headless -s tools/import_sprite.gd -- people <dir> <anim|still> <out name>
+##     8 rows (the rider row order: down-right, down, down-left, left, up-left, up, up-right, right), feet at the bottom
+##     centre of each frame: a person walking in every direction. <dir> holds rotations/ and animations/<anim>/<direction>/;
+##     "still" packs just the rotations (one column), for a pose that doesn't animate (a skier).
 ##   godot --headless -s tools/import_sprite.gd -- rotations <dir> <out name>
 ##     8 rows, one per direction of travel (the same row order as the rider sheets), one still each, centred in the
 ##     frame: for vehicles. <dir> holds rotations/<direction>.png.
@@ -19,6 +23,8 @@ func _initialize() -> void:
 	var out_dir := ProjectSettings.globalize_path("res://art")
 	if a.size() >= 5 and a[0] == "strip":
 		_strip(a[1], a[2], a[3], "%s/%s.png" % [out_dir, a[4]], a.size() > 5 and a[5] == "anchor=center")
+	elif a.size() >= 4 and a[0] == "people":
+		_people(a[1], a[2], "%s/%s.png" % [out_dir, a[3]])
 	elif a.size() >= 3 and a[0] == "rotations":
 		_rotations(a[1], "%s/%s.png" % [out_dir, a[2]])
 	else:
@@ -54,6 +60,41 @@ func _strip(dir: String, direction: String, anim: String, out: String, center: b
 		var off := shift + ref.position - first_rect.position if still != null else shift
 		sheet.blend_rect(frames[i], Rect2i(Vector2i.ZERO, frames[i].get_size()), Vector2i(i * size, 0) + off)
 	print("%s: %d frame(s) of %d px" % [out, frames.size(), size])
+	sheet.save_png(out)
+
+
+func _people(dir: String, anim: String, out: String) -> void:
+	var rows: Array = []   # per row: the frames
+	var size := 0
+	for d in ROW_DIRS:
+		var frames: Array[Image] = []
+		if anim == "still":
+			frames.append(_load("%s/rotations/%s.png" % [dir, d]))
+		else:
+			var folder := "%s/animations/%s/%s" % [dir, anim, d]
+			var files := Array(DirAccess.get_files_at(folder)).filter(func(f): return f.ends_with(".png"))
+			files.sort()
+			for f in files:
+				frames.append(_load("%s/%s" % [folder, f]))
+		if frames.is_empty() or frames[0] == null:
+			printerr("missing frames for ", d)
+			return
+		rows.append(frames)
+		for img in frames:
+			size = maxi(size, maxi(img.get_width(), img.get_height()))
+	size += 2 * FEET_MARGIN
+	var cols: int = rows[0].size()
+	var sheet := Image.create(size * cols, size * rows.size(), false, Image.FORMAT_RGBA8)
+	for row in rows.size():
+		var frames: Array = rows[row]
+		var still := _load("%s/rotations/%s.png" % [dir, ROW_DIRS[row]])
+		var first_rect: Rect2i = frames[0].get_used_rect()
+		var ref: Rect2i = still.get_used_rect() if still != null else first_rect
+		var shift := Vector2i(size / 2 - (ref.position.x + ref.size.x / 2), size - FEET_MARGIN - ref.end.y)
+		for i in mini(frames.size(), cols):
+			var off: Vector2i = shift + ref.position - first_rect.position if still != null and anim != "still" else shift
+			sheet.blend_rect(frames[i], Rect2i(Vector2i.ZERO, frames[i].get_size()), Vector2i(i * size, row * size) + off)
+	print("%s: %d frame(s) x 8 directions of %d px" % [out, cols, size])
 	sheet.save_png(out)
 
 

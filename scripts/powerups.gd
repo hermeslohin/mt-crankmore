@@ -63,76 +63,10 @@ static func col(kind: String) -> Color:
 
 ## A small pixel icon centred on `c`, about 10 px across at k = 1.
 static func draw_icon(ci: CanvasItem, c: Vector2, kind: String, k := 1.0) -> void:
-	var o := Iso.OUTLINE
-	match kind:
-		"portal":
-			ci.draw_circle(c, 5.5 * k, o)
-			ci.draw_circle(c, 4.6 * k, Color(0.95, 0.3, 0.2))
-			ci.draw_circle(c, 3.0 * k, Color(1.0, 0.75, 0.3))
-			ci.draw_circle(c, 1.4 * k, Color(0.55, 0.1, 0.35))
-			for a in 3:
-				var p := c + Vector2.from_angle(a * TAU / 3.0 + 0.5) * 3.6 * k
-				ci.draw_circle(p, 0.9 * k, Color(0.7, 0.1, 0.1))
-		"wrench":
-			ci.draw_line(c + Vector2(-4, 4) * k, c + Vector2(3, -3) * k, o, 3.5 * k)
-			ci.draw_line(c + Vector2(-4, 4) * k, c + Vector2(3, -3) * k, Color(0.78, 0.8, 0.86), 1.8 * k)
-			ci.draw_circle(c + Vector2(3, -3) * k, 2.8 * k, o)
-			ci.draw_circle(c + Vector2(3, -3) * k, 2.0 * k, Color(0.78, 0.8, 0.86))
-			ci.draw_rect(Rect2(c + Vector2(3, -5) * k, Vector2(2, 2) * k), o)
-		"walkie":
-			ci.draw_rect(Rect2(c + Vector2(-3, -3) * k, Vector2(6, 8) * k), o)
-			ci.draw_rect(Rect2(c + Vector2(-2, -2) * k, Vector2(4, 6) * k), Color(0.25, 0.7, 0.35))
-			ci.draw_rect(Rect2(c + Vector2(-1.5, -1.5) * k, Vector2(3, 2) * k), Color(0.75, 0.95, 0.75))
-			ci.draw_line(c + Vector2(1.5, -3) * k, c + Vector2(1.5, -6.5) * k, o, 1.5 * k)
-			ci.draw_rect(Rect2(c + Vector2(-1, 2) * k, Vector2(1, 1) * k), o)
-			ci.draw_rect(Rect2(c + Vector2(1, 2) * k, Vector2(1, 1) * k), o)
-		"frisbee":
-			ci.draw_circle(c, 5.0 * k, o)
-			ci.draw_circle(c, 4.2 * k, Color(0.85, 0.55, 0.2))
-			ci.draw_circle(c, 3.3 * k, Color(1.0, 0.85, 0.35))
-			for p in [Vector2(-1.5, -1), Vector2(1.5, 0.5), Vector2(-0.5, 2)]:
-				ci.draw_circle(c + p * k, 0.9 * k, Color(0.8, 0.15, 0.12))
-		"socks":
-			var flame := Color(1.0, 0.55, 0.1)
-			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-3, -6) * k, c + Vector2(0, -2) * k, c + Vector2(2, -6) * k,
-				c + Vector2(3, 0) * k, c + Vector2(-3, 0) * k]), Color(1.0, 0.85, 0.2))
-			ci.draw_rect(Rect2(c + Vector2(-3, -2) * k, Vector2(5, 5) * k), o)
-			ci.draw_rect(Rect2(c + Vector2(-2, -1) * k, Vector2(3, 3) * k), flame)
-			ci.draw_rect(Rect2(c + Vector2(-3, 2) * k, Vector2(7, 3) * k), o)
-			ci.draw_rect(Rect2(c + Vector2(-2, 3) * k, Vector2(5, 1) * k), flame)
-		"roller":
-			var a := c + Vector2(-5, 2) * k
-			var b := c + Vector2(5, -2) * k
-			ci.draw_line(a, b, o, 5.0 * k)
-			ci.draw_line(a + (b - a) * 0.2, a + (b - a) * 0.8, Color(0.85, 0.6, 0.35), 3.4 * k)
-			ci.draw_line(a, a + (b - a) * 0.15, Color(0.55, 0.32, 0.18), 2.0 * k)
-			ci.draw_line(b, b - (b - a) * 0.15, Color(0.55, 0.32, 0.18), 2.0 * k)
-			ci.draw_line(a + (b - a) * 0.3 + Vector2(0, -1) * k, a + (b - a) * 0.6 + Vector2(0, -1) * k, Color(1, 0.9, 0.75), 1.0 * k)
-		"breadsticks":
-			for q in 3:
-				var x := (q - 1) * 2.6
-				var a := c + Vector2(x - 1.0, 5) * k
-				var b := c + Vector2(x + 1.0, -5) * k
-				ci.draw_line(a, b, o, 3.2 * k)
-				ci.draw_line(a, b, Color(0.9, 0.7, 0.35), 1.8 * k)
-				ci.draw_rect(Rect2(b + Vector2(-0.5, 1.5) * k, Vector2(1, 1) * k), Color(1, 1, 0.9))
+	Sprites.draw_image(ci, "scenery_icon_%s" % kind, c + Vector2(0, 8.0 * k), false, 1.0, 0.5 * k)
 
 
 ## A wrapped gift box with a "?" on it, held up by the people who hand out power-ups.
-static func draw_gift(ci: CanvasItem, c: Vector2, t: float) -> void:
-	var bob := sin(t * 5.0) * 1.0
-	var p := c + Vector2(0, bob)
-	ci.draw_rect(Rect2(p + Vector2(-5, -5), Vector2(10, 9)), Iso.OUTLINE)
-	ci.draw_rect(Rect2(p + Vector2(-4, -4), Vector2(8, 7)), Color.from_hsv(fposmod(t * 0.3, 1.0), 0.6, 1.0))
-	ci.draw_rect(Rect2(p + Vector2(-1, -4), Vector2(2, 7)), Color(1, 1, 1))
-	ci.draw_rect(Rect2(p + Vector2(-4, -1), Vector2(8, 1)), Color(1, 1, 1))
-	ci.draw_line(p + Vector2(0, -5), p + Vector2(-3, -8), Color(1, 1, 1), 1.0)
-	ci.draw_line(p + Vector2(0, -5), p + Vector2(3, -8), Color(1, 1, 1), 1.0)
-	var spark := Color(1.0, 0.95, 0.5, 0.5 + 0.5 * sin(t * 9.0))
-	ci.draw_rect(Rect2(p + Vector2(6, -8), Vector2(1, 1)), spark)
-	ci.draw_rect(Rect2(p + Vector2(-8, -3), Vector2(1, 1)), spark)
-
-
 ## A spinning pizza in flight, `u` (0..1) along the way from `a` to `b` in a shallow arc.
 static func draw_frisbee(ci: CanvasItem, a: Vector2, b: Vector2, u: float, t: float) -> void:
 	var p := a.lerp(b, u) + Vector2(0, -sin(u * PI) * 14.0)
@@ -153,21 +87,3 @@ static func draw_flames(ci: CanvasItem, c: Vector2, back: Vector2, t: float) -> 
 		ci.draw_circle(p, 3.5 * (1.0 - u) + 1.0, Color(1.0, 0.85 - u * 0.6, 0.15, 0.85 * (1.0 - u)))
 
 
-## A plain spectator (used along the race course), the same style as the town's pedestrians.
-static func draw_person(ci: CanvasItem, ground: Vector2, shirt: Color, skin: Color, hair: Color, t: float, arm_up: bool) -> void:
-	var o := Iso.OUTLINE
-	var base := ground + Vector2(0, -absf(sin(t * 4.0)) * 1.5)
-	ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-4, 0), ground + Vector2(0, -2), ground + Vector2(4, 0), ground + Vector2(0, 2)]), Color(0, 0, 0, 0.2))
-	ci.draw_line(base + Vector2(-1, -6), base + Vector2(-1, 0), Color(0.2, 0.25, 0.45), 2.0)
-	ci.draw_line(base + Vector2(1, -6), base + Vector2(1, 0), Color(0.2, 0.25, 0.45), 2.0)
-	if arm_up:
-		ci.draw_line(base + Vector2(3, -12), base + Vector2(6, -20), o, 2.0)
-		ci.draw_line(base + Vector2(3, -12), base + Vector2(6, -20), skin, 1.0)
-	else:
-		ci.draw_line(base + Vector2(3, -12), base + Vector2(4, -7), shirt.darkened(0.2), 1.0)
-	ci.draw_line(base + Vector2(-3, -12), base + Vector2(-4, -7), shirt.darkened(0.2), 1.0)
-	ci.draw_rect(Rect2(base + Vector2(-3, -13), Vector2(6, 7)), o)
-	ci.draw_rect(Rect2(base + Vector2(-2, -12), Vector2(4, 6)), shirt)
-	ci.draw_circle(base + Vector2(0, -16), 3.0, o)
-	ci.draw_circle(base + Vector2(0, -16), 2.4, skin)
-	ci.draw_rect(Rect2(base + Vector2(-2, -19), Vector2(4, 2)), hair)

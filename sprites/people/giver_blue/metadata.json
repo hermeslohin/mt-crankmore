@@ -1,0 +1,49 @@
+{
+  "group_id": "afd08a89-9d42-4ce6-a0db-6f6793143403",
+  "states": [
+    {
+      "character": {
+        "id": "225e48f6-96a3-4d31-b86c-58854d33b340",
+        "name": "Idle",
+        "prompt": "friendly person in a blue puffer vest holding a wrapped gift box with a bow high above their head with both hands, arms raised overhead",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:25:34.777006+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "wave": {
+            "south": [
+              "Idle/animations/wave/south/frame_000.png",
+              "Idle/animations/wave/south/frame_001.png",
+              "Idle/animations/wave/south/frame_002.png",
+              "Idle/animations/wave/south/frame_003.png",
+              "Idle/animations/wave/south/frame_004.png",
+              "Idle/animations/wave/south/frame_005.png",
+              "Idle/animations/wave/south/frame_006.png",
+              "Idle/animations/wave/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:31:51.660142"
+}

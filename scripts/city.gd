@@ -77,7 +77,11 @@ const VEHICLE_DIMS := {
 	"sedan_jeep_wrangler_yellow": [0.5, 0.3, 2.0, 3.0], "sedan_minitruck_teal": [0.5, 0.29, 1.8, 2.6], "sedan_suv_maroon": [0.6, 0.31, 2.2, 3.0],
 	"sedan_kei_car_mint": [0.42, 0.27, 2.0, 2.8], "sedan_roadster_british_racing_green": [0.5, 0.28, 2.6, 3.6], "sedan_pt_cruiser_purple": [0.55, 0.3, 2.0, 2.8],
 	"van_panel_white": [0.7, 0.32, 2.0, 2.8], "van_vw_bus_blue": [0.65, 0.32, 1.8, 2.5], "van_minibus_orange": [0.8, 0.33, 1.8, 2.5],
-	"truck_pickup_blue_old": [0.65, 0.31, 1.8, 2.6], "truck_flatbed_hay": [0.9, 0.34, 1.4, 2.0], "truck_box_rental": [0.85, 0.34, 1.8, 2.5]}
+	"truck_pickup_blue_old": [0.65, 0.31, 1.8, 2.6], "truck_flatbed_hay": [0.9, 0.34, 1.4, 2.0], "truck_box_rental": [0.85, 0.34, 1.8, 2.5],
+	"van_city_bus": [1.05, 0.36, 1.6, 2.2], "sedan_vespa": [0.3, 0.14, 2.4, 3.2], "sedan_tuktuk": [0.4, 0.24, 1.8, 2.6],
+	"truck_street_sweeper": [0.7, 0.32, 0.8, 1.2], "truck_crane": [1.0, 0.36, 1.2, 1.8], "sedan_horse_carriage": [0.7, 0.3, 0.9, 1.3],
+	"sedan_4x4_skis": [0.6, 0.31, 2.2, 3.0], "van_ski_shuttle": [0.75, 0.33, 1.8, 2.6], "sedan_retro_wagon_wood": [0.6, 0.3, 1.8, 2.6],
+	"sedan_sports_blue": [0.55, 0.3, 2.8, 3.8], "truck_moving_van": [0.95, 0.35, 1.6, 2.2], "sedan_rally": [0.55, 0.3, 3.0, 4.0]}
 const PAINTED_VEHICLES := ["car", "truck"]
 const CAR_COUNT := 50    # vehicles in the town's traffic
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]

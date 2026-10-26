@@ -664,7 +664,7 @@ func _debug_animals() -> void:
 	Game.money = maxi(Game.money, 1000)
 	_start_race(0)
 	await get_tree().create_timer(0.3).timeout
-	var kinds := ["bear", "deer", "moose", "goat", "marmot", "rabbit", "squirrel", "fox"]
+	var kinds := ["bear", "deer", "moose", "goat", "marmot", "rabbit", "squirrel", "fox", "elk", "wolf", "raccoon", "hedgehog", "chipmunk", "skunk", "bighorn", "badger"]
 	var s0 := float(race.riders[0]["s"]) + 4.0
 	for look in ["idle", "run", "roar"]:
 		race.animals.clear()

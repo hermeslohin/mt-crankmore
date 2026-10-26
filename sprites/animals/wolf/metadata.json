@@ -1,0 +1,61 @@
+{
+  "group_id": "31847aba-4a8c-478f-9c7b-f0f877fe5a88",
+  "states": [
+    {
+      "character": {
+        "id": "43d7de1e-0810-4710-ad61-1ce58cc5fa5d",
+        "name": "Idle",
+        "prompt": "standing on all four legs, a grey timber wolf with thick grey fur, a pale muzzle and a bushy tail, friendly cartoon style",
+        "size": {
+          "width": 56,
+          "height": 56
+        },
+        "template_id": "dog",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:47:37.816847+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png"
+            ]
+          },
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:57:18.732099"
+}

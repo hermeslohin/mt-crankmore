@@ -1808,6 +1808,12 @@ func debug_spots() -> Array:
 			out.append(float(c["s"]) - 6.0)
 		if not life.devil.is_empty():
 			out.append(float(life.devil["s0"]) + 30.0)
+		if not life.lift.is_empty():   # the road sample nearest the bottom of the chairlift
+			var best := 0
+			for q in range(0, M, 4):
+				if pts[q].distance_to(Vector2(float(life.lift["x"]), float(life.lift["y0"]) - 4.0)) < pts[best].distance_to(Vector2(float(life.lift["x"]), float(life.lift["y0"]) - 4.0)):
+					best = q
+			out.append(s_m[best])
 	for q in M:   # the first place with snow
 		if _snow_cover(pts[q].x, pts[q].y, elev[q] * vz / peak) > 0.6:
 			out.append(s_m[q] + 30.0)
@@ -1987,6 +1993,7 @@ func _draw() -> void:
 					3: (it[1] as Callable).call()
 	_draw_birds(me_pos)
 	if life != null:
+		life.draw_lift_cables(self)
 		life.draw_helicopter(self)
 	_draw_flurries(vr, _snow_cover(me_pos.x, me_pos.y, _tz(me_pos) / peak))
 	for fz in frisbees:
@@ -2163,7 +2170,9 @@ func _draw_deco(e: Dictionary) -> void:
 				var p := p0 + Vector2(sin(u * TAU * 2.0) * 0.8, u * 3.0)
 				var b := Iso.to_screen(p, _tz(p))
 				var nxt := p0 + Vector2(sin((u + 0.01) * TAU * 2.0) * 0.8, (u + 0.01) * 3.0)
-				Sprites.draw_person(self, "person_skier", b, nxt - p, 0.0)
+				var sk: String = ["skier_red", "skier_blue", "skier_kid", "skier_retro", "snowboarder_green", "snowboarder_pink"][int(absf(p0.x * 7.0)) % 6]
+				if not Sprites.draw_person(self, "ped_%s_ski" % sk, b, nxt - p, t_, 8.0):
+					Sprites.draw_person(self, "person_skier", b, nxt - p, 0.0)
 		"pumpkins":
 			var b := Iso.to_screen(e["pos"], e["z"])
 			for k in 1 + int(e["sd"]) % 3:

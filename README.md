@@ -170,7 +170,9 @@ wavers and sign holders lining the steep ramps and photographers by the jumps; a
 bottles; fans camped with their camper vans. A devil superfan runs alongside you up one of the climbs, a TV moto and
 a marshal moto ride ahead of the leader with the TV helicopter overhead, and the team car follows the last rider. A
 mountain cog railway runs straight down the hillside; where it crosses the road there are level crossings whose
-lights flash and ring when the train comes by.
+lights flash and ring when the train comes by. Up in the snow there is a ski area: skiers and snowboarders carving down the slopes, a
+ski school snake, ski patrol, a chairlift whose chairs go round (full on the way up, empty on the way down), the lodge,
+a cocoa stand, ticket booth, ski racks, slalom gates, an igloo, and a snowcat and a snowmobile out on the snow.
 
 The ground everywhere (grass, forest floor, alpine meadow, scree, snow, gravel, creek water, asphalt, paving,
 cobbles, sand) is drawn with seamless 16-bit textures, lit in a few hard steps by the slope with a light/dark stripe

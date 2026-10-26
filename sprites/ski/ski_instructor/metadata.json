@@ -1,0 +1,131 @@
+{
+  "group_id": "be7b5f72-e38e-4f4c-85e8-0b994218f4ce",
+  "states": [
+    {
+      "character": {
+        "id": "a99b0e80-99c9-4f4c-9a7c-d25f5d5640b9",
+        "name": "Idle",
+        "prompt": "friendly smiling cartoon ski instructor standing on a pair of long red skis, charcoal grey ski jacket with a wide white chest band reading SKI SCHOOL, bright red beanie hat, face clearly visible, light blue ski pants, ski boots clipped into the skis, holding two ski poles",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T04:01:50.776810+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "cheer": {
+            "south": [
+              "Idle/animations/cheer/south/frame_000.png",
+              "Idle/animations/cheer/south/frame_001.png",
+              "Idle/animations/cheer/south/frame_002.png",
+              "Idle/animations/cheer/south/frame_003.png",
+              "Idle/animations/cheer/south/frame_004.png",
+              "Idle/animations/cheer/south/frame_005.png",
+              "Idle/animations/cheer/south/frame_006.png",
+              "Idle/animations/cheer/south/frame_007.png"
+            ]
+          },
+          "ski": {
+            "west": [
+              "Idle/animations/ski/west/frame_000.png",
+              "Idle/animations/ski/west/frame_001.png",
+              "Idle/animations/ski/west/frame_002.png",
+              "Idle/animations/ski/west/frame_003.png",
+              "Idle/animations/ski/west/frame_004.png",
+              "Idle/animations/ski/west/frame_005.png",
+              "Idle/animations/ski/west/frame_006.png",
+              "Idle/animations/ski/west/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/ski/north/frame_000.png",
+              "Idle/animations/ski/north/frame_001.png",
+              "Idle/animations/ski/north/frame_002.png",
+              "Idle/animations/ski/north/frame_003.png",
+              "Idle/animations/ski/north/frame_004.png",
+              "Idle/animations/ski/north/frame_005.png",
+              "Idle/animations/ski/north/frame_006.png",
+              "Idle/animations/ski/north/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/ski/south-east/frame_000.png",
+              "Idle/animations/ski/south-east/frame_001.png",
+              "Idle/animations/ski/south-east/frame_002.png",
+              "Idle/animations/ski/south-east/frame_003.png",
+              "Idle/animations/ski/south-east/frame_004.png",
+              "Idle/animations/ski/south-east/frame_005.png",
+              "Idle/animations/ski/south-east/frame_006.png",
+              "Idle/animations/ski/south-east/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/ski/south/frame_000.png",
+              "Idle/animations/ski/south/frame_001.png",
+              "Idle/animations/ski/south/frame_002.png",
+              "Idle/animations/ski/south/frame_003.png",
+              "Idle/animations/ski/south/frame_004.png",
+              "Idle/animations/ski/south/frame_005.png",
+              "Idle/animations/ski/south/frame_006.png",
+              "Idle/animations/ski/south/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/ski/east/frame_000.png",
+              "Idle/animations/ski/east/frame_001.png",
+              "Idle/animations/ski/east/frame_002.png",
+              "Idle/animations/ski/east/frame_003.png",
+              "Idle/animations/ski/east/frame_004.png",
+              "Idle/animations/ski/east/frame_005.png",
+              "Idle/animations/ski/east/frame_006.png",
+              "Idle/animations/ski/east/frame_007.png"
+            ],
+            "south-west": [
+              "Idle/animations/ski/south-west/frame_000.png",
+              "Idle/animations/ski/south-west/frame_001.png",
+              "Idle/animations/ski/south-west/frame_002.png",
+              "Idle/animations/ski/south-west/frame_003.png",
+              "Idle/animations/ski/south-west/frame_004.png",
+              "Idle/animations/ski/south-west/frame_005.png",
+              "Idle/animations/ski/south-west/frame_006.png",
+              "Idle/animations/ski/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/ski/north-east/frame_000.png",
+              "Idle/animations/ski/north-east/frame_001.png",
+              "Idle/animations/ski/north-east/frame_002.png",
+              "Idle/animations/ski/north-east/frame_003.png",
+              "Idle/animations/ski/north-east/frame_004.png",
+              "Idle/animations/ski/north-east/frame_005.png",
+              "Idle/animations/ski/north-east/frame_006.png",
+              "Idle/animations/ski/north-east/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/ski/north-west/frame_000.png",
+              "Idle/animations/ski/north-west/frame_001.png",
+              "Idle/animations/ski/north-west/frame_002.png",
+              "Idle/animations/ski/north-west/frame_003.png",
+              "Idle/animations/ski/north-west/frame_004.png",
+              "Idle/animations/ski/north-west/frame_005.png",
+              "Idle/animations/ski/north-west/frame_006.png",
+              "Idle/animations/ski/north-west/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T06:59:30.214583"
+}

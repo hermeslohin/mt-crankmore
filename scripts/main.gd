@@ -854,6 +854,8 @@ func _debug_race_shot() -> void:
 	print("COURSE %s: %.0f m, gain %.0f m, grade %+.1f%% to %+.1f%%, %d obstacles" % [race.course["name"], race.course["length"],
 		race.gain, gmin * 100.0, gmax * 100.0, race.obstacles.size()])
 	print("  %d hairpins, %d tunnels, %d steep/drop stretches" % [race.hairpins.size(), race.tunnels.size(), race.ramps.size()])
+	print("  %d skiers, chairlift %s, %d groomers, railway %s with %d crossings" % [race.life.skiers.size(), "yes" if not race.life.lift.is_empty() else "no",
+		race.life.groomers.size(), "yes" if race.life.rail_x >= 0.0 else "no", race.life.crossings.size()])
 	var spots: Array = race.debug_spots()
 	for k in spots.size():
 		race.debug_place(spots[k])

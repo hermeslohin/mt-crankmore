@@ -1072,7 +1072,9 @@ func _draw_sprop(e: Dictionary, at: Vector2) -> void:
 				return   # off to the lift
 			var d: Vector2 = e["dir"]
 			var vel: Vector2 = d * float(e["run"]) + Vector2(-d.y, d.x) * cos(u * TAU * 3.0) * 0.7 * TAU * 3.0
-			Sprites.draw_person(self, "person_skier", b, vel, 0.0)
+			var sk: String = ["skier_red", "skier_blue", "skier_kid", "skier_retro", "snowboarder_green", "snowboarder_pink"][int(absf(float(e["pos"].x) * 7.0)) % 6]
+			if not Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0):
+				Sprites.draw_person(self, "person_skier", b, vel, 0.0)
 		"skater":
 			var a: float = e["a0"] + t_ * float(e["w"])
 			var tan := Vector2(-sin(a), cos(a)) * signf(e["w"])

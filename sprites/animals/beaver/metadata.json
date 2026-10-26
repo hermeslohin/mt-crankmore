@@ -1,0 +1,61 @@
+{
+  "group_id": "d6a4c2bf-7c31-49e0-a009-be9e0c70c8ed",
+  "states": [
+    {
+      "character": {
+        "id": "66d54ae2-f907-48dd-b63b-a252c3e3a8d6",
+        "name": "Idle",
+        "prompt": "standing on all four legs, a beaver with chestnut brown fur, a big flat paddle tail, prominent orange front teeth, friendly cartoon style",
+        "size": {
+          "width": 56,
+          "height": 56
+        },
+        "template_id": "cat",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T01:20:34.896769+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png"
+            ]
+          },
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T01:27:39.159640"
+}

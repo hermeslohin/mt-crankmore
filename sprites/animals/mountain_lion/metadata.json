@@ -1,0 +1,62 @@
+{
+  "group_id": "687a32aa-82a8-4bb5-8db1-4bc328f535d0",
+  "states": [
+    {
+      "character": {
+        "id": "7c3e19de-7737-4a67-98d4-906083b7c7bc",
+        "name": "Idle",
+        "prompt": "standing on all four legs, a mountain lion cougar with tawny tan fur, a pale cream belly and muzzle, a long tail, friendly cartoon style",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "lion",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T01:13:34.453724+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          },
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png",
+              "Idle/animations/idle/east/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T01:19:49.201502"
+}

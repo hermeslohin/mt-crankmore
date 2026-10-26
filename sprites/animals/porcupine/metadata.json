@@ -1,0 +1,61 @@
+{
+  "group_id": "0c3c87fe-d30c-43f2-ae6e-91080459aee5",
+  "states": [
+    {
+      "character": {
+        "id": "91742c50-2253-4e86-9686-fb8f5700a75e",
+        "name": "Idle",
+        "prompt": "standing on all four legs, a porcupine with a brown body covered in long cream-tipped quills on its back, a small round snout, friendly cartoon style",
+        "size": {
+          "width": 56,
+          "height": 56
+        },
+        "template_id": "cat",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T01:13:34.956115+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png"
+            ]
+          },
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T01:19:50.659737"
+}

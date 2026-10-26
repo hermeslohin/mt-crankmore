@@ -2203,6 +2203,18 @@ func _draw_deco(e: Dictionary) -> void:
 			Sprites.draw_image(self, ["scenery_kite_red", "scenery_kite_blue", "scenery_kite_yellow"][int(ph * 10.0) % 3], k + Vector2(0, 28))
 
 
+## Bike lights at night for night.gd: a small pool ahead of every rider.
+func night_lights() -> Array:
+	var out: Array = []
+	var on := clampf((Skies.dark() - 0.3) * 3.0, 0.0, 1.0)
+	if on <= 0.0:
+		return out
+	for r in riders:
+		var pz := _pose(float(r["s"]) + 1.2, r["lat"])
+		out.append([Iso.to_screen(pz["pos"], pz["z"]), 32.0 if r.get("player", false) else 22.0, 0.75 * on])
+	return out
+
+
 func _sp(p: Dictionary, lift: float = 0.0) -> Vector2:
 	return Iso.to_screen(p["pos"], float(p["z"]) + 1.8 + lift)
 

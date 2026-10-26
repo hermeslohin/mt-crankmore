@@ -898,16 +898,20 @@ func _place_nature() -> void:
 				continue
 			if rng.randf() < 0.42:
 				trees.append(_make_tree(Vector2(x + rng.randf(), y + rng.randf()), 1.25))
-	# lamps around the plaza and along the village end of Valley Road
+	# street lamps: both sides around the plaza and through the village, then one every ~10 m on alternate
+	# sides out along the roads
 	for r in roads:
 		var s := 1.0
+		var k := 0
 		while s < float(r["len"]):
 			var at := _road_at(r, s)
 			var p: Vector2 = at[0]
-			if p.distance_to(PLAZA) < 24.0:
+			var village := p.distance_to(PLAZA) < 24.0
+			k += 1
+			if village or k % 3 == 0:
 				var tv: Vector2 = at[1]
 				var n := Vector2(-tv.y, tv.x)
-				for side in [1.0, -1.0]:
+				for side in ([1.0, -1.0] if village else [1.0 if k % 6 == 0 else -1.0]):
 					var lp: Vector2 = p + n * side * (ROAD_HW + 0.55)
 					var ix := int(lp.x)
 					var iy := int(lp.y)
@@ -1506,6 +1510,7 @@ func _process(delta: float) -> void:
 	_update_cars(delta)
 	_update_rivals(delta)
 	_update_life(delta)
+	_update_lamps(delta)
 	if events != null:
 		events.update(delta)
 	_update_mascots(delta)
@@ -2138,6 +2143,43 @@ func _car_curve_step(c: Dictionary, moved: float) -> void:
 	if u >= 1.0:
 		c.erase("curve")
 		_car_pose(c)
+
+
+## Street lamps come on one by one as it gets dark (each at its own darkness, flickering as it warms up) and go
+## off again in the morning.
+func _update_lamps(delta: float) -> void:
+	var dark := Skies.dark()
+	for p in props:
+		if p["kind"] != "lamp":
+			continue
+		var at: float = 0.25 + fposmod(p["pos"].x * 0.37 + p["pos"].y * 0.91, 1.0) * 0.3
+		var want := 1.0 if dark > at else 0.0
+		var g: float = move_toward(float(p.get("glow", want)), want, delta * 0.8)
+		p["glow"] = g
+		p["lit"] = g if g >= 1.0 or g <= 0.0 else g * (0.4 if randf() < 0.3 else 1.0)
+
+
+## The lights at night for night.gd: lamp pools and bulbs, car headlights, bike lights.
+func night_lights() -> Array:
+	var out: Array = []
+	var dark := Skies.dark()
+	var was := Iso.terrain_on
+	Iso.terrain_on = true
+	for p in props:
+		if p["kind"] == "lamp" and float(p.get("lit", 0.0)) > 0.0:
+			var base := Iso.to_screen(p["pos"])
+			out.append([base, 58.0, float(p["lit"]) * 0.85])
+			out.append([base + Vector2(0, -48), 9.0, float(p["lit"])])
+	if dark > 0.3:
+		var on := clampf((dark - 0.3) * 3.0, 0.0, 1.0)
+		for c in cars:
+			var f: Vector2 = c["fwd"]
+			out.append([Iso.to_screen(c["pos"] + f * (float(c["hl"]) + 0.9)), 30.0, 0.75 * on])
+		out.append([Iso.to_screen(p_pos + p_fwd * 0.7), 26.0, 0.7 * on])
+		for r in rival_state:
+			out.append([Iso.to_screen(r["pos"] + Vector2.from_angle(r["head"]) * 0.6), 20.0, 0.55 * on])
+	Iso.terrain_on = was
+	return out
 
 
 func _update_life(delta: float) -> void:

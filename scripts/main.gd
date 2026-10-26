@@ -32,6 +32,12 @@ func _ready() -> void:
 	sky.add_child(weather)
 	if OS.has_environment("PIZZA_SEASON"):   # dev helper: PIZZA_SEASON=spring|summer|fall|winter
 		Season.set_choice(OS.get_environment("PIZZA_SEASON"))
+	var dusk := CanvasLayer.new()   # night and rain clouds over the world and the weather, under the HUD
+	dusk.layer = 6
+	add_child(dusk)
+	var night := preload("res://scripts/night.gd").new()
+	night.source = func(): return city.night_lights() if mode == Mode.CITY else race.night_lights() if mode == Mode.RACE else []
+	dusk.add_child(night)
 	var layer := CanvasLayer.new()
 	layer.layer = 10
 	add_child(layer)

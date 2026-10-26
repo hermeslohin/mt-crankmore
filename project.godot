@@ -17,6 +17,7 @@ Trainer="*res://scripts/trainer_link.gd"
 Talk="*res://scripts/trash_talk.gd"
 Ride="*res://scripts/ride_log.gd"
 Strava="*res://scripts/strava.gd"
+Skies="*res://scripts/sky.gd"
 
 [display]
 

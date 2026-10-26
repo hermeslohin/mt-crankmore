@@ -92,6 +92,8 @@ func _ready() -> void:
 			_debug_gears()
 		"ride":
 			_debug_ride()
+		"events":
+			_debug_events()
 		"wipeout":
 			_debug_wipeout()
 		"animals":
@@ -617,6 +619,33 @@ func _debug_seasons() -> void:
 
 ## Dev helper: PIZZA_DEBUG=wipeout [PIZZA_OUT=dir] knocks the player and the first rival down (a frisbee-style hit), then
 ## runs the player over with a car, saving a screenshot at several moments of each wipe-out animation.
+## Dev helper: PIZZA_DEBUG=events [PIZZA_OUT=dir] sets off every kind of town happening (see TownEvents) right next to
+## the player and saves a screenshot of each. The player's save file is put back afterwards.
+func _debug_events() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	Trainer._autostart_clock = 0.0
+	_start_game()
+	await get_tree().create_timer(1.0).timeout
+	city.events.near = 2.5
+	city.events.far = 5.0
+	city.events.next_t = 999.0
+	for kind in ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren"]:
+		city.events.events.clear()
+		city.events.start(kind)
+		print("event %s: %s" % [kind, "started" if not city.events.events.is_empty() else "skipped (no art or no spot)"])
+		await get_tree().create_timer(1.2).timeout
+		cam.position = city.cam_target()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/event_%s.png" % [out, kind])
+	if backup != "":
+		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(backup)
+		f.close()
+	get_tree().quit()
+
+
 func _debug_wipeout() -> void:
 	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"

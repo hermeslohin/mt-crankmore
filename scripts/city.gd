@@ -84,6 +84,8 @@ const ER_JOKES := [
 ]
 const CHEERS := ["Go {n}!", "Pizza hero!", "Woo-hoo!", "Pedal faster!", "Extra cheese!", "Allez allez!", "You got this!",
 	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
+const SHOP_LINES := ["Bargain!", "Got snacks!", "Ooh, new socks!", "Best gelato ever.", "Back to work...", "Smells like pizza in there!",
+	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?"]
 const HONKS := ["Pizza coming through!", "Hot pizza, comin' atcha!", "On your left!", "Beep beep! Delivery!", "Move it or lose it!", "Ding ding!"]
 
 var active := false
@@ -106,6 +108,8 @@ var shops: Array = []     # pizza shops
 var zones: Array = []     # interactive doors
 var cars: Array = []
 var peds: Array = []
+var road_doors: Dictionary = {}   # road index -> [[s, side, building index], ...]: the doors people can pop into
+var events: TownEvents          # random happenings around the player (see TownEvents)
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
@@ -169,6 +173,7 @@ var season_props: Array = []   # scenery that only shows in one season: {"season
 
 func _ready() -> void:
 	font = ThemeDB.fallback_font
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED   # the ground textures (see Ground) wrap
 	_build_heights()
 	Iso.terrain_on = true
 	_generate()
@@ -176,6 +181,7 @@ func _ready() -> void:
 	_spawn_cars()
 	_spawn_rivals()
 	_spawn_life()
+	events = TownEvents.new(self)
 	Game.rival_say.connect(_on_rival_say)
 	rival_score.resize(Talk.rivals.size())
 	rival_score.fill(0)
@@ -675,7 +681,7 @@ func _next_name(kind: String) -> String:
 func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color = Color.WHITE) -> int:
 	var pos: Vector2 = lot["pos"]
 	var size: Vector2 = lot["size"]
-	var b := {"pos": pos, "size": size, "kind": kind, "face": lot["face"], "door": lot["door"], "accent": accent,
+	var b := {"pos": pos, "size": size, "kind": kind, "face": lot["face"], "door": lot["door"], "accent": accent, "road": lot["road"], "s": lot["s"],
 		"key": pos.x + pos.y + (size.x + size.y) * 0.5, "ridge_x": size.x >= size.y, "roof_h": 0.0}
 	match kind:
 		"shop":
@@ -1294,11 +1300,11 @@ func _route(from: Vector2, to: Vector2, off: Vector2) -> Array:
 
 
 func _spawn_cars() -> void:
-	# light traffic spread over the longer roads (about one car per 100 tiles of road)
+	# traffic spread over the longer roads
 	# a random mix of every kind of vehicle that has art, different each game
 	var pool: Array = VEHICLE_DIMS.keys().filter(func(k): return Sprites.sheet("vehicle_%s" % k) != null)
 	var kinds: Array = []
-	for k in 24:
+	for k in 38:
 		kinds.append(pool[randi() % pool.size()])
 	var long_roads: Array = []
 	for ri in roads.size():
@@ -1338,15 +1344,15 @@ func _spawn_life() -> void:
 	var shirts := [Color(0.95, 0.3, 0.3), Color(0.3, 0.6, 0.95), Color(1.0, 0.85, 0.2), Color(0.4, 0.85, 0.4), Color(0.95, 0.55, 0.85), Color(1, 1, 1)]
 	var hairs := [Color(0.3, 0.2, 0.1), Color(0.9, 0.75, 0.3), Color(0.1, 0.1, 0.1), Color(0.6, 0.3, 0.15), Color(0.85, 0.85, 0.85)]
 	var skins := [Color(0.96, 0.8, 0.65), Color(0.85, 0.62, 0.45), Color(0.62, 0.42, 0.3), Color(0.98, 0.86, 0.74)]
-	for k in 16:
+	for k in 26:
 		var a := randf() * TAU
 		peds.append({"pos": PLAZA + Vector2(cos(a), sin(a)) * randf_range(2.6, 6.0), "target": PLAZA, "col": shirts[k % shirts.size()],
 			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": k % Sprites.pedestrians().size(), "face": Vector2(1, 1),
 			"cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
 	# townsfolk strolling the pavements all over town
 	var made := 0
-	for tries in 400:
-		if made >= 60:
+	for tries in 800:
+		if made >= 110:
 			break
 		var ri := randi() % roads.size()
 		var r: Dictionary = roads[ri]
@@ -1386,6 +1392,8 @@ func _process(delta: float) -> void:
 	_update_cars(delta)
 	_update_rivals(delta)
 	_update_life(delta)
+	if events != null:
+		events.update(delta)
 	_update_mascots(delta)
 	_update_frisbees(delta)
 	_update_squash()
@@ -1920,9 +1928,38 @@ func _update_life(delta: float) -> void:
 				p["cheer"] = 2.6
 				p["shout"] = String(CHEERS.pick_random()).replace("{n}", Game.player_name)
 				continue
+		# and the rivals, a little less loudly
+		if p["cool"] <= 0.0 and int(Engine.get_process_frames() + int(p["phase"] * 10.0)) % 20 == 0:
+			for i in rival_state.size():
+				if (rival_state[i]["pos"] as Vector2).distance_to(p["pos"]) < 3.5:
+					p["cool"] = randf_range(10.0, 20.0)
+					if randf() < 0.5:
+						p["cheer"] = 2.0
+						p["shout"] = ["Go %s!", "Come on %s!", "Faster, %s!", "%s! %s!"].pick_random().replace("%s", Talk.rivals[i]["short"])
+					break
+			if p["cheer"] > 0.0:
+				continue
+		p["say_t"] = maxf(0.0, float(p.get("say_t", 0.0)) - delta)
+		if float(p.get("inside", 0.0)) > 0.0:
+			# in a shop: come back out a while later with something to say about it
+			p["inside"] -= delta
+			if p["inside"] <= 0.0:
+				p["say"] = SHOP_LINES.pick_random()
+				p["say_t"] = 2.2
+				p["shop_cool"] = randf_range(25.0, 60.0)
+			continue
+		p["shop_cool"] = maxf(0.0, float(p.get("shop_cool", randf_range(0.0, 20.0))) - delta)
 		if int(p["road"]) >= 0:
 			var r: Dictionary = roads[p["road"]]
+			var s_was: float = p["s"]
 			p["s"] = _wrap_s(r, p["s"] + p["dir"] * p["speed"] * delta)
+			if p["shop_cool"] <= 0.0 and not p["giver"]:
+				for d in _doors(p["road"]):
+					if float(d[1]) == float(p["side"]) and (float(d[0]) - s_was) * (float(d[0]) - float(p["s"])) <= 0.0:
+						p["shop_cool"] = randf_range(15.0, 40.0)
+						if randf() < 0.45:
+							p["inside"] = randf_range(4.0, 12.0)
+						break
 			if p["t"] <= 0.0 or (not r["closed"] and (p["s"] <= 0.5 or p["s"] >= float(r["len"]) - 0.5)):
 				p["dir"] = -p["dir"]
 				p["t"] = randf_range(8.0, 25.0)
@@ -1942,6 +1979,21 @@ func _update_life(delta: float) -> void:
 			p["phase"] += delta * 8.0
 	for b in boats:
 		b["a"] += b["w"] * delta
+
+
+## The doors along a road that people walking past can go into (shops, hotels, cafes, ...).
+func _doors(ri: int) -> Array:
+	if not road_doors.has(ri):
+		var out: Array = []
+		for bi in buildings.size():
+			var b: Dictionary = buildings[bi]
+			if int(b.get("road", -1)) != ri:
+				continue
+			var at := _road_at(roads[ri], float(b.get("s", 0.0)))
+			var n := Vector2(-at[1].y, at[1].x)
+			out.append([float(b.get("s", 0.0)), 1.0 if ((b["door"] as Vector2) - at[0]).dot(n) > 0.0 else -1.0, bi])
+		road_doors[ri] = out
+	return road_doors[ri]
 
 
 func _update_rivals(delta: float) -> void:
@@ -2484,8 +2536,12 @@ func _draw_world() -> void:
 			if tv.has_point(Iso.to_screen(sp)):
 				items.append([sp.x + sp.y, 9, e, sp])
 	for p in peds:
-		if tv.has_point(Iso.to_screen(p["pos"])):
+		if float(p.get("inside", 0.0)) <= 0.0 and tv.has_point(Iso.to_screen(p["pos"])):
 			items.append([p["pos"].x + p["pos"].y, 6, p])
+	if events != null:
+		for a in events.actors():
+			if tv.has_point(Iso.to_screen(a["pos"])):
+				items.append([a["pos"].x + a["pos"].y, 10, a])
 	for si in shops.size():
 		var cp: Vector2 = shops[si]["chef"]
 		if tv.has_point(Iso.to_screen(cp)):
@@ -2512,6 +2568,7 @@ func _draw_world() -> void:
 			7: Iso.held(Iso.ground_z(shops[it[2]]["chef"]), _draw_chef.bind(it[2]))
 			8: PowerUps.draw_mascot(self, Iso.to_screen(it[2]["pos"]), it[2]["phase"])
 			9: Iso.held(Iso.ground_z(it[3]), _draw_sprop.bind(it[2], it[3]))
+			10: Iso.held(Iso.ground_z(it[2]["pos"]), events.draw_actor.bind(self, it[2]))
 	_draw_gondola_cable()
 	_draw_overlays()
 
@@ -2603,6 +2660,22 @@ func _draw_ground(vr: Rect2) -> void:
 			var tile := Vector2(x, y)
 			var lit := _slope_light(tile)
 			var band := _contour(x, y)
+			# the textured look (see Ground): a stepped light level by slope and a light/dark stripe per contour band
+			var gname := _ground_name(kind, winter, fall)
+			if Ground.tex(gname) != null:
+				var light := Ground.band(lit) * (0.95 if band % 2 != 0 and (kind == T.GRASS or kind == T.FOREST) else 1.0)
+				var tint := Color(1.15, 1.16, 1.2) if winter and (kind == T.PLAZA or kind == T.SIDEWALK or kind == T.SAND) else Color.WHITE
+				Ground.quad(self, PackedVector2Array([Iso.to_screen(tile), Iso.to_screen(tile + Vector2(1, 0)), Iso.to_screen(tile + Vector2(1, 1)),
+					Iso.to_screen(tile + Vector2(0, 1))]), gname, light, Color.WHITE, tint)
+				if kind != T.PLAZA and kind != T.SIDEWALK and kind != T.SAND and kind != T.FOREST and not winter:
+					var fx := 0.2 + float(h % 60) / 100.0
+					var fy := 0.2 + float((h >> 6) % 60) / 100.0
+					if flower_every > 0 and h % flower_every == 0:
+						var flower: Color = [Color(1.0, 0.5, 0.75), Color(1.0, 0.92, 0.3), Color(1, 1, 1), Color(0.6, 0.6, 1.0), Color(1.0, 0.35, 0.3)][(h >> 8) % 5]
+						draw_rect(Rect2(Iso.to_screen(tile + Vector2(fx, 1.0 - fy)), Vector2(2, 2)), flower)
+				if fall and h % 5 == 0 and kind != T.FOREST:
+					draw_rect(Rect2(Iso.to_screen(tile + Vector2(0.3 + (h % 30) * 0.01, 0.6)), Vector2(2, 1)), Season.FALL_LEAVES[(h >> 4) % 4])
+				continue
 			match kind:
 				T.PLAZA:
 					# four cobbles per tile, each slightly different
@@ -2661,6 +2734,22 @@ func _draw_ground(vr: Rect2) -> void:
 					draw_line(Iso.to_screen(tile + Vector2(0, 1)), Iso.to_screen(tile + Vector2(1, 1)), line_col, 1.0)
 
 
+## The ground texture for a kind of tile in this season (see Ground).
+func _ground_name(kind: int, winter: bool, fall: bool) -> String:
+	match kind:
+		T.PLAZA:
+			return "plaza"
+		T.SIDEWALK:
+			return "sidewalk"
+		T.SAND:
+			return "sand"
+		T.WATER:
+			return ""
+		T.FOREST:
+			return "snow" if winter else ("grass_fall" if fall else "grass_forest")
+	return "snow" if winter else ("grass_fall" if fall else ("grass_spring" if Season.is_("spring") else "grass_meadow"))
+
+
 func _tile_edge(tile: Vector2, col: Color) -> void:
 	draw_line(Iso.to_screen(tile), Iso.to_screen(tile + Vector2(1, 0)), col, 1.0)
 	draw_line(Iso.to_screen(tile), Iso.to_screen(tile + Vector2(0, 1)), col, 1.0)
@@ -2683,11 +2772,19 @@ func _draw_lake(vr: Rect2) -> void:
 	if not vr.grow(700.0).has_point(Iso.to_screen(LAKE)):
 		return
 	var winter := Season.is_("winter")
-	draw_colored_polygon(lake_screen["sand"], Color(0.96, 0.86, 0.6).lerp(Season.SNOW, 0.75 if winter else 0.0))
-	draw_colored_polygon(lake_screen["wet"], Color(0.86, 0.74, 0.5).lerp(Season.SNOW, 0.6 if winter else 0.0))
-	draw_colored_polygon(lake_screen["water"], Season.water(Color(0.3, 0.68, 0.95)))
-	draw_colored_polygon(lake_screen["mid"], Season.water(Color(0.22, 0.56, 0.88)))
-	draw_colored_polygon(lake_screen["deep"], Season.water(Color(0.16, 0.44, 0.78)))
+	if winter or Ground.tex("water_creek") == null:
+		draw_colored_polygon(lake_screen["sand"], Color(0.96, 0.86, 0.6).lerp(Season.SNOW, 0.75 if winter else 0.0))
+		draw_colored_polygon(lake_screen["wet"], Color(0.86, 0.74, 0.5).lerp(Season.SNOW, 0.6 if winter else 0.0))
+		draw_colored_polygon(lake_screen["water"], Season.water(Color(0.3, 0.68, 0.95)))
+		draw_colored_polygon(lake_screen["mid"], Season.water(Color(0.22, 0.56, 0.88)))
+		draw_colored_polygon(lake_screen["deep"], Season.water(Color(0.16, 0.44, 0.78)))
+	else:
+		# textured: sand, darker wet sand, then the water in three bands that get deeper (darker) towards the middle
+		Ground.fill(self, lake_screen["sand"], "sand", Ground.band(1.06), Color(0.96, 0.86, 0.6))
+		Ground.fill(self, lake_screen["wet"], "sand", Ground.band(0.86), Color(0.86, 0.74, 0.5))
+		Ground.fill(self, lake_screen["water"], "water_creek", Ground.band(1.08), Color(0.3, 0.68, 0.95))
+		Ground.fill(self, lake_screen["mid"], "water_creek", Ground.band(0.92), Color(0.22, 0.56, 0.88))
+		Ground.fill(self, lake_screen["deep"], "water_creek", Ground.band(0.78), Color(0.16, 0.44, 0.78))
 	var shore: PackedVector2Array = lake_screen["water"].duplicate()
 	shore.append(shore[0])
 	draw_polyline(shore, Color(0.85, 0.95, 1.0), 2.0)
@@ -2722,12 +2819,15 @@ func _draw_roads(vr: Rect2) -> void:
 	for seg in road_draw:
 		if v.has_point(seg[0]):
 			vis.append(seg)
+	var winter_tint := Color(1.12, 1.13, 1.18) if Season.is_("winter") else Color.WHITE
 	for seg in vis:
-		draw_colored_polygon(seg[1], Color(0.7, 0.68, 0.64))
+		Ground.fill(self, seg[1], "sidewalk", 0.92, Color(0.7, 0.68, 0.64), winter_tint)
 	for seg in vis:
-		draw_colored_polygon(seg[2], Color(0.33, 0.34, 0.4))
+		Ground.fill(self, seg[2], "asphalt", 1.0, Color(0.33, 0.34, 0.4))
 	var v2 := vr.grow(40.0)
 	for seg in vis:
+		if Ground.tex("asphalt") != null:
+			break
 		for sp in seg[6]:
 			draw_rect(Rect2(sp, Vector2(2, 1)), Color(0.27, 0.28, 0.33))
 		if not seg[7].is_empty():
@@ -3045,7 +3145,10 @@ func _draw_tree(t: Dictionary) -> void:
 	var base := Iso.to_screen(t["pos"])
 	var s: float = t["s"]
 	draw_colored_polygon(PackedVector2Array([base + Vector2(-9, 0) * s, base + Vector2(0, -4) * s, base + Vector2(9, 0) * s, base + Vector2(0, 4) * s]), Color(0, 0, 0, 0.2))
-	Flora.tree(self, base, t["s"], {1: "pine_light", 3: "birch", 4: "oak"}.get(int(t["kind"]), "pine"))
+	# the town's own kinds of tree, each mixed with a few related species so the parks don't look planted in rows
+	var h := int(absf(t["pos"].x * 92821.0 + t["pos"].y * 68917.0))
+	var sp: String = {1: ["pine_light", "fir", "spruce"], 3: ["birch", "aspen", "willow"], 4: ["oak", "maple", "cherry"]}.get(int(t["kind"]), ["pine", "pine", "spruce", "larch"])[h % 3]
+	Flora.tree(self, base, t["s"], sp, false, h / 3)
 
 
 const STALL_ART := ["red", "orange", "green", "purple", "blue"]       # art/scenery_stall_<colour>.png, in PIZZA_COLORS order
@@ -3081,6 +3184,8 @@ func _draw_ped(p: Dictionary) -> void:
 		Sprites.draw_strip(self, "giver_%s_wave" % ("red" if look % 2 == 0 else "blue"), ground, t_ + float(p["phase"]), 8.0)
 	else:
 		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0)
+	if float(p.get("say_t", 0.0)) > 0.0:
+		_label(p["say"], ground + Vector2(0, -52), 8, Color(0.85, 0.95, 1.0))
 
 
 ## The pizza man outside each shop. With an order waiting he dances with the steaming box held high,
@@ -3134,6 +3239,8 @@ func _draw_car(c: Dictionary) -> void:
 	var tint := Color.WHITE.lerp(c["col"], 0.7) if c["kind"] in PAINTED_VEHICLES else Color.WHITE
 	if not Sprites.draw_vehicle(self, "vehicle_%s" % c["kind"], Iso.to_screen(pos), fwd, tint):
 		Sprites.draw_vehicle(self, "vehicle_car", Iso.to_screen(pos), fwd, Color.WHITE.lerp(c["col"], 0.7))
+	if c.get("siren", false):
+		TownEvents.draw_siren(self, c, Iso.to_screen(pos), t_)
 
 
 func _draw_player() -> void:

@@ -1,0 +1,61 @@
+{
+  "group_id": "dd6d2d32-939a-41b9-ab63-1cf47750004c",
+  "states": [
+    {
+      "character": {
+        "id": "46668854-7305-478c-abb7-4114042b567e",
+        "name": "Idle",
+        "prompt": "a small grey city pigeon standing on the ground, plump grey body, iridescent green and purple neck, two dark wing bars, small head, short pink legs, friendly cartoon style",
+        "size": {
+          "width": 32,
+          "height": 32
+        },
+        "template_id": "custom",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T02:11:07.329484+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "fly": {
+            "east": [
+              "Idle/animations/fly/east/frame_000.png",
+              "Idle/animations/fly/east/frame_001.png",
+              "Idle/animations/fly/east/frame_002.png",
+              "Idle/animations/fly/east/frame_003.png",
+              "Idle/animations/fly/east/frame_004.png",
+              "Idle/animations/fly/east/frame_005.png",
+              "Idle/animations/fly/east/frame_006.png",
+              "Idle/animations/fly/east/frame_007.png"
+            ]
+          },
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T02:20:47.233986"
+}

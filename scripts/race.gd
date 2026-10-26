@@ -58,7 +58,12 @@ var oy := 0
 var zgrid := PackedFloat32Array()     # terrain height (px) at cell corners
 var rdist := PackedFloat32Array()     # tiles to the road at cell corners (99 = far)
 var cell_col := PackedColorArray()
-var cell_kind := PackedByteArray()    # 0 bare, 1 meadow, 2 forest floor, 3 scree
+var cell_kind := PackedByteArray()    # 0 bare, 1 meadow, 2 forest floor, 3 scree, 4 snow
+var cell_tex := PackedByteArray()     # index into GROUND_KINDS: the texture of each cell (see Ground)
+var cell_light := PackedFloat32Array() # banded light level of each cell
+var cell_tint := PackedColorArray()
+const GROUND_KINDS := ["grass_meadow", "grass_forest", "grass_alpine", "grass_fall", "grass_spring", "scree", "snow", "dirt"]
+const CONTOUR_M := 3.0                # metres between the light/dark contour stripes on the hillside
 var peak := 1.0
 var streams: Array = []
 var stream_buckets: Dictionary = {}
@@ -96,6 +101,7 @@ var snow_called := false
 
 func _ready() -> void:
 	font = ThemeDB.fallback_font
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED   # the ground textures (see Ground) wrap
 	Game.rival_say.connect(func(rival: int, text: String): bubbles[rival + 1] = {"text": text, "t": 4.5})
 
 
@@ -461,6 +467,9 @@ func _build_terrain() -> void:
 			peak = maxf(peak, zgrid[idx])
 	cell_col.resize(gw * gh)
 	cell_kind.resize(gw * gh)
+	cell_tex.resize(gw * gh)
+	cell_light.resize(gw * gh)
+	cell_tint.resize(gw * gh)
 	for j in gh:
 		for i in gw:
 			var z00 := zgrid[j * n1 + i]
@@ -503,6 +512,31 @@ func _build_terrain() -> void:
 			if cover > 0.0:
 				col = col.lerp(Color(0.93, 0.96, 1.0), cover * 0.92)
 			cell_col[j * gw + i] = Iso.shade(col, sh)
+			# the textured look: which ground, a stepped light level, and stripes every few metres of height
+			var gname := "grass_meadow"
+			if kind == 4 or cover > 0.5 or f > 0.975 or (Season.bare() and kind != 3):
+				gname = "snow"
+			elif kind == 3:
+				gname = "scree"
+			elif kind == 2:
+				gname = "grass_fall" if Season.is_("fall") else "grass_forest"
+			elif f > 0.6:
+				gname = "grass_alpine"
+			elif Season.is_("spring") or course.get("flowers", false):
+				gname = "grass_spring"
+			elif Season.is_("fall"):
+				gname = "grass_fall"
+			var stripe := 0.94 if int(floorf(zc / (CONTOUR_M * vz))) % 2 == 1 else 1.0
+			cell_tex[j * gw + i] = GROUND_KINDS.find(gname)
+			cell_light[j * gw + i] = Ground.band(sh) * stripe
+			var tint := Color.WHITE
+			if kind == 3 and Season.bare():
+				tint = Color(1.15, 1.15, 1.2)
+			elif cover > 0.0 and gname != "snow":
+				tint = Color.WHITE.lerp(Color(1.2, 1.22, 1.28), cover)
+			if _stream_d(x, y) < 1.8 and gname.begins_with("grass"):
+				tint = tint * Color(0.9, 1.0, 0.92)
+			cell_tint[j * gw + i] = tint
 			cell_kind[j * gw + i] = kind
 
 
@@ -814,7 +848,7 @@ func _draw_board(e: Dictionary) -> void:
 				ic + Vector2(m * 4, -2), ic + Vector2(m * 4, 4)]), ink, 2.0)
 			draw_colored_polygon(PackedVector2Array([ic + Vector2(m * 4, 8), ic + Vector2(m * 7, 3), ic + Vector2(m * 1, 3)]), ink)
 		"up", "down":
-			var m := -1.0 if e["icon"] == "up" else 1.0
+			var m := 1.0 if e["icon"] == "up" else -1.0
 			draw_colored_polygon(PackedVector2Array([ic + Vector2(-8, m * 5), ic + Vector2(8, m * 5), ic + Vector2(0, -m * 6)]), ink)
 			draw_colored_polygon(PackedVector2Array([ic + Vector2(-5, m * 4), ic + Vector2(5, m * 4), ic + Vector2(0, -m * 2)]), Color(1.0, 0.45, 0.1))
 		"tunnel":
@@ -878,20 +912,43 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 				chance = 0.0
 			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
-			if _rd(p) < 2.0 or _stream_d(x, y) < 1.0:
+			var sd := _stream_d(x, y)
+			if _rd(p) < 2.0 or sd < 1.0:
 				continue
+			var rock_chance := 0.09 if f > 0.85 else 0.04 if snow else 0.015
 			if roll < chance:
-				var kind := rng.randi() % 3
+				# conifers up high and in the forest, broadleaves lower down and out in the meadows, willows by the creeks
 				var r2 := rng.randf()
-				if forest < 0.4 and r2 < 0.5:
-					kind = 3 if r2 < 0.3 else 4
+				var sp := "pine"
+				if snow:
+					sp = "snag" if r2 < 0.05 else "pine"
 				elif r2 < 0.04:
-					kind = 5
-				if snow and kind != 5:
-					kind = 0 if kind != 1 else 1   # only firs hold on up here
-				_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.8, 1.4), "kind": kind, "snow": snow}, [])
-			elif roll < chance + (0.09 if f > 0.85 else 0.04 if snow else 0.015):
+					sp = "snag"
+				elif r2 < 0.06:
+					sp = "stump"
+				elif sd < 2.4 and r2 < 0.3:
+					sp = "willow"
+				elif f > 0.55 or forest > 0.6:
+					sp = ["pine", "pine", "pine_light", "spruce", "fir", "larch", "larch"][rng.randi() % 7]
+				else:
+					sp = ["oak", "birch", "birch", "maple", "aspen", "aspen", "cherry", "pine_light", "pine"][rng.randi() % 9]
+				_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.8, 1.4), "sp": sp, "snow": snow, "h": rng.randi()}, [])
+			elif roll < chance + rock_chance:
 				_put_static(3, {"pos": p, "z": z, "size": rng.randf_range(0.6, 1.5), "h": rng.randi(), "snow": snow}, [])
+			elif roll < chance + rock_chance + (0.22 if sd < 2.2 else 0.12):
+				# ground plants: reeds and wet stones on the creek banks, ferns, berries and mushrooms in the forest,
+				# wildflowers and long grass out in the meadows
+				var r3 := rng.randf()
+				var kind := "bush"
+				if sd < 2.2:
+					kind = "reeds" if r3 < 0.6 else "stones"
+				elif snow:
+					kind = "bush" if r3 < 0.5 else "stones"
+				elif forest > 0.5:
+					kind = ["bush", "bush", "mushrooms", "grass"][rng.randi() % 4]
+				else:
+					kind = ["flowers", "flowers", "flowers", "grass", "grass", "bush"][rng.randi() % 6]
+				_put_static(7, {"pos": p, "z": z, "kind": kind, "h": rng.randi(), "snow": snow, "scale": rng.randf_range(0.8, 1.15)}, [])
 
 
 func _build_stream_geometry() -> void:
@@ -931,8 +988,9 @@ func _build_road_geometry() -> void:
 		var zb := elev[i + 1] * vz + 1.5
 		var edge := PackedVector2Array([Iso.to_screen(pa - ua * 0.64, za), Iso.to_screen(pb - ub * 0.64, zb),
 			Iso.to_screen(pb + ub * 0.64, zb), Iso.to_screen(pa + ua * 0.64, za)])
-		var gravel := PackedVector2Array([Iso.to_screen(pa - ua * 0.52, za + 0.3), Iso.to_screen(pb - ub * 0.52, zb + 0.3),
-			Iso.to_screen(pb + ub * 0.52, zb + 0.3), Iso.to_screen(pa + ua * 0.52, za + 0.3)])
+		var pb2 := pb + (pb - pa).normalized() * 0.08   # overlap the next piece a little, so no seam shows between them
+		var gravel := PackedVector2Array([Iso.to_screen(pa - ua * 0.52, za + 0.3), Iso.to_screen(pb2 - ub * 0.52, zb + 0.3),
+			Iso.to_screen(pb2 + ub * 0.52, zb + 0.3), Iso.to_screen(pa + ua * 0.52, za + 0.3)])
 		var ruts: Array = []
 		for off in [-0.25, 0.25]:
 			ruts.append(PackedVector2Array([Iso.to_screen(pa + ua * (off - 0.05), za + 0.5), Iso.to_screen(pb + ub * (off - 0.05), zb + 0.5),
@@ -943,7 +1001,21 @@ func _build_road_geometry() -> void:
 			var lat := fposmod(i * 0.377 + k * 0.53, 1.0) * 1.0 - 0.5
 			pebbles.append(Iso.to_screen(pa.lerp(pb, f) + ua * lat, lerpf(za, zb, f) + 0.6))
 		var snow := _snow_cover(pa.x, pa.y, elev[i] * vz / peak)
-		road_segs.append({"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2), "snow": snow})
+		var seg := {"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2), "snow": snow,
+			"light": Ground.band(1.0 - clampf(grade_a[i], -0.1, 0.12) * 1.6)}
+		# a chevron painted on the road every 40 m or so, pointing the way, coloured by how steep it is
+		if i % 24 == 12 and s_m[i] < float(course["length"]):
+			var t := (pb - pa).normalized()
+			var n := Vector2(-t.y, t.x)
+			var g := grade_a[i]
+			var col := Color(0.35, 0.65, 1.0) if g <= -0.02 else (Color(0.4, 0.85, 0.35) if g < 0.03 else (Color(1.0, 0.85, 0.2) if g < 0.06 else (Color(1.0, 0.5, 0.15) if g < 0.09 else Color(0.95, 0.2, 0.2))))
+			var chev: Array = []
+			for k in (2 if g >= 0.09 else 1):
+				var c := pa + t * (k * 0.32)
+				chev.append(PackedVector2Array([Iso.to_screen(c - t * 0.16 + n * 0.32, za + 0.6), Iso.to_screen(c + t * 0.16, za + 0.6), Iso.to_screen(c - t * 0.16 - n * 0.32, za + 0.6)]))
+			seg["chev"] = chev
+			seg["chev_col"] = col
+		road_segs.append(seg)
 		var d := _diag((pa + pb) * 0.5)
 		if not road_buckets.has(d):
 			road_buckets[d] = []
@@ -1808,16 +1880,27 @@ func _draw() -> void:
 				continue
 			var col := cell_col[j * gw + i]
 			# a quad primitive needs no triangulation, so steep cells that fold over still draw
-			draw_primitive(PackedVector2Array([Iso.to_screen(Vector2(wx, wy), z00), Iso.to_screen(Vector2(wx + 1, wy), z10),
-				Iso.to_screen(Vector2(wx + 1, wy + 1), z11), Iso.to_screen(Vector2(wx, wy + 1), z01)]), PackedColorArray([col]), PackedVector2Array())
-			_cell_detail(i, j, center, cell_kind[j * gw + i], col)
+			var ci_ := j * gw + i
+			var gname: String = GROUND_KINDS[cell_tex[ci_]]
+			var quad := PackedVector2Array([Iso.to_screen(Vector2(wx, wy), z00), Iso.to_screen(Vector2(wx + 1, wy), z10),
+				Iso.to_screen(Vector2(wx + 1, wy + 1), z11), Iso.to_screen(Vector2(wx, wy + 1), z01)])
+			if Ground.tex(gname) == null:
+				draw_primitive(quad, PackedColorArray([col]), PackedVector2Array())
+				_cell_detail(i, j, center, cell_kind[ci_], col)
+			else:
+				Ground.quad(self, quad, gname, cell_light[ci_], col, cell_tint[ci_])
+				if cell_kind[ci_] == 1 and not Season.bare():
+					_cell_flowers(i, j, center)
 	for d in range(d0, d1 + 1):
 		if stream_buckets.has(d):
 			for sg in stream_buckets[d]:
 				var a: Vector2 = sg["a"]
 				if not big.has_point(a):
 					continue
-				draw_colored_polygon(sg["poly"], Season.water(WATER))
+				if Season.bare() or Ground.tex("water_creek") == null:
+					draw_colored_polygon(sg["poly"], Season.water(WATER))
+				else:
+					Ground.fill(self, sg["poly"], "water_creek", 1.0, WATER)
 				if not Season.bare() and (int(sg["k"]) + int(t_ * 5.0)) % 4 == 0:
 					draw_line(a, sg["b"], Color(0.85, 0.95, 1.0), 1.0)
 	for d in range(d0, d1 + 1):
@@ -1828,14 +1911,30 @@ func _draw() -> void:
 				if not big.has_point(e[0]):
 					continue
 				var sn: float = maxf(float(seg["snow"]) * 0.6, 0.3 if Season.bare() else 0.0)
-				draw_colored_polygon(e, Color(0.5, 0.42, 0.33).lerp(Color(0.7, 0.74, 0.8), sn))
-				draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52).lerp(Season.SNOW, sn), seg["shade"]))
-				for rut in seg["ruts"]:
-					draw_colored_polygon(rut, Color(0.6, 0.52, 0.42).lerp(Color(0.62, 0.66, 0.74), sn))
-				var pi_ := 0
-				for pb in seg["pebbles"]:
-					draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
-					pi_ += 1
+				var snow_tint := Color.WHITE.lerp(Color(1.25, 1.27, 1.32), sn)
+				var textured := Ground.tex("gravel_road") != null
+				if textured:
+					Ground.fill(self, e, "dirt", float(seg["light"]) * 0.82, Color(0.5, 0.42, 0.33), snow_tint)
+					Ground.fill(self, seg["gravel"], "gravel_road", float(seg["light"]), Color(0.72, 0.64, 0.52), snow_tint)
+					for rut in seg["ruts"]:
+						draw_colored_polygon(rut, Color(0.3, 0.24, 0.18, 0.22))
+				else:
+					draw_colored_polygon(e, Color(0.5, 0.42, 0.33).lerp(Color(0.7, 0.74, 0.8), sn))
+					draw_colored_polygon(seg["gravel"], Iso.shade(Color(0.72, 0.64, 0.52).lerp(Season.SNOW, sn), seg["shade"]))
+					for rut in seg["ruts"]:
+						draw_colored_polygon(rut, Color(0.6, 0.52, 0.42).lerp(Color(0.62, 0.66, 0.74), sn))
+					var pi_ := 0
+					for pb in seg["pebbles"]:
+						draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
+						pi_ += 1
+	for d in range(d0, d1 + 1):   # the grade chevrons on top of the road
+		if road_buckets.has(d):
+			for si in road_buckets[d]:
+				var seg: Dictionary = road_segs[si]
+				if seg.has("chev") and big.has_point(seg["edge"][0]):
+					for ch in seg["chev"]:
+						draw_polyline(ch, Iso.OUTLINE, 4.0)
+						draw_polyline(ch, seg["chev_col"], 2.0)
 	for d in range(d0, d1 + 1):
 		if statics.has(d):
 			for it in statics[d]:
@@ -1852,6 +1951,7 @@ func _draw() -> void:
 					3: _draw_rock(it[1])
 					4: _draw_obstacle(it[1])
 					6: _draw_tunnel_piece(it[1])
+					7: Flora.plant(self, Iso.to_screen(it[1]["pos"], it[1]["z"]), it[1]["kind"], it[1]["h"], it[1]["snow"], it[1]["scale"])
 		if buckets.has(d):
 			for it in buckets[d]:
 				match it[0]:
@@ -1972,13 +2072,23 @@ const FLOWER_COLS := [Color(1.0, 0.45, 0.7), Color(1.0, 0.92, 0.3), Color(1, 1, 
 
 
 ## Flour Run: every meadow cell is a little patch of flowers, each a stem and a four-petal head.
+## Flowers dotted over the textured meadows (the texture has the grass).
+func _cell_flowers(i: int, j: int, center: Vector2) -> void:
+	var h := ((i * 73856093) ^ (j * 19349663)) & 0x7fffffff
+	var o := Vector2(float(h % 17) - 8.0, float((h >> 5) % 9) - 4.0)
+	if course.get("flowers", false) and (not Season.is_("fall") or h % 4 == 0):
+		_flowers(center, h)
+	elif h % (3 if Season.is_("spring") else 6 if Season.is_("summer") else 24) == 0:
+		draw_rect(Rect2(center - o, Vector2(2, 2)), [Color(1.0, 0.5, 0.75), Color(1.0, 0.92, 0.3), Color(1, 1, 1), Color(0.6, 0.6, 1.0)][(h >> 3) % 4])
+
+
 func _flowers(center: Vector2, h: int) -> void:
 	Sprites.draw_image(self, ["scenery_tulips_red", "scenery_tulips_yellow", "scenery_tulips_pink"][h % 3], center + Vector2(0, 6), h % 2 == 0, 1.0, 0.7)
 
 
 func _draw_tree(t: Dictionary) -> void:
 	var base := Iso.to_screen(t["pos"], t["z"])
-	Flora.tree(self, base, t["s"], {1: "pine_light", 3: "oak", 4: "birch", 5: "snag"}.get(int(t["kind"]), "pine"), t.get("snow", false))
+	Flora.tree(self, base, t["s"], t.get("sp", "pine"), t.get("snow", false), int(t.get("h", 0)))
 
 
 func _draw_rock(r: Dictionary) -> void:
@@ -2076,7 +2186,10 @@ func _draw_obstacle(ob: Dictionary) -> void:
 				right.append(_sp(_pose(ss, 1.0), 0.2))
 			right.reverse()
 			var poly := left + right
-			draw_colored_polygon(poly, Iso.fa(Season.water(WATER), 0.9))
+			if Season.bare() or Ground.tex("water_creek") == null:
+				draw_colored_polygon(poly, Iso.fa(Season.water(WATER), 0.9))
+			else:
+				Ground.fill(self, poly, "water_creek", 1.08, WATER, Color(1, 1, 1, 0.88))
 			for q in 3:
 				var u := fposmod(t_ * 0.5 + q / 3.0, 1.0)
 				var ss := s - FORD_HALF + FORD_HALF * 2.0 * u

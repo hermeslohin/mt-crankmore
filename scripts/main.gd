@@ -730,7 +730,7 @@ func _debug_events() -> void:
 ## if it has one. Your save is put back as it was when you quit.
 const VIEWER_SEASON := {"snowball_fight": "winter", "sledding": "winter", "tree_lighting": "winter", "egg_hunt": "spring",
 	"duck_crossing": "spring", "volleyball": "summer", "fishing": "summer", "lemonade": "summer", "trick_or_treat": "fall",
-	"hayride": "fall", "harvest_festival": "fall"}
+	"hayride": "fall", "harvest_festival": "fall", "zombie_kids": "fall"}
 const VIEWER_HOUR := {"fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
 
 func _debug_viewer() -> void:

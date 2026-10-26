@@ -623,7 +623,7 @@ func _draw_challenge(city, r: Rect2) -> void:
 			elif c["kind"] == "climb":
 				draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(c.get("progress", 0.0)), bar.size.y)), Color(0.4, 1.0, 0.5) if float(c["t"]) <= float(c["target"]) else Color(1.0, 0.5, 0.4))
 				_text("%s   %s / %s" % [c["name"], city._clock(float(c["t"])), city._clock(float(c["target"]))], Vector2(x, y + 36), 8, Color.WHITE)
-			elif c["kind"] == "gulls":
+			elif c["kind"] == "gulls" or c["kind"] == "zombies":
 				var k := clampf(float(c["gap"]) / float(c["escape"]), 0.0, 1.0)
 				draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.4, 0.3))
 				_text("Get away! %d m ahead of them" % int(c["gap"]), Vector2(x, y + 36), 8, Color.WHITE)

@@ -23,7 +23,8 @@ const TOWN := ["parade_float", "market", "car_wash", "wedding", "flash_mob", "co
 const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual", "norm_woman_tracksuit", "norm_man_shorts", "cyclist_fan"]
 const RUN_LEN := 18.0                  # tiles of road closed for a fun run
 const SEASONAL := {"winter": ["snowball_fight", "sledding", "tree_lighting"], "spring": ["egg_hunt", "duck_crossing"],
-	"summer": ["volleyball", "fishing", "lemonade"], "fall": ["trick_or_treat", "hayride", "harvest_festival"]}
+	"summer": ["volleyball", "fishing", "lemonade"], "fall": ["trick_or_treat", "hayride", "harvest_festival", "zombie_kids"]}
+const ZOMBIES := ["zombie_kid_1", "zombie_kid_2", "zombie_kid_3", "zombie_kid_4"]
 const KIDS := ["kid", "bucket_hat_kid", "skater_kid", "norm_boy_kid", "scout", "norm_teen_girl", "norm_teen_boy"]
 const EGG_COLS := [Color(1.0, 0.55, 0.75), Color(0.55, 0.8, 1.0), Color(1.0, 0.9, 0.4), Color(0.6, 1.0, 0.6), Color(0.85, 0.6, 1.0)]
 
@@ -188,7 +189,7 @@ func _fx(e: Dictionary, q: Vector2, fn: Callable) -> Dictionary:
 
 func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 	var needs_spot := not kind in ["parade_float", "flash_mob", "tree_lighting", "wedding", "arcade_queue", "video_rush",
-		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race", "mountain_rescue"]
+		"eating_contest", "fishing", "volleyball", "outage", "cart", "seagulls", "hot_air_balloon", "kid_race", "mountain_rescue", "zombie_kids"]
 	if needs_spot and sp.is_empty():
 		return false
 	var pos: Vector2 = e.get("pos", city.p_pos)
@@ -465,6 +466,27 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			var kid := _extra(e, pos - across * 0.9, pos + across, "", KIDS)
 			_say(kid, "Lemonade! 25 cents!", 3.0)
 			e["stand"] = pos
+		"zombie_kids":
+			# kids in zombie costumes lurch out after you: half your FTP gets you away (City.CHALLENGES "zombies")
+			if not city.start_challenge("zombies"):
+				return false
+			e["t"] = 60.0
+			var have: Array = ZOMBIES.filter(func(d): return _has("ped_%s_walk" % d))
+			for k in 4:
+				var z: Dictionary
+				if k < have.size():
+					z = _person(city.p_pos, have[k], city.p_fwd)
+				else:   # no zombie art yet: trick-or-treaters gone a bit green
+					z = _person(city.p_pos, "", city.p_fwd)
+					z["looks"] = (["tot_ghost", "tot_witch", "tot_pumpkin", "tot_skeleton"] + KIDS).filter(func(d): return _has("ped_%s_walk" % d))
+					z["tint"] = Color(0.7, 1.0, 0.65)
+				z["zombie"] = k
+				z["anim"] = "walk"
+				z["moving"] = true
+				z["fps"] = 7.0
+				e["actors"].append(z)
+			_say(e["actors"][0], "BRAAAAINS!", 2.5)
+			Game.toast.emit("ZOMBIE KIDS! Get away from them (50% of your FTP)!", Color(0.6, 1.0, 0.5))
 		"trick_or_treat":
 			e["t"] = 70.0
 			e["dir"] = 1.0 if randf() < 0.5 else -1.0
@@ -934,6 +956,33 @@ func _step(e: Dictionary, delta: float) -> void:
 			elif c["state"] == "lost" and not e.get("said", false):
 				e["said"] = true
 				_say(kid, ["HA! Beat you!", "Too slow, pizza person!", "Woo-hoo! I win!"].pick_random(), 3.0)
+		"zombie_kids":
+			var c: Dictionary = city.challenge
+			if c.is_empty() or c["kind"] != "zombies" or c["state"] in ["won", "lost"]:
+				# give up the chase (or crowd round you, cheering, if they caught you)
+				var caught: bool = not c.is_empty() and c["kind"] == "zombies" and c["state"] == "lost"
+				for a in e["actors"]:
+					if caught:
+						a["moving"] = false
+						a["anim"] = "cheer"
+						if a["label_t"] <= 0.0:
+							_say(a, ["Trick or treat!", "Gotcha!", "Candy tax!"].pick_random(), 2.0)
+					else:
+						a["moving"] = false
+						a["anim"] = "idle"
+				if not e.get("ending", false):
+					e["ending"] = true
+					e["t"] = minf(float(e["t"]), 4.0)
+				return
+			var at: Array = city.challenge_pos()
+			for a in e["actors"]:
+				var k: int = a["zombie"]
+				var f: Vector2 = at[1]
+				a["pos"] = (at[0] as Vector2) - f * (k / 2) * 0.6 + f.orthogonal() * ((k % 2) * 0.6 - 0.3)
+				a["face"] = f
+				a["moving"] = true
+				if a["label_t"] <= 0.0 and randf() < delta * 0.3:
+					_say(a, ["BRAAAINS!", "Uuuurgh...", "Trick or treat... or BRAINS!", "Come back, pizza!", "Graaawr!"].pick_random(), 1.6)
 		"seagulls":
 			var c: Dictionary = city.challenge
 			if c.is_empty() or c["kind"] != "gulls" or c["state"] in ["won", "lost"]:

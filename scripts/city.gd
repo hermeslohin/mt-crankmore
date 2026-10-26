@@ -2833,6 +2833,7 @@ const CHALLENGES := {
 	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 150.0, "count": 3.0},
 	"rush": {"title": "PIZZA RUSH", "pct": 0.80, "reward": 120, "stops": 5},
 	"climb": {"title": "HILL SPRINT", "pct": 1.05, "reward": 60},
+	"zombies": {"title": "ZOMBIE KIDS!", "pct": 0.50, "reward": 0, "gap": 6.0, "escape": 25.0, "time": 45.0},
 	"gulls": {"title": "SEAGULLS!", "pct": 0.90, "reward": 0, "gap": 15.0, "escape": 40.0, "time": 90.0},   # a head start, and time to get away
 }
 const RUSH_CHANCE := 0.12     # orders that are a pizza rush: five stops, paid a bonus for an 80% FTP average
@@ -2897,7 +2898,7 @@ func _update_challenge(delta: float) -> void:
 			pass   # ends at the last stop (see _deliver)
 		"climb":
 			_update_climb(c)
-		"gulls":
+		"gulls", "zombies":
 			c["gap"] = float(c["gap"]) + (me - them) * delta
 			if float(c["gap"]) >= float(c["escape"]) or float(c["t"]) > float(c["time"]):
 				_end_challenge(true)
@@ -2943,6 +2944,14 @@ func _end_challenge(won: bool) -> void:
 				Game.toast.emit("%s in %s! Beat %s: +$%d" % [str(challenge["name"]).to_upper(), _clock(float(challenge["t"])), _clock(float(challenge["target"])), int(challenge["reward"])], Color(0.4, 1.0, 0.5))
 			else:
 				Game.toast.emit(str(challenge.get("why", "Too slow up %s" % challenge["name"])), Color(1.0, 0.6, 0.5))
+			return
+		"zombies":
+			if won:
+				Game.toast.emit("You escaped the zombies!", Color(0.6, 1.0, 0.6))
+			else:
+				Game.add_money(-10)
+				p_speed = 0.0
+				Game.toast.emit("The zombies got you! You hand over $10 of candy money.", Color(1.0, 0.6, 0.4))
 			return
 		"gulls":
 			if won:
@@ -3062,7 +3071,7 @@ func challenge_pos() -> Array:
 		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, CAR_LANE)
 	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
 		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm, BIKE_LANE - 0.4)
-	if challenge.get("kind", "") == "gulls":
+	if challenge.get("kind", "") == "gulls" or challenge.get("kind", "") == "zombies":
 		return _rail_ahead(-float(challenge["gap"]) * tpm, 0.6)
 	return _rail_ahead(float(challenge.get("gap", 0.0)) * tpm, BIKE_LANE)
 

@@ -1029,30 +1029,19 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["car"] = _responder(["truck_firetruck"], b["road"], float(b["s"]))
 			Game.toast.emit("Smoke over %s! The fire brigade is on its way." % str(b.get("name", "town")), Color(1.0, 0.55, 0.3))
 		"ambulance":
-			# a pile-up on the pavement: four people hurt, a bystander calling for help, and the ambulance crew wheeling
-			# each of them to the ambulance on a stretcher
-			e["t"] = 150.0
+			# someone hurt on the pavement and a bystander calling for help; the ambulance crew wheels them to the
+			# ambulance on a stretcher. Then another call comes in nearby: PATIENTS people in all, one at a time, each
+			# somebody different, somewhere different.
+			e["t"] = 170.0
 			e["stage"] = "down"
 			e["clock"] = 0.0
-			var along: Vector2 = sp[4]
-			var hurt: Array = []
-			for k in PATIENTS:
-				var q: Vector2 = pos + along * (k - (PATIENTS - 1) * 0.5) * 1.0
-				if not _free(q):
-					continue
-				var patient := _person(q, "", along)
-				patient["anim"] = "idle"
-				patient["down"] = true
-				patient["patient"] = true
-				hurt.append(patient)
-				e["actors"].append(patient)
-			if hurt.is_empty():
-				return false
-			_say(hurt[0], ["Ow! My ankle!", "I'm fine... I'm not fine.", "Did anyone get that bike's number?"].pick_random(), 3.0)
-			if hurt.size() > 2:
-				_say(hurt[2], ["My elbow!", "Ooof.", "Too much pizza..."].pick_random(), 3.0)
-			var helper := _person(pos - (sp[5] as Vector2 - pos).normalized() * 0.7, "", along)
+			e["left"] = PATIENTS - 1
+			e["road"] = sp[1]
+			e["s"] = float(sp[2])
+			_add_patient(e, pos, sp[4])
+			var helper := _person(pos - (sp[5] as Vector2 - pos).normalized() * 0.7, "", sp[4])
 			helper["anim"] = "cheer"
+			helper["helper"] = true
 			_say(helper, "Someone call an ambulance!", 3.0)
 			e["actors"].append(helper)
 			e["car"] = _responder(["van_ambulance"], sp[1], float(sp[2]))
@@ -1332,12 +1321,15 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 			_carry(e, false)
 			if e["clock"] > 1.2:
 				e["stretcher"]["load"] = false
+				if hurt.is_empty() and int(e["left"]) > 0 and _next_casualty(e):
+					e["left"] = int(e["left"]) - 1
+					hurt = e["actors"].filter(func(q): return q.get("patient", false) and not q.get("gone", false) and q.get("down", false))
 				if hurt.is_empty():
 					e["stage"] = "done"
 					for a in e["actors"]:
 						if a.has("medic") or a["type"] == "stretcher":
 							a["gone"] = true
-					var helper: Dictionary = e["actors"].filter(func(a): return not a.has("medic") and not a.get("patient", false) and a["type"] == "person")[0]
+					var helper: Dictionary = e["actors"].filter(func(a): return a.get("helper", false))[0]
 					_say(helper, "Thank you, paramedics!", 3.0)
 					helper["anim"] = "idle"
 					_drive_off(e)
@@ -1347,6 +1339,29 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 			for a in e["actors"]:
 				if a.get("patient", false):
 					_walk_to(a, delta)
+
+
+## A casualty lying at `q` (anyone: their look comes from the cast), groaning about it.
+func _add_patient(e: Dictionary, q: Vector2, face: Vector2) -> void:
+	var patient := _person(q, "", face)
+	patient["anim"] = "idle"
+	patient["down"] = true
+	patient["patient"] = true
+	_say(patient, ["Ow! My ankle!", "I'm fine... I'm not fine.", "Did anyone get that bike's number?", "My elbow!", "Ooof.",
+		"Too much pizza...", "I slipped on a pepperoni!", "Is my hat OK?"].pick_random(), 3.0)
+	e["actors"].append(patient)
+
+
+## The next call: someone else down a little way along the pavement from the ambulance, either side of the road.
+func _next_casualty(e: Dictionary) -> bool:
+	var r: Dictionary = city.roads[e["road"]]
+	for _try in 12:
+		var s: float = city._wrap_s(r, float(e["s"]) + randf_range(2.0, 5.0) * (1.0 if randf() < 0.5 else -1.0))
+		var k: Array = _kerb(e["road"], s, 1.0 if randf() < 0.5 else -1.0)
+		if _free(k[0]):
+			_add_patient(e, k[0], k[1])
+			return true
+	return false
 
 
 ## Off to the nearest casualty still lying there.

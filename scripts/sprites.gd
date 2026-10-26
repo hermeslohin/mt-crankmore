@@ -146,14 +146,16 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	return true
 
 
-## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets) with its middle on `at`,
-## heading `w` (world direction), tinted by `tint`.
-static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE) -> bool:
+## A vehicle (art/<name>.png: 8 square rows, one per direction of travel as in the rider sheets; columns are the frames
+## of its driving animation, if it has one) with its middle on `at`, heading `w` (world direction), tinted by `tint`.
+## `frame` picks the animation frame (it wraps).
+static func draw_vehicle(ci: CanvasItem, name: String, at: Vector2, w: Vector2, tint := Color.WHITE, frame := 0) -> bool:
 	var tex := sheet(name)
 	if tex == null:
 		return false
 	var f := tex.get_height() / DIRS
-	var src := Rect2(0, dir_row(w) * f, f, f)
+	var frames := maxi(1, tex.get_width() / f)
+	var src := Rect2(posmod(frame, frames) * f, dir_row(w) * f, f, f)
 	var dst := Rect2((at - Vector2(f * 0.5, f * 0.5 + VEHICLE_LIFT)).round(), Vector2(f, f))
 	ci.draw_texture_rect_region(tex, dst, src, tint)
 	return true

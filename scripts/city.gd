@@ -1873,6 +1873,7 @@ func _update_cars(delta: float) -> void:
 				target = 0.0
 		c["speed"] = move_toward(c["speed"], target, 4.0 * delta)
 		var moved: float = c["speed"] * delta
+		c["odo"] = float(c.get("odo", randf() * 10.0)) + moved   # distance driven: turns the wheels, bounces the body
 		var s0: float = c["s"]
 		c["s"] = _wrap_s(r, s0 + c["dir"] * moved)
 		_car_junctions(c, r, s0, moved)
@@ -3253,8 +3254,21 @@ func _draw_car(c: Dictionary) -> void:
 	var rt := Vector2(-fwd.y, fwd.x)
 	draw_colored_polygon(_to_screen_poly(PackedVector2Array([pos + fwd * hl + rt * hw, pos - fwd * hl + rt * hw, pos - fwd * hl - rt * hw, pos + fwd * hl - rt * hw])), Color(0, 0, 0, 0.25))
 	var tint := Color.WHITE.lerp(c["col"], 0.7) if c["kind"] in PAINTED_VEHICLES else Color.WHITE
-	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), Iso.to_screen(pos), fwd, tint):
-		Sprites.draw_vehicle(self, "vehicle_car", Iso.to_screen(pos), fwd, Color.WHITE.lerp(c["col"], 0.7))
+	var odo: float = c.get("odo", 0.0)
+	var moving: bool = float(c["speed"]) > 0.3
+	# a one-pixel bounce on the suspension while it drives, and the wheels turn with the distance driven
+	var at := Iso.to_screen(pos) + Vector2(0, -1 if moving and int(odo * 5.0) % 2 == 0 else 0)
+	var frame := int(odo * 6.0)
+	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame):
+		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame)
+	if not String(c["kind"]).contains("electric") and not String(c["kind"]).contains("carriage"):
+		# exhaust: little puffs from the back that drift up and fade, more when it pulls away
+		var rear: Vector2 = pos - fwd * hl
+		var puff := clampf(float(c["speed"]) / maxf(float(c["max"]), 0.1), 0.25, 1.0)
+		for k in 3:
+			var u := fposmod(t_ * 1.4 + k / 3.0 + float(c["hl"]) * 7.0, 1.0)
+			var p := Iso.to_screen(rear - fwd * u * 0.7) + Vector2(0, -4.0 - u * 10.0)
+			draw_circle(p, 1.2 + u * 2.4, Color(0.85, 0.85, 0.88, (1.0 - u) * 0.35 * puff))
 	if c.get("siren", false):
 		TownEvents.draw_siren(self, c, Iso.to_screen(pos), t_)
 

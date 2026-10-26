@@ -10,6 +10,9 @@ extends SceneTree
 ##     8 rows (the rider row order: down-right, down, down-left, left, up-left, up, up-right, right), feet at the bottom
 ##     centre of each frame: a person walking in every direction. <dir> holds rotations/ and animations/<anim>/<direction>/;
 ##     "still" packs just the rotations (one column), for a pose that doesn't animate (a skier).
+##   godot --headless -s tools/import_sprite.gd -- vehicle <dir> <anim> <out name>
+##     8 rows of directions (as rotations), one column per frame of animations/<anim>/<direction>/, each frame centred
+##     on the same spot as the still: a vehicle's driving animation.
 ##   godot --headless -s tools/import_sprite.gd -- rotations <dir> <out name>
 ##     8 rows, one per direction of travel (the same row order as the rider sheets), one still each, centred in the
 ##     frame: for vehicles. <dir> holds rotations/<direction>.png.
@@ -25,6 +28,8 @@ func _initialize() -> void:
 		_strip(a[1], a[2], a[3], "%s/%s.png" % [out_dir, a[4]], a.size() > 5 and a[5] == "anchor=center")
 	elif a.size() >= 4 and a[0] == "people":
 		_people(a[1], a[2], "%s/%s.png" % [out_dir, a[3]])
+	elif a.size() >= 4 and a[0] == "vehicle":
+		_vehicle(a[1], a[2], "%s/%s.png" % [out_dir, a[3]])
 	elif a.size() >= 3 and a[0] == "rotations":
 		_rotations(a[1], "%s/%s.png" % [out_dir, a[2]])
 	else:
@@ -114,6 +119,36 @@ func _rotations(dir: String, out: String) -> void:
 		var off := Vector2i(size / 2 - (r.position.x + r.size.x / 2), row * size + size / 2 - (r.position.y + r.size.y / 2))
 		sheet.blend_rect(imgs[row], Rect2i(Vector2i.ZERO, imgs[row].get_size()), off)
 	print("%s: 8 directions of %d px" % [out, size])
+	sheet.save_png(out)
+
+
+func _vehicle(dir: String, anim: String, out: String) -> void:
+	var rows: Array = []
+	var size := 0
+	for d in ROW_DIRS:
+		var folder := "%s/animations/%s/%s" % [dir, anim, d]
+		var files := Array(DirAccess.get_files_at(folder)).filter(func(f): return f.ends_with(".png"))
+		files.sort()
+		var frames: Array[Image] = []
+		for f in files:
+			frames.append(_load("%s/%s" % [folder, f]))
+		if frames.is_empty():
+			printerr("missing frames for ", d)
+			return
+		rows.append(frames)
+		for img in frames:
+			size = maxi(size, maxi(img.get_width(), img.get_height()))
+	var cols: int = rows[0].size()
+	var sheet := Image.create(size * cols, size * ROW_DIRS.size(), false, Image.FORMAT_RGBA8)
+	for row in rows.size():
+		var frames: Array = rows[row]
+		# every frame is placed like the still for that direction, so the vehicle doesn't jump about between frames
+		var still := _load("%s/rotations/%s.png" % [dir, ROW_DIRS[row]])
+		var r: Rect2i = still.get_used_rect() if still != null else (frames[0] as Image).get_used_rect()
+		var off := Vector2i(size / 2 - (r.position.x + r.size.x / 2), size / 2 - (r.position.y + r.size.y / 2))
+		for i in mini(frames.size(), cols):
+			sheet.blend_rect(frames[i], Rect2i(Vector2i.ZERO, frames[i].get_size()), Vector2i(i * size, row * size) + off)
+	print("%s: %d frame(s) x 8 directions of %d px" % [out, cols, size])
 	sheet.save_png(out)
 
 

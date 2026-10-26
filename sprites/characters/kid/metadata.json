@@ -1,0 +1,119 @@
+{
+  "group_id": "04ac77c3-7821-4f87-9fe8-fc9e789dc3a4",
+  "states": [
+    {
+      "character": {
+        "id": "91cc22f7-e438-46f2-b443-3e60ffa85fc7",
+        "name": "Idle",
+        "prompt": "cyclist riding a bicycle, seated on the bike with both hands on the handlebars, a cheerful cartoon kid about ten years old in a backwards red baseball cap, yellow t-shirt and shorts; riding a small blue BMX bicycle. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T19:20:32.572918+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "pedaling": {
+            "south-east": [
+              "Idle/animations/pedaling/south-east/frame_000.png",
+              "Idle/animations/pedaling/south-east/frame_001.png",
+              "Idle/animations/pedaling/south-east/frame_002.png",
+              "Idle/animations/pedaling/south-east/frame_003.png",
+              "Idle/animations/pedaling/south-east/frame_004.png",
+              "Idle/animations/pedaling/south-east/frame_005.png",
+              "Idle/animations/pedaling/south-east/frame_006.png",
+              "Idle/animations/pedaling/south-east/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/pedaling/north/frame_000.png",
+              "Idle/animations/pedaling/north/frame_001.png",
+              "Idle/animations/pedaling/north/frame_002.png",
+              "Idle/animations/pedaling/north/frame_003.png",
+              "Idle/animations/pedaling/north/frame_004.png",
+              "Idle/animations/pedaling/north/frame_005.png",
+              "Idle/animations/pedaling/north/frame_006.png",
+              "Idle/animations/pedaling/north/frame_007.png"
+            ],
+            "south-west": [
+              "Idle/animations/pedaling/south-west/frame_000.png",
+              "Idle/animations/pedaling/south-west/frame_001.png",
+              "Idle/animations/pedaling/south-west/frame_002.png",
+              "Idle/animations/pedaling/south-west/frame_003.png",
+              "Idle/animations/pedaling/south-west/frame_004.png",
+              "Idle/animations/pedaling/south-west/frame_005.png",
+              "Idle/animations/pedaling/south-west/frame_006.png",
+              "Idle/animations/pedaling/south-west/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/pedaling/north-west/frame_000.png",
+              "Idle/animations/pedaling/north-west/frame_001.png",
+              "Idle/animations/pedaling/north-west/frame_002.png",
+              "Idle/animations/pedaling/north-west/frame_003.png",
+              "Idle/animations/pedaling/north-west/frame_004.png",
+              "Idle/animations/pedaling/north-west/frame_005.png",
+              "Idle/animations/pedaling/north-west/frame_006.png",
+              "Idle/animations/pedaling/north-west/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/pedaling/south/frame_000.png",
+              "Idle/animations/pedaling/south/frame_001.png",
+              "Idle/animations/pedaling/south/frame_002.png",
+              "Idle/animations/pedaling/south/frame_003.png",
+              "Idle/animations/pedaling/south/frame_004.png",
+              "Idle/animations/pedaling/south/frame_005.png",
+              "Idle/animations/pedaling/south/frame_006.png",
+              "Idle/animations/pedaling/south/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/pedaling/west/frame_000.png",
+              "Idle/animations/pedaling/west/frame_001.png",
+              "Idle/animations/pedaling/west/frame_002.png",
+              "Idle/animations/pedaling/west/frame_003.png",
+              "Idle/animations/pedaling/west/frame_004.png",
+              "Idle/animations/pedaling/west/frame_005.png",
+              "Idle/animations/pedaling/west/frame_006.png",
+              "Idle/animations/pedaling/west/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/pedaling/north-east/frame_000.png",
+              "Idle/animations/pedaling/north-east/frame_001.png",
+              "Idle/animations/pedaling/north-east/frame_002.png",
+              "Idle/animations/pedaling/north-east/frame_003.png",
+              "Idle/animations/pedaling/north-east/frame_004.png",
+              "Idle/animations/pedaling/north-east/frame_005.png",
+              "Idle/animations/pedaling/north-east/frame_006.png",
+              "Idle/animations/pedaling/north-east/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/pedaling/east/frame_000.png",
+              "Idle/animations/pedaling/east/frame_001.png",
+              "Idle/animations/pedaling/east/frame_002.png",
+              "Idle/animations/pedaling/east/frame_003.png",
+              "Idle/animations/pedaling/east/frame_004.png",
+              "Idle/animations/pedaling/east/frame_005.png",
+              "Idle/animations/pedaling/east/frame_006.png",
+              "Idle/animations/pedaling/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T19:29:58.960092"
+}

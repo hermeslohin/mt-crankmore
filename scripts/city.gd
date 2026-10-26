@@ -202,9 +202,10 @@ func _ready() -> void:
 	_generate()
 	_build_graph()
 	_spawn_cars()
+	_find_climbs()
 	_spawn_rivals()
 	_spawn_life()
-	events = TownEvents.new(self)
+	events = TownHappenings.new(self)
 	Game.rival_say.connect(_on_rival_say)
 	rival_score.resize(Talk.rivals.size())
 	rival_score.fill(0)
@@ -1640,6 +1641,8 @@ func _process(delta: float) -> void:
 	_update_life(delta)
 	_update_lamps(delta)
 	_update_challenge(delta)
+	_update_climbs(delta)
+	outage_t = maxf(0.0, outage_t - delta)
 	if events != null:
 		events.update(delta)
 	_update_mascots(delta)
@@ -2304,7 +2307,7 @@ func _update_lamps(delta: float) -> void:
 		if p["kind"] != "lamp":
 			continue
 		var at: float = 0.25 + fposmod(p["pos"].x * 0.37 + p["pos"].y * 0.91, 1.0) * 0.3
-		var want := 1.0 if dark > at else 0.0
+		var want := 1.0 if dark > at and outage_t <= 0.0 else 0.0
 		var g: float = move_toward(float(p.get("glow", want)), want, delta * 0.8)
 		p["glow"] = g
 		p["lit"] = g if g >= 1.0 or g <= 0.0 else g * (0.4 if randf() < 0.3 else 1.0)
@@ -2575,6 +2578,29 @@ func _post_order() -> void:
 			break
 		d = randi() % spots.size()
 		dist = shops[s]["window"].distance_to(spots[d]["pos"])
+	# now and then a party orders a stack of pizzas: five stops, one after the other
+	if challenge.is_empty() and randf() < RUSH_CHANCE and not orders.any(func(q): return q.has("rush")):
+		var stops: Array = []
+		var at: Vector2 = shops[s]["window"]
+		for k in CHALLENGES["rush"]["stops"]:
+			var best := -1
+			for _try in 30:
+				var c := randi() % spots.size()
+				var dd: float = spots[c]["pos"].distance_to(at)
+				if not c in stops and dd > 6.0 and dd < 22.0:
+					best = c
+					break
+			if best < 0:
+				break
+			stops.append(best)
+			at = spots[best]["pos"]
+		if stops.size() == CHALLENGES["rush"]["stops"]:
+			var o := {"id": next_order_id, "shop": s, "dest": stops[0], "pay": 18 * stops.size(), "rush": stops, "leg": 0,
+				"state": "open", "rival": -1, "age": 0.0, "t_left": 0.0, "t_total": 0.0, "quality": 1.0}
+			next_order_id += 1
+			orders.append(o)
+			Game.toast.emit("RING RING!  PIZZA RUSH! %s: %d pizzas for a party, %d stops!" % [shops[s]["name"], stops.size(), stops.size()], Color(1.0, 0.6, 0.2))
+			return
 	# now and then it's the construction crew's lunch break
 	var crew := site_spot >= 0 and randf() < SITE_ORDER_CHANCE and not orders.any(func(q): return q["dest"] == site_spot and q["state"] != "done")
 	if crew:
@@ -2631,6 +2657,8 @@ func _take_order(o: Dictionary) -> void:
 	o["t_left"] = o["t_total"]
 	carry = o
 	Game.toast.emit("Got it! Deliver to %s in %ds or no pay!" % [spots[o["dest"]]["name"], int(o["t_total"])], Color(0.5, 1.0, 0.5))
+	if o.has("rush"):
+		start_challenge("rush", {"stops": o["rush"].size()})
 	var best := -1
 	var best_d := 1e9
 	for i in rival_state.size():
@@ -2647,6 +2675,22 @@ func _take_order(o: Dictionary) -> void:
 
 
 func _deliver() -> void:
+	# a pizza rush: drop this one and head straight on to the next stop
+	if carry.has("rush") and int(carry["leg"]) < carry["rush"].size() - 1:
+		var leg_pay: int = int(carry["pay"]) / int(carry["rush"].size())
+		Game.add_money(leg_pay)
+		carry["leg"] = int(carry["leg"]) + 1
+		var from: Vector2 = spots[carry["dest"]]["pos"]
+		carry["dest"] = carry["rush"][carry["leg"]]
+		carry["t_total"] = 15.0 + _path_len(from, spots[carry["dest"]]["pos"]) / (1.6 * PACE)
+		carry["t_left"] = carry["t_total"]
+		if challenge.get("kind", "") == "rush":
+			challenge["done"] = carry["leg"]
+		Game.toast.emit("Stop %d of %d: +$%d. Next: %s" % [carry["leg"], carry["rush"].size(), leg_pay, spots[carry["dest"]]["name"]], Color(0.4, 1.0, 0.5))
+		return
+	if carry.has("rush") and challenge.get("kind", "") == "rush":
+		challenge["done"] = carry["rush"].size()
+		_end_challenge(float(challenge["p_sum"]) / maxf(float(challenge["p_t"]), 0.1) >= float(challenge_watts()))
 	var frac: float = clampf(carry["t_left"] / carry["t_total"], 0.0, 1.0)
 	var tip := int(carry["pay"] * 0.6 * frac)
 	var base := int(carry["pay"] * carry["quality"])
@@ -2753,7 +2797,16 @@ const CHALLENGES := {
 	"thief": {"title": "CATCH THE THIEF", "pct": 1.10, "reward": 150, "gap": 12.0, "catch": 2.0, "lose": 45.0, "time": 80.0},
 	"dog": {"title": "CATCH THE DOG", "pct": 0.80, "reward": 50, "gap": 10.0, "catch": 1.5, "lose": 40.0, "time": 75.0},
 	"race": {"title": "BEAT THE HOT ROD", "pct": 1.20, "reward": 300, "dist": 110.0, "count": 3.0},
+	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 150.0, "count": 3.0},
+	"rush": {"title": "PIZZA RUSH", "pct": 0.80, "reward": 120, "stops": 5},
+	"climb": {"title": "HILL SPRINT", "pct": 1.05, "reward": 60},
+	"gulls": {"title": "SEAGULLS!", "pct": 0.90, "reward": 0, "gap": 4.0, "escape": 25.0, "time": 45.0},
 }
+const RUSH_CHANCE := 0.12     # orders that are a pizza rush: five stops, paid a bonus for an 80% FTP average
+const CLIMB_EVERY := [150.0, 300.0]   # seconds between hill sprints showing up
+var climbs: Array = []        # {road, dir, s0, s1, name, start, end}: the hills a sprint can be on (found at generation)
+var climb_t := 90.0
+var outage_t := 0.0           # a power cut: the street lamps are out
 var challenge := {}   # the one going on: a CHALLENGES entry plus kind, state ("count", "on", "won", "lost"), t, gap / me_m, them_m
 
 
@@ -2765,10 +2818,13 @@ func start_challenge(kind: String, extra := {}) -> bool:
 	challenge.merge(extra, true)
 	challenge["kind"] = kind
 	challenge["t"] = 0.0
-	challenge["state"] = "count" if kind == "race" else "on"
+	challenge["state"] = "count" if challenge.has("dist") else "armed" if kind == "climb" else "on"
 	challenge["me_m"] = 0.0
 	challenge["them_m"] = 0.0
-	if kind == "race":
+	challenge["p_sum"] = 0.0
+	challenge["p_t"] = 0.0
+	challenge["done"] = 0
+	if challenge.has("dist"):   # a race to a line up the road
 		var fin := _rail_ahead(float(challenge["dist"]) * TILES_PER_MS * PACE, 0.0)
 		challenge["finish"] = fin[0]
 		challenge["finish_fwd"] = fin[1]
@@ -2801,7 +2857,19 @@ func _update_challenge(delta: float) -> void:
 		return
 	var me := p_speed / (TILES_PER_MS * PACE)
 	var them := _quarry_mps()
-	match c["kind"]:
+	c["p_sum"] = float(c["p_sum"]) + Trainer.power() * delta
+	c["p_t"] = float(c["p_t"]) + delta
+	match "race" if c.has("dist") else c["kind"]:
+		"rush":
+			pass   # ends at the last stop (see _deliver)
+		"climb":
+			_update_climb(c)
+		"gulls":
+			c["gap"] = float(c["gap"]) + (me - them) * delta
+			if float(c["gap"]) >= float(c["escape"]) or float(c["t"]) > float(c["time"]):
+				_end_challenge(true)
+			elif float(c["gap"]) <= 0.0:
+				_end_challenge(false)
 		"race":
 			if c["state"] == "count":
 				c["count"] = float(c["count"]) - delta
@@ -2827,12 +2895,130 @@ func _update_challenge(delta: float) -> void:
 func _end_challenge(won: bool) -> void:
 	challenge["state"] = "won" if won else "lost"
 	challenge["end"] = 3.0
+	match challenge["kind"]:
+		"rush":
+			var avg := int(float(challenge["p_sum"]) / maxf(float(challenge["p_t"]), 0.1))
+			if won:
+				Game.add_money(int(challenge["reward"]))
+				Game.toast.emit("PIZZA RUSH DONE! Average %d W - bonus +$%d" % [avg, int(challenge["reward"])], Color(0.4, 1.0, 0.5))
+			else:
+				Game.toast.emit("Rush done, but you averaged %d W (needed %d W): no bonus" % [avg, challenge_watts()], Color(1.0, 0.7, 0.4))
+			return
+		"climb":
+			if won:
+				Game.add_money(int(challenge["reward"]))
+				Game.toast.emit("%s in %s! Beat %s: +$%d" % [str(challenge["name"]).to_upper(), _clock(float(challenge["t"])), _clock(float(challenge["target"])), int(challenge["reward"])], Color(0.4, 1.0, 0.5))
+			else:
+				Game.toast.emit(str(challenge.get("why", "Too slow up %s" % challenge["name"])), Color(1.0, 0.6, 0.5))
+			return
+		"gulls":
+			if won:
+				Game.toast.emit("You lost the seagulls!", Color(0.6, 0.9, 1.0))
+			else:
+				if not carry.is_empty():
+					carry["state"] = "done"
+					carry = {}
+					Game.toast.emit("The seagulls stole your pizza! Order lost.", Color(1.0, 0.5, 0.4))
+				else:
+					Game.toast.emit("The seagulls mobbed you!", Color(1.0, 0.6, 0.5))
+			return
 	if won:
 		Game.add_money(int(challenge["reward"]))
 		Game.save_game()
-		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "dog": "You caught the dog", "race": "You beat the hot rod"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
+		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "dog": "You caught the dog", "race": "You beat the hot rod", "kid_race": "You beat the kid"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
 	else:
-		Game.toast.emit({"thief": "The thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!"}[challenge["kind"]], Color(1.0, 0.6, 0.5))
+		Game.toast.emit({"thief": "The thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!", "kid_race": "The kid beat you! Ouch."}[challenge["kind"]], Color(1.0, 0.6, 0.5))
+
+
+func _clock(t: float) -> String:
+	return "%d:%02d" % [int(t) / 60, int(t) % 60]
+
+
+## Hill sprints: the climbs in town where the road keeps going up for a while (found once, when the town is made).
+## Every few minutes one near you lights up: a START line at the foot and a FINISH at the top, and a time to beat
+## that riding it at 105% of your FTP would give.
+func _find_climbs() -> void:
+	climbs.clear()
+	const SUFFIX := ["Wall", "Ramp", "Kicker", "Grind", "Climb", "Hill"]
+	for ri in roads.size():
+		var r: Dictionary = roads[ri]
+		var length: float = r["len"]
+		for dir in [1.0, -1.0]:
+			var s := 1.0
+			while s < length - 12.0:
+				var s0: float = s if dir > 0.0 else length - s
+				var best := -1.0
+				var sum := 0.0
+				var n := 0
+				var q := 0.0
+				while q < 40.0:
+					var at := _road_at(r, _wrap_s(r, s0 + dir * q))
+					sum += grade_at(at[0], at[1] * dir)
+					n += 1
+					q += 1.0
+					if q >= 12.0 and sum / n >= 0.04:
+						best = q
+				if best > 0.0:
+					var a := _road_at(r, s0)
+					var b := _road_at(r, _wrap_s(r, s0 + dir * best))
+					climbs.append({"road": ri, "dir": dir, "s0": s0, "s1": _wrap_s(r, s0 + dir * best), "len": best,
+						"name": "%s %s" % [str(r["name"]), SUFFIX[climbs.size() % SUFFIX.size()]], "start": a[0], "end": b[0],
+						"start_fwd": a[1] * dir, "end_fwd": b[1] * dir})
+					s += best + 6.0
+				else:
+					s += 3.0
+
+
+func _update_climbs(delta: float) -> void:
+	climb_t -= delta
+	if climb_t > 0.0 or not challenge.is_empty() or not active or climbs.is_empty():
+		return
+	climb_t = randf_range(CLIMB_EVERY[0], CLIMB_EVERY[1])
+	var near: Array = climbs.filter(func(c): return p_pos.distance_to(c["start"]) > 6.0 and p_pos.distance_to(c["start"]) < 30.0)
+	if near.is_empty():
+		return
+	var c: Dictionary = near.pick_random()
+	# the time to beat: each tile of it at 105% of your FTP on its grade
+	var bike := Game.bike()
+	var r: Dictionary = roads[c["road"]]
+	var target := 0.0
+	var q := 0.0
+	while q < float(c["len"]):
+		var at := _road_at(r, _wrap_s(r, float(c["s0"]) + float(c["dir"]) * q))
+		var g := grade_at(at[0], at[1] * float(c["dir"]))
+		target += (1.0 / (TILES_PER_MS * PACE)) / minf(Game.speed_from_power(1.05 * Game.ftp, bike["mass"], bike["cda"], bike["crr"], g), MAX_TOWN_SPEED)
+		q += 1.0
+	var extra := c.duplicate()
+	extra["target"] = target
+	extra["armed_t"] = 240.0
+	if start_challenge("climb", extra):
+		Game.toast.emit("HILL SPRINT: %s - get up it in %s! Find the START line." % [c["name"], _clock(target)], Color(1.0, 0.85, 0.3))
+
+
+func _update_climb(c: Dictionary) -> void:
+	var r: Dictionary = roads[c["road"]]
+	var along := (rs - float(c["s0"])) * float(c["dir"])   # how far past the start line you are, if you're on its road
+	if r["closed"]:
+		along = fposmod(along + 2.0, float(r["len"])) - 2.0
+	if c["state"] == "armed":
+		c["armed_t"] = float(c["armed_t"]) - get_process_delta_time()
+		if rr == int(c["road"]) and rdir == float(c["dir"]) and along >= 0.0 and along < 1.0:
+			c["state"] = "on"
+			c["t"] = 0.0
+			Game.toast.emit("GO! %s" % c["name"], Color(1.0, 0.85, 0.3))
+		elif c["armed_t"] <= 0.0 or p_pos.distance_to(c["start"]) > 45.0:
+			challenge = {}   # you didn't go for it: it fades away
+		return
+	if rr != int(c["road"]) or rdir != float(c["dir"]):
+		c["why"] = "Off course - %s abandoned" % c["name"]
+		_end_challenge(false)
+		return
+	c["progress"] = clampf(along / float(c["len"]), 0.0, 1.0)
+	if along >= float(c["len"]):
+		_end_challenge(float(c["t"]) <= float(c["target"]))
+	elif float(c["t"]) > float(c["target"]) * 1.6:
+		c["why"] = "Too slow up %s" % c["name"]
+		_end_challenge(false)
 
 
 ## Where the quarry is: [world position, heading] — the gap ahead of you along your road (the hot rod: its lead over
@@ -2841,6 +3027,10 @@ func challenge_pos() -> Array:
 	var tpm := TILES_PER_MS * PACE
 	if challenge.get("kind", "") == "race":
 		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, 0.45)
+	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
+		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm, BIKE_LANE - 0.4)
+	if challenge.get("kind", "") == "gulls":
+		return _rail_ahead(-float(challenge["gap"]) * tpm, 0.6)
 	return _rail_ahead(float(challenge.get("gap", 0.0)) * tpm, BIKE_LANE)
 
 
@@ -2854,10 +3044,18 @@ func _rail_ahead(d: float, lane: float) -> Array:
 
 ## The chequered finish line painted across the road for a hot rod race.
 func _draw_finish() -> void:
-	if challenge.get("kind", "") != "race" or challenge["state"] == "lost":
+	var kind: String = challenge.get("kind", "")
+	if kind == "climb" and challenge["state"] in ["armed", "on"]:
+		_draw_line_banner(challenge["start"], challenge["start_fwd"], "START", Color(0.2, 0.75, 0.3))
+		_draw_line_banner(challenge["end"], challenge["end_fwd"], "FINISH", Color(0.95, 0.2, 0.2))
 		return
-	var f: Vector2 = challenge["finish"]
-	var fwd: Vector2 = challenge["finish_fwd"]
+	if not challenge.has("dist") or challenge["state"] == "lost":
+		return
+	_draw_line_banner(challenge["finish"], challenge["finish_fwd"], "FINISH", Color(0.95, 0.2, 0.2))
+
+
+## A chequered line across the road at `f` with a banner over it on two poles.
+func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color) -> void:
 	var n := Vector2(-fwd.y, fwd.x)
 	for k in 8:
 		for row in 2:
@@ -2869,8 +3067,8 @@ func _draw_finish() -> void:
 	var b := Iso.to_screen(f + n * 1.25)
 	draw_line(a, a + Vector2(0, -40), Iso.OUTLINE, 2.0)
 	draw_line(b, b + Vector2(0, -40), Iso.OUTLINE, 2.0)
-	draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y - 46), Vector2(absf(b.x - a.x), 9)), Color(0.95, 0.2, 0.2))
-	_label("FINISH", (a + b) * 0.5 + Vector2(0, -38), 8, Color.WHITE)
+	draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y - 46), Vector2(absf(b.x - a.x), 9)), col)
+	_label(text, (a + b) * 0.5 + Vector2(0, -38), 8, Color.WHITE)
 
 
 const GIVER_COUNT := 8

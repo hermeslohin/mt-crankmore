@@ -1,0 +1,61 @@
+{
+  "group_id": "dd2dcec2-1dec-48d2-8294-9d74db8d3ce7",
+  "states": [
+    {
+      "character": {
+        "id": "63a93732-d5d9-4c01-9820-af3c191f5f11",
+        "name": "Idle",
+        "prompt": "cheerful cartoon friendly teen in a purple tracksuit with braids, holding a wrapped gift box with a bow high above their head with both hands, arms raised overhead",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T18:34:59.133121+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "wave": {
+            "south": [
+              "Idle/animations/wave/south/frame_000.png",
+              "Idle/animations/wave/south/frame_001.png",
+              "Idle/animations/wave/south/frame_002.png",
+              "Idle/animations/wave/south/frame_003.png",
+              "Idle/animations/wave/south/frame_004.png",
+              "Idle/animations/wave/south/frame_005.png",
+              "Idle/animations/wave/south/frame_006.png",
+              "Idle/animations/wave/south/frame_007.png"
+            ]
+          },
+          "idle": {
+            "south": [
+              "Idle/animations/idle/south/frame_000.png",
+              "Idle/animations/idle/south/frame_001.png",
+              "Idle/animations/idle/south/frame_002.png",
+              "Idle/animations/idle/south/frame_003.png",
+              "Idle/animations/idle/south/frame_004.png",
+              "Idle/animations/idle/south/frame_005.png",
+              "Idle/animations/idle/south/frame_006.png",
+              "Idle/animations/idle/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T18:42:08.451647"
+}

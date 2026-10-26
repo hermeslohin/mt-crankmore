@@ -708,14 +708,16 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 				if not Sprites.draw_person(ci, "ped_%s_run" % d, ground, a["face"], ph, 12.0):
 					Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, 14.0)
 			elif anim == "walk" and a.get("moving", false):
-				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, float(a.get("fps", 8.0)))
+				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, float(a.get("fps", 8.0)), a.get("tint", Color.WHITE))
 			elif (anim == "spray" or anim == "work") and Sprites.draw_person(ci, "ped_%s_%s" % [d, anim], ground, a["face"], ph, 9.0):
 				pass
 			elif anim == "cheer" or anim == "perform":
 				if anim == "cheer" or not Sprites.draw_strip(ci, "ped_%s_perform" % d, ground, ph, 10.0):
 					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground, ph)
+			elif a.get("seated", false):   # sitting on the grass (movie night): just their top half shows over it
+				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, 7), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE))
 			else:   # standing about: shifting their weight now and then
-				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0)
+				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, -1 if int(ph * 1.3) % 3 == 0 else 0), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE))
 			if (d == "drummer" or d == "trumpeter" or d.begins_with("band_") or anim == "perform") and int(ph * 3.0 + float(a.get("row", 0)) * 0.5) % 2 == 0:
 				_note(ci, ground + Vector2(10, -46 - fmod(ph * 20.0, 14.0)))
 			if a.has("spray_to"):
@@ -737,7 +739,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-7, 0), ground + Vector2(0, -3), ground + Vector2(7, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.2))
 			if not Sprites.draw_rider(ci, ground, a["face"], a["pedal"], false, a["who"], false) and a.has("design"):
 				# no bike art for them: they run for it instead
-				var look := Sprites.cast(a, Sprites.variants(a["design"]) if a["design"] != "" else [], true)
+				var look := Sprites.cast(a, Sprites.variants(a["design"]) if a["design"] != "" else a.get("looks", []), true)
 				if not Sprites.draw_person(ci, "ped_%s_run" % look, ground, a["face"], ph, 12.0):
 					Sprites.draw_person(ci, "ped_%s_walk" % look, ground, a["face"], ph, 14.0)
 		"fire":

@@ -35,6 +35,7 @@ var amount := 0.0            # how hard it is raining / snowing, 0-1 (eases in a
 var _left := 0.0             # seconds until the weather changes
 var _forced := ""
 var _season := ""
+var outage := false          # a power cut in town: darker still at night (see TownHappenings)
 var _dried := false          # had the season's first dry spell
 
 
@@ -85,6 +86,8 @@ func dark() -> float:
 func tint() -> Color:
 	var c: Color = _at(1)
 	c *= Color.WHITE.lerp(OVERCAST if _season != "winter" else Color(0.86, 0.88, 0.94), amount)
+	if outage and dark() > 0.3:
+		c *= Color(0.72, 0.72, 0.8)
 	return Color(c.r, c.g, c.b, 1.0)
 
 

@@ -586,11 +586,13 @@ func _draw_challenge(city, r: Rect2) -> void:
 	_panel(r)
 	var x := r.position.x + 6
 	var y := r.position.y + 10
-	_text("%s  $%d" % [c["title"], int(c["reward"])], Vector2(x, y), 8, Color(1.0, 0.85, 0.3))
+	_text(("%s  $%d" % [c["title"], int(c["reward"])]) if int(c["reward"]) > 0 else str(c["title"]), Vector2(x, y), 8, Color(1.0, 0.85, 0.3))
 	var need: int = city.challenge_watts()
 	var have := int(Trainer.power())
+	if c["kind"] == "rush":   # the rush is judged on your average
+		have = int(float(c["p_sum"]) / maxf(float(c["p_t"]), 0.1))
 	var on := have >= need
-	_text("Ride %d W+ (%d%% FTP)" % [need, int(round(float(c["pct"]) * 100.0))], Vector2(x, y + 11), 8, Color(0.85, 0.9, 1.0))
+	_text(("Average %d W+ (%d%% FTP)" if c["kind"] == "rush" else "Ride %d W+ (%d%% FTP)") % [need, int(round(float(c["pct"]) * 100.0))], Vector2(x, y + 11), 8, Color(0.85, 0.9, 1.0))
 	_text("%d W" % have, Vector2(r.end.x - 50, y + 11), 8, Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.5, 0.4), 44, HORIZONTAL_ALIGNMENT_RIGHT)
 	var bar := Rect2(x, y + 20, r.size.x - 12, 6)
 	draw_rect(bar.grow(1.0), INK)
@@ -600,14 +602,27 @@ func _draw_challenge(city, r: Rect2) -> void:
 			_text("WON!" if c["state"] == "won" else "MISSED IT", Vector2(x, y + 36), 8, Color(0.4, 1.0, 0.5) if c["state"] == "won" else Color(1.0, 0.5, 0.4))
 		"count":
 			_text("Get ready... %d" % int(ceil(float(c["count"]))), Vector2(x, y + 36), 8, Color.WHITE)
+		"armed":
+			_text("Ride to the START line", Vector2(x, y + 36), 8, Color.WHITE)
 		_:
-			if c["kind"] == "race":
+			if c["kind"] == "rush":
+				var k := float(c["done"]) / float(c["stops"])
+				draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.75, 0.3))
+				_text("Stop %d of %d   average %d W" % [int(c["done"]) + 1, int(c["stops"]), have], Vector2(x, y + 36), 8, Color.WHITE)
+			elif c["kind"] == "climb":
+				draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(c.get("progress", 0.0)), bar.size.y)), Color(0.4, 1.0, 0.5) if float(c["t"]) <= float(c["target"]) else Color(1.0, 0.5, 0.4))
+				_text("%s   %s / %s" % [c["name"], city._clock(float(c["t"])), city._clock(float(c["target"]))], Vector2(x, y + 36), 8, Color.WHITE)
+			elif c["kind"] == "gulls":
+				var k := clampf(float(c["gap"]) / float(c["escape"]), 0.0, 1.0)
+				draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.4, 0.3))
+				_text("Get away! %d m ahead of them" % int(c["gap"]), Vector2(x, y + 36), 8, Color.WHITE)
+			elif c.has("dist"):
 				var dist: float = c["dist"]
 				var me := clampf(float(c["me_m"]) / dist, 0.0, 1.0)
 				var them := clampf(float(c["them_m"]) / dist, 0.0, 1.0)
 				draw_rect(Rect2(bar.position + Vector2(bar.size.x * them - 2, -1), Vector2(4, 8)), Color(1.0, 0.55, 0.15))
 				draw_rect(Rect2(bar.position + Vector2(bar.size.x * me - 2, -1), Vector2(4, 8)), Color.WHITE)
-				_text("you %dm   hot rod %dm   / %dm" % [int(c["me_m"]), int(c["them_m"]), int(dist)], Vector2(x, y + 36), 8, Color.WHITE)
+				_text("you %dm   %s %dm   / %dm" % [int(c["me_m"]), "hot rod" if c["kind"] == "race" else "kid", int(c["them_m"]), int(dist)], Vector2(x, y + 36), 8, Color.WHITE)
 			else:
 				var k := clampf(1.0 - (float(c["gap"]) - float(c["catch"])) / (float(c["lose"]) - float(c["catch"])), 0.0, 1.0)
 				draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color(0.4, 1.0, 0.5) if on else Color(1.0, 0.75, 0.3))

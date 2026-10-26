@@ -20,8 +20,9 @@ extends RefCounted
 const GAP_MIN := 20.0         # seconds between happenings
 const GAP_MAX := 40.0
 const MAX_LIVE := 2           # happenings going on at once
-var near := 7.0               # tiles from the player a happening starts (not under your wheels, but in view)
-var far := 15.0
+var near := 7.0               # tiles from the player a happening starts
+var far := 24.0
+var allow_in_view := false    # (the debug helpers start things right in front of you; normally nothing appears in view)
 const SIREN_KINDS := ["truck_firetruck", "van_ambulance", "sedan_police"]
 const DOGS := ["town_dog_corgi", "town_dog_dalmatian", "town_dog_poodle"]
 const BALLOON_COLS := [Color(1.0, 0.3, 0.35), Color(0.3, 0.6, 1.0), Color(1.0, 0.85, 0.2), Color(0.5, 0.9, 0.4), Color(0.95, 0.5, 0.95)]
@@ -192,6 +193,8 @@ func update(delta: float) -> void:
 		for a in e["actors"]:
 			a["phase"] = float(a.get("phase", 0.0)) + delta
 			a["label_t"] = maxf(0.0, float(a.get("label_t", 0.0)) - delta)
+			if a.has("arrive_to"):
+				_arriving(a, delta)
 		if e["t"] <= 0.0:
 			_end(e)
 			events.remove_at(i)
@@ -236,7 +239,8 @@ func _spot() -> Array:
 			var d: float = (at[0] as Vector2).distance_to(p)
 			# ahead of you, where you'll see it (or anywhere while you stand still)
 			var ahead: bool = city.p_fwd == Vector2.ZERO or ((at[0] as Vector2) - p).dot(city.p_fwd) > d * 0.3
-			if d > near and d < far and ahead:
+			# just out of sight, so it's already going by the time you ride up (nobody pops into view)
+			if d > near and d < far and ahead and (allow_in_view or not city._in_view(at[0])):
 				cands.append([ri, s, at])
 			s += 2.0
 	for _try in 12:
@@ -261,6 +265,44 @@ func _free(pos: Vector2) -> bool:
 
 
 ## "" = anyone: their look comes from the cast when they're drawn (nobody appears twice on screen; see Sprites.cast).
+## Someone who'd appear right in view instead walks in from just off the screen to where they should be (`then`: their
+## animation once there; `collapse`: they fall down on arrival, an ambulance case).
+func _arrive(a: Dictionary) -> void:
+	if allow_in_view or not city._in_view(a["pos"]):
+		return
+	var to: Vector2 = a["pos"]
+	var away: Vector2 = to - city.p_pos
+	if away.length() < 0.1:
+		away = Vector2(1, 1)
+	var start := to
+	for k in 60:
+		start += away.normalized() * 0.5
+		if not city._in_view(start):
+			break
+	a["arrive_to"] = to
+	a["arrive_anim"] = a.get("anim", "idle")
+	a["pos"] = start
+
+
+func _arriving(a: Dictionary, delta: float) -> void:
+	var to: Vector2 = a["arrive_to"]
+	var d: Vector2 = to - (a["pos"] as Vector2)
+	if d.length() < 0.05:
+		a["pos"] = to
+		a["anim"] = a["arrive_anim"]
+		a["moving"] = false
+		a.erase("arrive_to")
+		if a.get("collapse", false):
+			a["down"] = true
+			a.erase("collapse")
+			_say(a, ["Ow! My ankle!", "Oof!", "I slipped on a pepperoni!", "My knee!"].pick_random(), 3.0)
+		return
+	a["pos"] = (a["pos"] as Vector2) + d.normalized() * minf(d.length(), 1.4 * delta)
+	a["face"] = d.normalized()
+	a["anim"] = "walk"
+	a["moving"] = true
+
+
 func _design() -> String:
 	return ""
 
@@ -487,11 +529,13 @@ func _start_parade(near_p := Vector2.INF) -> void:
 	var r: Dictionary = city.roads[0]
 	var s := randf() * float(r["len"])
 	if near_p != Vector2.INF:
+		# the nearest point of the loop that's out of sight (they march into view)
 		var best := 1e9
 		var q := 0.0
 		while q < float(r["len"]):
-			var d: float = (city._road_at(r, q)[0] as Vector2).distance_to(near_p)
-			if d < best:
+			var pt: Vector2 = city._road_at(r, q)[0]
+			var d: float = pt.distance_to(near_p)
+			if d < best and (allow_in_view or not city._in_view(pt)):
 				best = d
 				s = q
 			q += 0.5
@@ -912,7 +956,7 @@ func _responder(kinds: Array, road: int, park_s: float) -> Dictionary:
 	var length: float = r["len"]
 	# come from whichever end has more room, ~14 m back
 	var dir := 1.0 if r["closed"] or park_s > length * 0.5 else -1.0
-	var s: float = city._wrap_s(r, park_s - dir * 14.0) if r["closed"] else clampf(park_s - dir * 14.0, 0.5, length - 0.5)
+	var s: float = city._wrap_s(r, park_s - dir * 20.0) if r["closed"] else clampf(park_s - dir * 20.0, 0.5, length - 0.5)   # from out of sight
 	var c := {"road": road, "s": s, "dir": dir, "speed": 0.0, "max": float(d[3]) * 1.5 * city.PACE, "col": Color.WHITE, "kind": kind,
 		"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT, "siren": true, "park_s": park_s, "last_j": -1}
 	city._car_pose(c)
@@ -952,7 +996,8 @@ func _door_side(b: Dictionary) -> float:
 func _building_near(kinds: Array) -> Dictionary:
 	var p: Vector2 = city.p_pos
 	var cands: Array = city.buildings.filter(func(b): return b["kind"] in kinds and int(b.get("road", -1)) >= 0 \
-		and (b["door"] as Vector2).distance_to(p) > 3.0 and (b["door"] as Vector2).distance_to(p) < 9.0)
+		and (b["door"] as Vector2).distance_to(p) > 3.0 and (b["door"] as Vector2).distance_to(p) < (9.0 if allow_in_view else 20.0) \
+		and (allow_in_view or not city._in_view(b["door"])))
 	return {} if cands.is_empty() else cands.pick_random()
 
 
@@ -981,6 +1026,7 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 				if _free(q):
 					var fan := _person(q, _design(), Vector2(1, -1).normalized())
 					fan["anim"] = "idle"
+					_arrive(fan)
 					e["actors"].append(fan)
 			Game.toast.emit("Fireworks over Crankmore!", Color(1.0, 0.75, 0.95))
 		"soapbox":
@@ -1355,7 +1401,8 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 				e["stretcher"]["load"] = false
 				if hurt.is_empty() and int(e["left"]) > 0 and _next_casualty(e):
 					e["left"] = int(e["left"]) - 1
-					hurt = e["actors"].filter(func(q): return q.get("patient", false) and not q.get("gone", false) and q.get("down", false))
+					e["stage"] = "wait_next"   # until the next one has walked in and gone down
+					return
 				if hurt.is_empty():
 					e["stage"] = "done"
 					for a in e["actors"]:
@@ -1371,14 +1418,25 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 			for a in e["actors"]:
 				if a.get("patient", false):
 					_walk_to(a, delta)
+		"wait_next":
+			_carry(e, false)
+			if not hurt.is_empty():
+				_next_patient(e)
 
 
 ## A casualty lying at `q` (anyone: their look comes from the cast), groaning about it.
-func _add_patient(e: Dictionary, q: Vector2, face: Vector2) -> void:
+func _add_patient(e: Dictionary, q: Vector2, face: Vector2, walk_in := false) -> void:
 	var patient := _person(q, "", face)
 	patient["anim"] = "idle"
 	patient["down"] = true
 	patient["patient"] = true
+	if walk_in:   # the next one walks in from out of sight, then goes down
+		patient["down"] = false
+		patient["collapse"] = true
+		_arrive(patient)
+		if not patient.has("arrive_to"):
+			patient["down"] = true
+			patient.erase("collapse")
 	_say(patient, ["Ow! My ankle!", "I'm fine... I'm not fine.", "Did anyone get that bike's number?", "My elbow!", "Ooof.",
 		"Too much pizza...", "I slipped on a pepperoni!", "Is my hat OK?"].pick_random(), 3.0)
 	e["actors"].append(patient)
@@ -1391,7 +1449,7 @@ func _next_casualty(e: Dictionary) -> bool:
 		var s: float = city._wrap_s(r, float(e["s"]) + randf_range(2.0, 5.0) * (1.0 if randf() < 0.5 else -1.0))
 		var k: Array = _kerb(e["road"], s, 1.0 if randf() < 0.5 else -1.0)
 		if _free(k[0]):
-			_add_patient(e, k[0], k[1])
+			_add_patient(e, k[0], k[1], true)
 			return true
 	return false
 
@@ -1694,8 +1752,8 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 	match e["stage"]:
 		"roll_up":
 			# comes up from behind in the car lane and draws level
-			var u := clampf(float(e["clock"]) / 2.0, 0.0, 1.0)
-			var at: Array = city._rail_ahead(lerpf(-4.0, 0.4, u), city.CAR_LANE)
+			var u := clampf(float(e["clock"]) / 3.0, 0.0, 1.0)
+			var at: Array = city._rail_ahead(lerpf(-16.0, 0.4, u * (2.0 - u)), city.CAR_LANE)   # from out of sight behind
 			rod["pos"] = at[0]
 			rod["face"] = at[1]
 			if u >= 1.0:

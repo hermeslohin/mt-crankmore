@@ -717,6 +717,7 @@ func _debug_events() -> void:
 	await get_tree().create_timer(1.0).timeout
 	city.events.near = 2.5
 	city.events.far = 5.0
+	city.events.allow_in_view = true
 	city.events.next_t = 999.0
 	var kinds: Array = ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade", "soapbox", "group_ride", "fire", "ambulance", "crime", "fireworks"]
 	if OS.has_environment("PIZZA_EVENTS"):   # just these (comma separated)
@@ -755,6 +756,7 @@ const VIEWER_HOUR := {"santa": 22.0, "fireworks": 22.0, "movie_night": 20.5, "ho
 
 func _debug_viewer() -> void:
 	Game.no_save = true   # nothing that happens in here touches your save
+	city.events.allow_in_view = true   # start everything right where you can see it
 	viewer = {"i": -1, "status": "",
 		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
 			"soapbox", "group_ride", "fire", "ambulance", "crime", "bike_theft", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]

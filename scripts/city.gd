@@ -3074,7 +3074,9 @@ func challenge_pos() -> Array:
 	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
 		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm, BIKE_LANE - 0.4)
 	if challenge.get("kind", "") == "gulls" or challenge.get("kind", "") == "zombies":
-		return _rail_ahead(-float(challenge["gap"]) * tpm, 0.6)
+		# they come in from out of sight behind you and close up to where they really are
+		var run_in := maxf(0.0, 45.0 - float(challenge["t"]) * 12.0)
+		return _rail_ahead(-(float(challenge["gap"]) + run_in) * tpm, 0.6)
 	return _rail_ahead(float(challenge.get("gap", 0.0)) * tpm, BIKE_LANE)
 
 

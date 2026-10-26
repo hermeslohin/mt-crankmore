@@ -85,29 +85,37 @@ func update(delta: float) -> void:
 		_start("seagulls")
 
 
-## Whether a happening can go ahead now: the right time of day, somewhere suitable near you.
+## Whether a happening can go ahead now: the right time of day, somewhere suitable near you, and (for one with a
+## fixed place) that place out of sight, so nobody pops up in front of you.
 func _fits(k: String) -> bool:
 	var h: float = Skies.hour
 	var p: Vector2 = city.p_pos
+	var hidden := func(q: Vector2) -> bool: return allow_in_view or not city._in_view(q)
 	match k:
 		"hot_air_balloon":
 			return h >= 5.5 and h <= 9.5
 		"movie_night":
 			return h >= 19.0 and h <= 23.5
 		"tree_lighting":
-			return h >= 16.0 and h <= 23.0 and p.distance_to(city.PLAZA) < 30.0
+			return h >= 16.0 and h <= 23.0 and p.distance_to(city.PLAZA) < 30.0 and hidden.call(city.PLAZA + Vector2(-4.5, 3.5))
 		"trick_or_treat":
 			return h >= 16.5 or h < 1.0
-		"parade_float", "flash_mob":
+		"parade_float":
 			return p.distance_to(city.PLAZA) < 30.0
+		"flash_mob":
+			return p.distance_to(city.PLAZA) < 30.0 and hidden.call(city.PLAZA + Vector2(3, 3))
 		"wedding":
-			return not _named_near("Town Hall", 25.0).is_empty()
+			var b := _named_near("Town Hall", 25.0)
+			return not b.is_empty() and hidden.call(b["door"])
 		"arcade_queue":
-			return not _named_near("Pixel Palace", 25.0).is_empty()
+			var b := _named_near("Pixel Palace", 25.0)
+			return not b.is_empty() and hidden.call(b["door"])
 		"video_rush":
-			return not _named_near("Rewind Video", 25.0).is_empty()
+			var b := _named_near("Rewind Video", 25.0)
+			return not b.is_empty() and hidden.call(b["door"])
 		"eating_contest":
-			return not _pizza_near().is_empty()
+			var sh := _pizza_near()
+			return not sh.is_empty() and hidden.call(sh["window"])
 		"fishing":
 			return p.distance_to(city.LAKE) < 35.0
 		"outage":
@@ -115,7 +123,8 @@ func _fits(k: String) -> bool:
 		"cart", "hydrant":
 			return city.p_speed > 0.5
 		"mountain_rescue":
-			return not _lift_near().is_empty()
+			var l := _lift_near()
+			return not l.is_empty() and hidden.call(l["base"])
 	return true
 
 
@@ -303,10 +312,14 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			Game.toast.emit("Cows loose in the street!", Color(0.9, 0.95, 0.7))
 		"hot_air_balloon":
 			e["t"] = 110.0
-			var at: Vector2 = city.p_pos + city.p_fwd * 5.0 + Vector2(2.0, -1.0)
+			var at: Vector2 = pos - across * 3.0 if not sp.is_empty() else city.p_pos + city.p_fwd * 5.0
 			if city.p_pos.distance_to(city.LAKE) < 35.0:
-				var ang: float = (city.p_pos - city.LAKE).angle()
-				at = city.LAKE + Vector2.from_angle(ang) * (city._lake_r(ang) + 2.0)
+				for k in 12:   # on the lake shore, round from where you can see
+					var ang: float = (city.p_pos - city.LAKE).angle() + 0.35 * (k + 1) * (1.0 if k % 2 == 0 else -1.0)
+					var q: Vector2 = city.LAKE + Vector2.from_angle(ang) * (city._lake_r(ang) + 2.0)
+					if allow_in_view or not city._in_view(q):
+						at = q
+						break
 			var bal := _image(e, at, "scenery_hot_air_balloon", 0.0)
 			bal["hab"] = true
 			bal["drift"] = Vector2(randf_range(-0.5, 0.5), randf_range(-0.6, -0.2))
@@ -423,6 +436,7 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			for k in 8:
 				var a := _extra(e, tq + Vector2.from_angle(PI * 0.1 + k * 0.35) * randf_range(2.0, 3.2), tq)
 				a["crowd"] = true
+				_arrive(a)
 			Game.toast.emit("Christmas tree lighting in the plaza!", Color(0.6, 1.0, 0.6))
 		"egg_hunt":
 			e["t"] = 80.0
@@ -459,6 +473,11 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 		"fishing":
 			e["t"] = 90.0
 			var ang: float = (city.p_pos - city.LAKE).angle()
+			for k in 12:   # a stretch of shore round from where you can see it
+				var a3: float = ang + 0.3 * (k + 1) * (1.0 if k % 2 == 0 else -1.0)
+				if allow_in_view or not city._in_view(city.LAKE + Vector2.from_angle(a3) * city._lake_r(a3)):
+					ang = a3
+					break
 			for k in 4:
 				var a2: float = ang + (k - 1.5) * 0.08
 				var q: Vector2 = city.LAKE + Vector2.from_angle(a2) * (city._lake_r(a2) + 1.0)
@@ -969,8 +988,14 @@ func _step(e: Dictionary, delta: float) -> void:
 			kid["pos"] = at[0]
 			kid["face"] = at[1]
 			kid["pedal"] = float(kid["pedal"]) + delta * 8.0
-			if c["state"] == "count" and kid["label_t"] <= 0.0:
-				_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9)
+			if c["state"] == "count":
+				# pedals up from out of sight behind you while counting down
+				var u: float = clampf(1.0 - float(c["count"]) / 3.0, 0.0, 1.0)
+				var back: Array = city._rail_ahead(lerpf(-16.0, 0.0, u * (2.0 - u)), city.BIKE_LANE - 0.4)
+				kid["pos"] = back[0]
+				kid["face"] = back[1]
+				if kid["label_t"] <= 0.0 and u > 0.6:
+					_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9)
 			elif c["state"] == "won" and not e.get("said", false):
 				e["said"] = true
 				_say(kid, ["No fair! You've got gears!", "Aww... here's your $20.", "Rematch tomorrow!"].pick_random(), 3.0)

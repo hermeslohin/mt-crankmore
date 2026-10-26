@@ -67,6 +67,8 @@ static var _cast_prev := {}     # uid -> look, last frame
 static var _cast_now := {}      # uid -> look, this frame
 static var _taken := {}         # look -> uid, this frame
 static var _held := {}          # look -> uid that had it last frame
+static var _hid_prev := {}      # uids left out last frame (nobody to be): they stay out until they've left the screen
+static var _hid_now := {}
 static var _everyone: Array = []
 static var doubles := 0         # times someone had to be drawn in a look already on screen (debugging)
 
@@ -77,6 +79,8 @@ static func cast(person: Dictionary, options: Array = [], must := false) -> Stri
 		_cast_frame = f
 		_cast_prev = _cast_now
 		_cast_now = {}
+		_hid_prev = _hid_now
+		_hid_now = {}
 		_taken = {}
 		_held = {}
 		for u in _cast_prev:
@@ -94,11 +98,14 @@ static func cast(person: Dictionary, options: Array = [], must := false) -> Stri
 			if not _taken.has(d) and (not _held.has(d) or _held[d] == u):
 				pick = d
 				break
-	if pick == "":
+	if pick == "" or (not _cast_prev.has(u) and _hid_prev.has(u) and not must):
+		# no look for them: they're left out, and stay out while on screen (no popping in when one frees up)
 		if not must or pool.is_empty():
+			_hid_now[u] = true
 			return ""
-		pick = pool[0]
-		doubles += 1
+		if pick == "":
+			pick = pool[0]
+			doubles += 1
 	_taken[pick] = u
 	_cast_now[u] = pick
 	return pick

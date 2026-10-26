@@ -75,14 +75,14 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 | `bakers/<shop>/` | one baker per pizza shop (`Idle` state with a `tap` animation, `Holding_pizza` state with a `dance` animation, south view) | `art/chef_<shop>_tap.png`, `art/chef_<shop>_dance.png` |
 | `mascot/pizza-mascot/` | the Walkie Talkie's dancing pizza-slice mascot (`dance` animation, south view) | `art/mascot_dance.png` |
 | `props/pizza-spin/` | the thrown pizza, spinning (8 frames) | `art/pizza_spin.png` |
-| `vehicles/<kind>/` | the traffic in 8 directions (`rotations/`): `car` and `truck` (white, painted in game), `motorcycle`, and coloured `sedan_*`, `truck_*` and `van_*` | `art/vehicle_<kind>.png` |
+| `vehicles/<kind>/` | the traffic in 8 directions (`rotations/`): `car` and `truck` (white, painted in game), `motorcycle`, and 27 coloured `sedan_*`, `truck_*` and `van_*` | `art/vehicle_<kind>.png` |
 | `buildings/hospital.png` | St. Pedro's Hospital with a helicopter pad on the roof (a 192x176 image) | `art/hospital.png` |
 | `buildings/landmarks/` | the 7 pizza shops, 2 bike shops, race HQ and gondola base (192x176) | `art/building_<name>.png` |
 | `buildings/shops/` | one themed shop per shop name (128x128) | `art/building_<name>.png` |
 | `buildings/hotels/` | one themed hotel per hotel name (192x208) | `art/building_<name>.png` |
 | `buildings/condos/` | the six condo blocks (160x160) | `art/building_<name>.png` |
 | `buildings/chalets/` | 16 chalet designs (128x112) | `art/building_chalet_NN.png` |
-| `animals/<kind>/` | the race-course wildlife: bear (`idle`, `run`, `roar`), deer, moose, goat, fox, marmot, rabbit, squirrel (`idle`, `run`), all east-facing; `eagle` (`fly`) and `butterfly` (`flutter`) | `art/animal_<kind>_<anim>.png` |
-| `people/<slug>/` | six pedestrians (`ped_*`: `walk` in 8 directions, `cheer` facing south), two gift-givers (`giver_*`: `wave`), a skier and a skater (stills) | `art/ped_<d>_walk.png`, `_cheer.png`, `giver_*_wave.png`, `person_*.png` |
+| `animals/<kind>/` | the race-course wildlife: bear (`idle`, `run`, `roar`), deer, moose, goat, fox, marmot, rabbit, squirrel, elk, wolf, raccoon, hedgehog, chipmunk, skunk, bighorn, badger (`idle`, `run`), all east-facing; `eagle` (`fly`) and `butterfly` (`flutter`) | `art/animal_<kind>_<anim>.png` |
+| `people/<slug>/` | twelve pedestrians (`ped_*`: `walk` in 8 directions, `cheer` facing south), two gift-givers (`giver_*`: `wave`), a skier and a skater (stills) | `art/ped_<d>_walk.png`, `_cheer.png`, `giver_*_wave.png`, `person_*.png` |
 | `scenery/` | trees (pine, oak, birch, snag in their seasons), bushes, rocks, flower beds, pumpkins, leaf piles, hay, snowmen, scarecrow, kites, picnics, volleyball net, market stalls, umbrellas, lamp, fountain, dock, signs, clouds and power-up icons (single images) | `art/scenery_<name>.png` |
 | `objects/<slug>/` | rowboat, canoe, duck, duckling, gondola cabin, dirt jump, fallen log, race arch, in 8 directions (`rotations/`) | `art/obj_<name>.png` |

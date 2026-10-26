@@ -251,10 +251,13 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 			tex = null
 			throw_t = -1.0
 			_throws.erase(base)
+	pizza_top = Vector2.INF
+	var with_pizza := false
 	if tex == null:
 		for suffix in (["_pizza", "_boxed", ""] if has_pizza else (["_boxed", ""] if boxed else [""])):
 			tex = outfit(base + suffix)
 			if tex != null:
+				with_pizza = suffix == "_pizza"
 				break
 	if tex == null:
 		return false
@@ -268,8 +271,53 @@ static func draw_rider(ci: CanvasItem, c: Vector2, w: Vector2, phase: float, has
 	var key := "%d/%s" % [ci.get_instance_id(), who]   # each rider is one of a kind in a scene
 	if not _rider_turns.has(key):
 		_rider_turns[key] = {}
-	_draw_turning(ci, tex, dst, col * fw, fw, fh, turn_rows(_rider_turns[key], w), Color.WHITE)
+	var rows := turn_rows(_rider_turns[key], w)
+	_draw_turning(ci, tex, dst, col * fw, fw, fh, rows, Color.WHITE)
+	if with_pizza:
+		var spot := _pizza_spot(tex, outfit(base + "_boxed"), int(rows[0]), col)
+		if spot != Vector2.INF:
+			pizza_top = dst.position + spot
 	return true
+
+
+## Where the pizza is in the frame draw_rider just drew (its top middle, on screen), Vector2.INF if no pizza: for the
+## steam (BikeDraw). Found by comparing the pizza sheet with the same rider's empty-box sheet: the difference is the
+## pizza, frame by frame.
+static var pizza_top := Vector2.INF
+static var _pizza_spots := {}   # pizza texture -> {cell index: top-middle of the pizza in the cell, or INF}
+
+
+static func _pizza_spot(tp: Texture2D, tb: Texture2D, row: int, col: int) -> Vector2:
+	if tb == null:
+		return Vector2.INF
+	if not _pizza_spots.has(tp):
+		_pizza_spots[tp] = {}
+	var cache: Dictionary = _pizza_spots[tp]
+	var key := row * 64 + col
+	if cache.has(key):
+		return cache[key]
+	var spot := Vector2.INF
+	var ip := tp.get_image()
+	var ib := tb.get_image()
+	if ip != null and ib != null and ip.get_size() == ib.get_size():
+		var fh := ip.get_height() / DIRS
+		var x0 := col * fh
+		var y0 := row * fh
+		var lo := Vector2i(fh, fh)
+		var hi := Vector2i(-1, -1)
+		for y in fh:
+			for x in fh:
+				var a := ip.get_pixel(x0 + x, y0 + y)
+				var b := ib.get_pixel(x0 + x, y0 + y)
+				# a pixel that's different in the pizza sheet and pizza-coloured (cheese, crust, sauce, pepperoni)
+				var pizza_col := a.r > 0.55 and a.b < 0.45 and a.r > a.b + 0.25
+				if a.a > 0.5 and pizza_col and (b.a < 0.5 or absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) > 0.3):
+					lo = Vector2i(mini(lo.x, x), mini(lo.y, y))
+					hi = Vector2i(maxi(hi.x, x), maxi(hi.y, y))
+		if hi.x >= 0 and (hi - lo).x < fh / 2:   # a pizza-sized patch, not a whole different pose
+			spot = Vector2((lo.x + hi.x) * 0.5, lo.y + 1.0)
+	cache[key] = spot
+	return spot
 
 
 ## An animation row (art/<name>.png, square frames side by side) drawn at the screen point `at`: standing on it with

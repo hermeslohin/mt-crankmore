@@ -32,7 +32,8 @@ static func draw(ci: CanvasItem, c: Vector2, ds: Vector2, phase: float, has_pizz
 		sh.append(_proj(Vector3(cos(a) * 15.0, sin(a) * 6.5, 0.0)))
 	ci.draw_colored_polygon(sh, SHADOW_COL)
 	if Sprites.draw_rider(ci, c, w, phase, has_pizza, who, boxed, fall_t) and has_pizza and heat > 0.0 and fall_t < 0.0:
-		_steam(ci, _proj(Vector3(-11, 0, 17.4)), heat)
+		# from the pizza itself, wherever it sits in this frame (a rough spot over the rack if it can't be found)
+		_steam(ci, Sprites.pizza_top if Sprites.pizza_top != Vector2.INF else _proj(Vector3(-11, 0, 17.4)), heat)
 
 
 static func _iso(v: Vector2) -> Vector2:

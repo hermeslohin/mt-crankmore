@@ -9,9 +9,9 @@ extends RefCounted
 ## Each happening is a handful of actors (people, animals, a parked vehicle, a ball or a balloon) that City sorts into
 ## its drawing like everything else (see actors()). Anything without art is skipped.
 
-const GAP_MIN := 9.0          # seconds between happenings
-const GAP_MAX := 18.0
-const MAX_LIVE := 4           # happenings going on at once
+const GAP_MIN := 20.0         # seconds between happenings
+const GAP_MAX := 40.0
+const MAX_LIVE := 2           # happenings going on at once
 var near := 7.0               # tiles from the player a happening starts (not under your wheels, but in view)
 var far := 15.0
 const SIREN_KINDS := ["truck_firetruck", "van_ambulance", "sedan_police"]
@@ -26,7 +26,7 @@ var t_ := 0.0
 var critters: Array = []
 const CRITTERS := ["squirrel", "squirrel", "rabbit", "rabbit", "chipmunk", "hedgehog", "raccoon", "skunk", "fox", "town_cat_ginger",
 	"town_dog_corgi", "town_pigeon", "town_pigeon", "marmot"]
-const CRITTER_COUNT := 45
+const CRITTER_COUNT := 18
 
 
 func _init(c) -> void:
@@ -242,8 +242,8 @@ func _start(kind: String) -> void:
 		"crowd":
 			# five to eight fans along the kerb, cheering whenever you are close
 			e["t"] = 45.0
-			for k in randi_range(5, 8):
-				var a := _person(pos + along * (k - 3.5) * 0.55 - across * randf_range(0.0, 0.5), _design(), across)
+			for k in randi_range(3, 5):
+				var a := _person(pos + along * (k - 2.0) * 0.55 - across * randf_range(0.0, 0.5), _design(), across)
 				a["anim"] = "cheer"
 				a["fan"] = true
 				e["actors"].append(a)
@@ -254,7 +254,7 @@ func _start(kind: String) -> void:
 			e["actors"].append({"type": "animal", "name": dog, "pos": pos + along * 0.7, "home": pos + along * 0.7, "face": along, "anim": "idle", "state": "wait", "phase": 0.0})
 			e["t"] = 40.0
 		"pigeons":
-			for k in randi_range(6, 10):
+			for k in randi_range(3, 6):
 				var q := pos + along * randf_range(-1.6, 1.6) - across * randf_range(-0.3, 0.6)
 				e["actors"].append({"type": "animal", "name": "town_pigeon", "pos": q, "face": along * (1.0 if randf() < 0.5 else -1.0), "anim": "idle",
 					"state": "peck", "phase": randf() * 2.0, "lift": 0.0, "small": true})
@@ -269,9 +269,9 @@ func _start(kind: String) -> void:
 			# a marching band (drummers and trumpeters) and a few fans following it down the pavement
 			e["t"] = 40.0
 			e["dir"] = 1.0 if randf() < 0.5 else -1.0
-			for k in 6:
+			for k in 4:
 				var design := "drummer" if k % 2 == 0 else "trumpeter"
-				if k >= 4:
+				if k >= 3:
 					design = _design()
 				var a := _person(pos, design, along * e["dir"])
 				a["lane"] = k
@@ -282,7 +282,7 @@ func _start(kind: String) -> void:
 			var star := _person(pos - across * 0.3, kind, across)
 			star["anim"] = "perform"
 			e["actors"].append(star)
-			for k in randi_range(3, 5):
+			for k in randi_range(2, 3):
 				var ang := PI * (0.15 + 0.7 * k / 4.0)
 				var off := (-across * cos(ang) * 0.0 + along * cos(ang)) * 1.3 + across * sin(ang) * 0.9
 				var a := _person(star["pos"] + off, _design(), -off.normalized())
@@ -299,7 +299,7 @@ func _start(kind: String) -> void:
 			e["actors"].append({"type": "vehicle", "name": "vehicle_%s" % kinds.pick_random(), "pos": vpos, "face": along, "phase": 0.0})
 			e["actors"][0]["label"] = "Ding-a-ling!" if String(e["actors"][0]["name"]).ends_with("icecream") else "Hot food!"
 			e["actors"][0]["label_t"] = 3.0
-			for k in randi_range(3, 5):
+			for k in randi_range(2, 3):
 				var a := _person(pos - across * 0.4 + along * (k + 1) * 0.6, _design(), -along)
 				a["queue"] = k
 				e["actors"].append(a)
@@ -421,7 +421,7 @@ func _step(e: Dictionary, delta: float) -> void:
 				a["face"] = at[1] * float(e["dir"])
 				a["moving"] = true
 				a["anim"] = "walk"
-				if int(a["lane"]) >= 4 and riding and p.distance_to(a["pos"]) < 5.0:
+				if int(a["lane"]) >= 3 and riding and p.distance_to(a["pos"]) < 5.0:
 					a["anim"] = "cheer"
 					a["moving"] = false
 			if not (city.roads[e["road"]]["closed"]) and (float(e["s"]) < 1.0 or float(e["s"]) > float(r["len"]) - 1.0):

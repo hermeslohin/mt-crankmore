@@ -73,7 +73,7 @@ const VEHICLE_DIMS := {
 	"truck_cement_mixer": [0.85, 0.36, 1.6, 2.2], "truck_delivery_box": [0.85, 0.34, 2.0, 2.8], "truck_milk": [0.85, 0.34, 1.8, 2.4],
 	"truck_logging": [0.9, 0.34, 1.6, 2.2], "van_camper_orange": [0.65, 0.32, 1.8, 2.6], "van_bakery": [0.7, 0.32, 2.0, 2.8]}
 const PAINTED_VEHICLES := ["car", "truck"]
-const CAR_COUNT := 110   # vehicles in the town's traffic
+const CAR_COUNT := 50    # vehicles in the town's traffic
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.9), Color(0.95, 0.95, 0.95), Color(0.2, 0.75, 0.45), Color(0.15, 0.15, 0.22)]
 const ER_JOKES := [
 	"Doctor: \"Good news: you're fine. Bad news: your bike filed a complaint.\"",
@@ -1358,7 +1358,7 @@ func _spawn_life() -> void:
 	var shirts := [Color(0.95, 0.3, 0.3), Color(0.3, 0.6, 0.95), Color(1.0, 0.85, 0.2), Color(0.4, 0.85, 0.4), Color(0.95, 0.55, 0.85), Color(1, 1, 1)]
 	var hairs := [Color(0.3, 0.2, 0.1), Color(0.9, 0.75, 0.3), Color(0.1, 0.1, 0.1), Color(0.6, 0.3, 0.15), Color(0.85, 0.85, 0.85)]
 	var skins := [Color(0.96, 0.8, 0.65), Color(0.85, 0.62, 0.45), Color(0.62, 0.42, 0.3), Color(0.98, 0.86, 0.74)]
-	for k in 55:
+	for k in 18:
 		var a := randf() * TAU
 		peds.append({"pos": PLAZA + Vector2(cos(a), sin(a)) * randf_range(2.6, 6.0), "target": PLAZA, "col": shirts[k % shirts.size()],
 			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": randi() % Sprites.pedestrians().size(), "face": Vector2(1, 1),
@@ -1366,7 +1366,7 @@ func _spawn_life() -> void:
 	# townsfolk strolling the pavements all over town
 	var made := 0
 	for tries in 4000:
-		if made >= 480:
+		if made >= 150:
 			break
 		var ri := randi() % roads.size()
 		var r: Dictionary = roads[ri]

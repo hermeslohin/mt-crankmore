@@ -935,7 +935,7 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 				_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.8, 1.4), "sp": sp, "snow": snow, "h": rng.randi()}, [])
 			elif roll < chance + rock_chance:
 				_put_static(3, {"pos": p, "z": z, "size": rng.randf_range(0.6, 1.5), "h": rng.randi(), "snow": snow}, [])
-			elif roll < chance + rock_chance + (0.22 if sd < 2.2 else 0.12):
+			elif roll < chance + rock_chance + (0.1 if sd < 2.2 else 0.05):
 				# ground plants: reeds and wet stones on the creek banks, ferns, berries and mushrooms in the forest,
 				# wildflowers and long grass out in the meadows
 				var r3 := rng.randf()

@@ -450,6 +450,9 @@ func _step_crew(delta: float) -> void:
 				a["anim"] = "walk"
 			continue
 		a["wait"] = float(a["wait"]) - delta
+		# at their spot: hammering or digging away, facing the building
+		a["face"] = ((b["pos"] + b["size"] * 0.5) - (a["pos"] as Vector2)).normalized()
+		a["anim"] = "work"
 		if a["wait"] <= 0.0:
 			a["to"] = _crew_spot(b)
 			a["moving"] = true
@@ -685,6 +688,16 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			if d == "":
 				return
 			var anim: String = a["anim"]
+			if a.has("hose_from"):
+				# the hose snaking back along the ground to the fire engine
+				var hp := PackedVector2Array()
+				var from: Vector2 = a["hose_from"]
+				var to: Vector2 = a["pos"]
+				var side := (to - from).orthogonal().normalized()
+				for k in 9:
+					var u := k / 8.0
+					hp.append(Iso.to_screen(from.lerp(to, u) + side * sin(u * PI) * 0.35) + Vector2(0, -1))
+				ci.draw_polyline(hp, Color(0.55, 0.12, 0.1), 2.0)
 			ground.y -= float(a.get("lift", 0.0))   # standing on a soapbox
 			if a.get("down", false):
 				# lying on the pavement: the standing sprite turned on its side
@@ -696,6 +709,8 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 					Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, 14.0)
 			elif anim == "walk" and a.get("moving", false):
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], ph, float(a.get("fps", 8.0)))
+			elif (anim == "spray" or anim == "work") and Sprites.draw_person(ci, "ped_%s_%s" % [d, anim], ground, a["face"], ph, 9.0):
+				pass
 			elif anim == "cheer" or anim == "perform":
 				if anim == "cheer" or not Sprites.draw_strip(ci, "ped_%s_perform" % d, ground, ph, 10.0):
 					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground, ph)
@@ -727,6 +742,21 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 					Sprites.draw_person(ci, "ped_%s_walk" % look, ground, a["face"], ph, 14.0)
 		"fire":
 			_draw_fire(ci, a, ground, ph)
+		"stretcher":
+			var loaded: bool = a.get("load", false)
+			if not Sprites.draw_vehicle(ci, "obj_stretcher_patient" if loaded else "obj_stretcher_empty", ground, a["face"]):
+				# no art: a little wheeled bed, red blanket on it when someone's aboard
+				var f: Vector2 = a["face"]
+				var n := Vector2(-f.y, f.x)
+				var pos: Vector2 = a["pos"]
+				var c := func(u: float, v: float, z: float) -> Vector2: return Iso.to_screen(pos + f * u + n * v, z)
+				for u in [-0.4, 0.4]:
+					for v in [-0.15, 0.15]:
+						ci.draw_line(c.call(u, v, 0.0), c.call(u, v, 7.0), Color(0.6, 0.62, 0.66), 1.0)
+				ci.draw_colored_polygon(PackedVector2Array([c.call(-0.5, -0.2, 8.0), c.call(0.5, -0.2, 8.0), c.call(0.5, 0.2, 8.0), c.call(-0.5, 0.2, 8.0)]), Color(0.95, 0.95, 0.97))
+				if loaded:
+					ci.draw_colored_polygon(PackedVector2Array([c.call(-0.4, -0.18, 11.0), c.call(0.25, -0.18, 11.0), c.call(0.25, 0.18, 11.0), c.call(-0.4, 0.18, 11.0)]), Color(0.85, 0.2, 0.2))
+					ci.draw_circle(c.call(0.38, 0.0, 11.0), 2.5, Color(0.96, 0.8, 0.65))
 		"animal":
 			var flip := Iso.to_screen(a["face"]).x < 0.0
 			var lift: float = a.get("lift", 0.0)
@@ -746,6 +776,12 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 		"balloon":
 			var lift: float = a["lift"]
 			var top := ground + Vector2(sin(ph * 1.7) * 3.0, -26.0 - lift)
+			if Sprites.sheet("balloon_float_white") != null:
+				# the PixelLab balloon, bobbing and swaying, string and all, in this balloon's colour
+				if not a["free"]:
+					ci.draw_line(ground + Vector2(0, -22.0), top + Vector2(0, 18), Color(0.9, 0.9, 0.9), 1.0)
+				Sprites.draw_strip(ci, "balloon_float_white", top + Vector2(0, 8), ph, 8.0, false, false, Color.WHITE.lerp(a["col"], 0.85))
+				return
 			ci.draw_line(ground + Vector2(0, -22.0 - (lift - 22.0 if a["free"] else 0.0)), top + Vector2(0, 6), Color(0.9, 0.9, 0.9), 1.0)
 			ci.draw_circle(top, 5.0, Iso.OUTLINE)
 			ci.draw_circle(top, 4.2, a["col"])
@@ -764,6 +800,11 @@ func _draw_fire(ci: CanvasItem, a: Dictionary, ground: Vector2, ph: float) -> vo
 		var sp := top + Vector2(sin(k * 1.7 + ph) * 6.0 + u * 14.0, -10.0 - u * 70.0)
 		var g := 0.25 + 0.2 * pw
 		ci.draw_circle(sp, 5.0 + u * 10.0, Color(g, g, g + 0.03, (1.0 - u) * 0.55 * maxf(pw, smoke * 0.6)))
+	if a.get("wet", false):
+		# steam hissing up where the water hits
+		for k in 6:
+			var u := fposmod(ph * 0.9 + k / 6.0, 1.0)
+			ci.draw_circle(top + Vector2(sin(k * 2.3 + ph * 2.0) * 10.0, -4.0 - u * 30.0), 3.0 + u * 6.0, Color(0.95, 0.97, 1.0, (1.0 - u) * 0.6))
 	if pw <= 0.0:
 		return
 	for k in 6:
@@ -820,6 +861,7 @@ const RIDE_LINES := ["On your left!", "Car back!", "Hold your line!", "Nice pull
 const FW_COLS := [Color(1.0, 0.3, 0.35), Color(0.35, 0.65, 1.0), Color(1.0, 0.85, 0.3), Color(0.45, 1.0, 0.5),
 	Color(0.95, 0.5, 1.0), Color(1.0, 1.0, 1.0)]
 const FW_CROWD := ["Ooooh!", "Aaaah!", "Pretty!", "BOOM!", "Whoa!", "Did you see that one?!", "Encore!"]
+const PATIENTS := 4             # people the ambulance crew has to take in
 const CLUB := ["Carl", "Sarah", "Carla", "Wanda", "Gus", "Maya", "Tony", "Kim"]
 
 
@@ -985,15 +1027,30 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["car"] = _responder(["truck_firetruck"], b["road"], float(b["s"]))
 			Game.toast.emit("Smoke over %s! The fire brigade is on its way." % str(b.get("name", "town")), Color(1.0, 0.55, 0.3))
 		"ambulance":
-			e["t"] = 90.0
+			# a pile-up on the pavement: four people hurt, a bystander calling for help, and the ambulance crew wheeling
+			# each of them to the ambulance on a stretcher
+			e["t"] = 150.0
 			e["stage"] = "down"
-			var patient := _person(pos, _design(), sp[4])
-			patient["anim"] = "idle"
-			patient["down"] = true
-			_say(patient, ["Ow! My ankle!", "I'm fine... I'm not fine.", "Too much pizza...", "Did anyone get that bike's number?"].pick_random(), 3.0)
-			e["actors"].append(patient)
-			var helper := _person(pos + (sp[4] as Vector2) * 0.8, _design(), -(sp[4] as Vector2))
-			helper["anim"] = "idle"
+			e["clock"] = 0.0
+			var along: Vector2 = sp[4]
+			var hurt: Array = []
+			for k in PATIENTS:
+				var q: Vector2 = pos + along * (k - (PATIENTS - 1) * 0.5) * 1.0
+				if not _free(q):
+					continue
+				var patient := _person(q, "", along)
+				patient["anim"] = "idle"
+				patient["down"] = true
+				patient["patient"] = true
+				hurt.append(patient)
+				e["actors"].append(patient)
+			if hurt.is_empty():
+				return false
+			_say(hurt[0], ["Ow! My ankle!", "I'm fine... I'm not fine.", "Did anyone get that bike's number?"].pick_random(), 3.0)
+			if hurt.size() > 2:
+				_say(hurt[2], ["My elbow!", "Ooof.", "Too much pizza..."].pick_random(), 3.0)
+			var helper := _person(pos - (sp[5] as Vector2 - pos).normalized() * 0.7, "", along)
+			helper["anim"] = "cheer"
 			_say(helper, "Someone call an ambulance!", 3.0)
 			e["actors"].append(helper)
 			e["car"] = _responder(["van_ambulance"], sp[1], float(sp[2]))
@@ -1171,6 +1228,7 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 					ff["speed"] = 1.2
 					ff["moving"] = true
 					ff["firefighter"] = true
+					ff["hose_from"] = truck["pos"]
 					e["actors"].append(ff)
 				_say(e["actors"][1], "Over here!", 2.0)
 		"spray":
@@ -1182,14 +1240,18 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 						a["face"] = (center - (a["pos"] as Vector2)).normalized()
 						a["spray_to"] = center
 						a["spray_h"] = fire["h"]
+						a["anim"] = "spray"
 						spraying = true
+			fire["wet"] = spraying
 			if spraying:
-				fire["power"] = maxf(0.0, float(fire["power"]) - delta * 0.07)
+				fire["power"] = maxf(0.0, float(fire["power"]) - delta * 0.045)
 			if fire["power"] <= 0.0:
 				e["stage"] = "out"
+				fire["wet"] = false
 				for a in e["actors"]:
 					if a.get("firefighter", false):
 						a.erase("spray_to")
+						a["anim"] = "walk"
 						a["to"] = truck["pos"]
 						a["moving"] = true
 				_say(e["actors"][1], "Thank you, Crankmore FD!", 3.0)
@@ -1209,65 +1271,106 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 				_drive_off(e)
 
 
+## The ambulance call-out: once the ambulance has pulled up, two paramedics wheel a stretcher out to each casualty
+## in turn ("fetch"), load them ("load"), wheel them back ("back") and put them in the ambulance ("stow"), then drive off.
 func _step_ambulance(e: Dictionary, delta: float) -> void:
 	var van: Dictionary = e.get("car", {})
-	var patient: Dictionary = e["actors"][0]
+	e["clock"] = float(e["clock"]) + delta
+	var hurt: Array = e["actors"].filter(func(a): return a.get("patient", false) and not a.get("gone", false) and a.get("down", false))
 	match e["stage"]:
 		"down":
 			if van.is_empty():
-				e["stage"] = "up"
-				e["clock"] = 4.0
-			elif _parked(van):
-				e["stage"] = "treat"
-				e["clock"] = 7.0
+				# no ambulance art: they pick themselves up and limp off
+				if e["clock"] > 6.0:
+					for a in hurt:
+						a["down"] = false
+						a["to"] = (a["pos"] as Vector2) + (a["face"] as Vector2) * 3.0
+						a["speed"] = 0.6
+						a["moving"] = true
+					e["stage"] = "limp"
+				return
+			if _parked(van):
+				var medics: Array = []
 				for k in clampi(Sprites.variants("paramedic").size(), 1, 2):
 					var m := _person(van["pos"], "paramedic" if _has("ped_paramedic_walk") else "nurse", Vector2(1, 1))
-					m["to"] = (patient["pos"] as Vector2) + Vector2(0.5 - k, -0.4 + k * 0.8) * 0.6
-					m["speed"] = 1.4
-					m["moving"] = true
-					m["medic"] = true
+					m["medic"] = k
 					e["actors"].append(m)
-		"treat":
-			var there := true
+					medics.append(m)
+				e["stretcher"] = {"type": "stretcher", "pos": van["pos"], "face": Vector2(1, 1), "phase": 0.0, "label_t": 0.0, "load": false}
+				e["actors"].append(e["stretcher"])
+				_say(medics[0], "Paramedics! Coming through!", 2.5)
+				_next_patient(e)
+		"fetch", "back":
+			var st: Dictionary = e["stretcher"]
+			var to: Vector2 = e["goal"]
+			var d: Vector2 = to - (st["pos"] as Vector2)
+			if d.length() > 0.05:
+				st["pos"] = (st["pos"] as Vector2) + d.normalized() * minf(d.length(), 1.3 * delta)
+				st["face"] = d.normalized()
+			_carry(e)
+			if d.length() <= 0.05:
+				if e["stage"] == "fetch":
+					e["stage"] = "load"
+					e["clock"] = 0.0
+					var medics: Array = e["actors"].filter(func(a): return a.has("medic"))
+					_say(medics[0], ["Let's get you on the stretcher.", "Easy does it...", "On three. One, two, three!"].pick_random(), 2.2)
+				else:
+					e["stage"] = "stow"
+					e["clock"] = 0.0
+		"load":
+			_carry(e, false)
+			if e["clock"] > 2.2:
+				var pt: Dictionary = e["patient"]
+				pt["gone"] = true
+				pt["down"] = false
+				e["stretcher"]["load"] = true
+				e["stage"] = "back"
+				e["goal"] = van["pos"]
+		"stow":
+			_carry(e, false)
+			if e["clock"] > 1.2:
+				e["stretcher"]["load"] = false
+				if hurt.is_empty():
+					e["stage"] = "done"
+					for a in e["actors"]:
+						if a.has("medic") or a["type"] == "stretcher":
+							a["gone"] = true
+					var helper: Dictionary = e["actors"].filter(func(a): return not a.has("medic") and not a.get("patient", false) and a["type"] == "person")[0]
+					_say(helper, "Thank you, paramedics!", 3.0)
+					helper["anim"] = "idle"
+					_drive_off(e)
+				else:
+					_next_patient(e)
+		"limp":
 			for a in e["actors"]:
-				if a.get("medic", false):
+				if a.get("patient", false):
 					_walk_to(a, delta)
-					if a.get("moving", false):
-						there = false
-					else:
-						a["face"] = ((patient["pos"] as Vector2) - (a["pos"] as Vector2)).normalized()
-			if there:
-				if not e.get("said", false):
-					e["said"] = true
-					var medics: Array = e["actors"].filter(func(a): return a.get("medic", false))
-					_say(medics[0], ["Let's take a look.", "Where does it hurt?", "Just a sprain!"].pick_random(), 2.5)
-				e["clock"] -= delta
-				if e["clock"] <= 0.0:
-					e["stage"] = "up"
-					e["clock"] = 2.0
-					patient["down"] = false
-					_say(patient, ["Thanks, doc!", "I feel great!", "Can I still get pizza?"].pick_random(), 2.5)
-		"up":
-			e["clock"] -= delta
-			if e["clock"] <= 0.0:
-				e["stage"] = "board"
-				for a in e["actors"]:
-					if a.get("medic", false) or a == patient:
-						a["to"] = van["pos"] if not van.is_empty() else (a["pos"] as Vector2) + Vector2(2, 0)
-						a["speed"] = 1.0
-						a["moving"] = true
-		"board":
-			var aboard := true
-			for a in e["actors"]:
-				if a.has("to") and not a.get("gone", false):
-					_walk_to(a, delta)
-					if a.get("moving", false):
-						aboard = false
-					else:
-						a["gone"] = true
-			if aboard and not e.get("leaving", false):
-				e["leaving"] = true
-				_drive_off(e)
+
+
+## Off to the nearest casualty still lying there.
+func _next_patient(e: Dictionary) -> void:
+	var st: Dictionary = e["stretcher"]
+	var best: Dictionary = {}
+	for a in e["actors"]:
+		if a.get("patient", false) and a.get("down", false) and not a.get("gone", false):
+			if best.is_empty() or (a["pos"] as Vector2).distance_to(st["pos"]) < (best["pos"] as Vector2).distance_to(st["pos"]):
+				best = a
+	e["patient"] = best
+	e["goal"] = (best["pos"] as Vector2) + (best["face"] as Vector2).orthogonal() * 0.5
+	e["stage"] = "fetch"
+
+
+## The paramedics at either end of the stretcher, walking it along (`moving`) or standing at it.
+func _carry(e: Dictionary, moving := true) -> void:
+	var st: Dictionary = e["stretcher"]
+	var f: Vector2 = st["face"]
+	for a in e["actors"]:
+		if a.has("medic"):
+			var end := 0.55 if int(a["medic"]) == 0 else -0.55
+			a["pos"] = (st["pos"] as Vector2) + f * end
+			a["face"] = f
+			a["moving"] = moving
+			a["anim"] = "walk" if moving else "idle"
 
 
 func _step_crime(e: Dictionary, delta: float) -> void:

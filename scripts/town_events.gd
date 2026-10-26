@@ -188,7 +188,9 @@ func _spot() -> Array:
 		while s < float(r["len"]) - 0.5:
 			var at: Array = city._road_at(r, s)
 			var d: float = (at[0] as Vector2).distance_to(p)
-			if d > near and d < far:
+			# ahead of you, where you'll see it (or anywhere while you stand still)
+			var ahead: bool = city.p_fwd == Vector2.ZERO or ((at[0] as Vector2) - p).dot(city.p_fwd) > d * 0.3
+			if d > near and d < far and ahead:
 				cands.append([ri, s, at])
 			s += 2.0
 	for _try in 12:

@@ -18,6 +18,8 @@ const TILES_PER_MS := 0.45
 ## Overall pace of the town (rider, rivals, traffic). 0.7 = 30% slower than the original tuning.
 const PACE := 0.7
 const CAR_HIT_R := 0.14
+const CAR_SCALE := 0.85     # cars drawn a bit smaller than their art, so two lanes and a bike fit the road
+const CAR_LANE := 0.42      # a car's distance from the middle of the road
 const BIKE_LANE := 0.95
 const ROAD_HW := 1.0
 const TURN_R := 2.2         # how far before / after a junction the rider eases into / out of the turn
@@ -1566,7 +1568,7 @@ func _spawn_cars() -> void:
 func _car_pose(c: Dictionary) -> void:
 	var at := _road_at(roads[c["road"]], c["s"])
 	var fwd: Vector2 = at[1] * c["dir"]
-	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * (0.5 + 0.45 * float(c.get("pull", 0.0)))   # pulled over onto the kerb
+	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * (CAR_LANE + 0.5 * float(c.get("pull", 0.0)))   # pulled over onto the kerb
 	c["fwd"] = fwd
 
 
@@ -1749,7 +1751,8 @@ func _update_player(delta: float) -> void:
 				continue
 			var rel: Vector2 = rail_pos - c["pos"]
 			var f: Vector2 = c["fwd"]
-			if absf(rel.dot(f)) < float(c["hl"]) + CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(c["hw"]) + CAR_HIT_R:
+			# the car's body as drawn (CAR_SCALE), so riding past one in your lane is a near miss, not a crash
+			if absf(rel.dot(f)) < float(c["hl"]) * CAR_SCALE + CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(c["hw"]) * CAR_SCALE + CAR_HIT_R * 0.5:
 				_hit_by_car(c)
 				break
 
@@ -2254,7 +2257,7 @@ func _start_curve(c: Dictionary, road: int, s: float, dir: float) -> void:
 	var f1: Vector2 = c["fwd"]
 	var at := _road_at(roads[road], s)
 	var f2: Vector2 = at[1] * dir
-	var e: Vector2 = at[0] + Vector2(-f2.y, f2.x) * 0.5
+	var e: Vector2 = at[0] + Vector2(-f2.y, f2.x) * CAR_LANE
 	var k: Vector2
 	var den := f1.cross(f2)
 	if absf(den) > 0.3:
@@ -3898,8 +3901,8 @@ func _draw_car(c: Dictionary) -> void:
 	# a one-pixel bounce on the suspension while it drives, and the wheels turn with the distance driven
 	var at := Iso.to_screen(pos) + Vector2(0, -1 if moving and int(odo * 5.0) % 2 == 0 else 0)
 	var frame := int(odo * 6.0)
-	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame):
-		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame)
+	if not Sprites.draw_vehicle(self, c.get("art", "vehicle_%s" % c["kind"]), at, fwd, tint, frame, true, CAR_SCALE):
+		Sprites.draw_vehicle(self, "vehicle_car", at, fwd, Color.WHITE.lerp(c["col"], 0.7), frame, true, CAR_SCALE)
 	if not String(c["kind"]).contains("electric") and not String(c["kind"]).contains("carriage"):
 		# exhaust: little puffs from the back that drift up and fade, more when it pulls away
 		var rear: Vector2 = pos - fwd * hl

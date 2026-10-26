@@ -712,7 +712,10 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			elif (anim == "spray" or anim == "work") and Sprites.draw_person(ci, "ped_%s_%s" % [d, anim], ground, a["face"], ph, 9.0):
 				pass
 			elif anim == "yell" or anim == "caught":   # one-direction strips: shaking a fist, sitting with hands up
-				if not Sprites.draw_strip(ci, "ped_%s_%s" % [d, anim], ground, ph, 9.0):
+				var st := ph
+				if anim == "caught" and ph * 9.0 >= 8.0:   # sits down once, then just the hands-up frames
+					st = (4.0 + fmod(ph * 9.0 - 8.0, 4.0)) / 9.0
+				if not Sprites.draw_strip(ci, "ped_%s_%s" % [d, anim], ground, st, 9.0):
 					Sprites.draw_person(ci, "ped_%s_walk" % d, ground, a["face"], 0.0, 0.0, Color.WHITE, a)
 			elif anim == "cheer" or anim == "perform":
 				var sat := Vector2(0, 7) if a.get("seated", false) else Vector2.ZERO   # cheering from where they sit

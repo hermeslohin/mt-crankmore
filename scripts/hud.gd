@@ -264,12 +264,14 @@ func _draw_city_hud(w: float, h: float) -> void:
 	for i in Talk.rivals.size():
 		rows.append({"name": Talk.rivals[i]["short"], "n": city.rival_score[i], "col": Talk.rivals[i]["color"]})
 	rows.sort_custom(func(a, b): return a["n"] > b["n"])
-	_panel(Rect2(4, 4, 84, 14 + rows.size() * 9))
-	_text("DELIVERIES", Vector2(9, 14), 8, Color(1.0, 0.85, 0.3))
+	# (bottom right: the WEEHOO has the top left)
+	var lb := Rect2(w - 88, h - 18 - rows.size() * 9, 84, 14 + rows.size() * 9)
+	_panel(lb)
+	_text("DELIVERIES", lb.position + Vector2(5, 10), 8, Color(1.0, 0.85, 0.3))
 	for i in rows.size():
 		var r: Dictionary = rows[i]
-		_text("%d %s" % [i + 1, r["name"]], Vector2(9, 24 + i * 9), 8, r["col"])
-		_text(str(r["n"]), Vector2(60, 24 + i * 9), 8, r["col"], 22, HORIZONTAL_ALIGNMENT_RIGHT)
+		_text("%d %s" % [i + 1, r["name"]], lb.position + Vector2(5, 20 + i * 9), 8, r["col"])
+		_text(str(r["n"]), lb.position + Vector2(56, 20 + i * 9), 8, r["col"], 22, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	# orders
 	var lines: Array = []
@@ -379,7 +381,7 @@ func _zone_col(frac: float) -> Color:
 	return Color(0.95, 0.15, 0.15)
 
 
-## The WEEHOO bike computer in the bottom-right corner: LED power strip, map page on top,
+## The WEEHOO bike computer in the top-left corner: LED power strip, map page on top,
 ## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence.
 ## `map_fn` draws into the map window; `cell` is [label, text, colour]; bars are [label, frac, colour].
 ## What the WEEHOO's power-up row shows: the item you're carrying, or a running Fire Socks / Breadsticks / Dough Roller timer.
@@ -398,15 +400,28 @@ func _gear_text() -> String:
 	return "FIXED" if Game.fixed_gear() else "GEAR %d" % Trainer.gear
 
 
+## Where the WEEHOO sits (top left) and, on its pixel-art shell (art/ui_weehoo_shell.png), the window the live
+## display is drawn into. Without the shell art it's drawn as a plain case of WEEHOO_SIZE.
+const WEEHOO_POS := Vector2(4, 4)
+const WEEHOO_SIZE := Vector2(192, 288)
+const WEEHOO_SCREEN := Rect2(33, 46, 126, 176)
+
+
+func weehoo_rect() -> Rect2:
+	return Rect2(WEEHOO_POS, WEEHOO_SIZE)
+
+
 func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn: Callable, cell: Array, bar1: Array, pu: Dictionary) -> void:
-	var d := Rect2(w - 134, h - 198, 128, 194)
-	draw_style_box(weehoo_shadow, Rect2(d.position + Vector2(3, 3), d.size))
-	for k in 2:   # side buttons
-		draw_rect(Rect2(d.position.x - 2 + k * (d.size.x + 1), d.position.y + 40, 3, 16), Color(0.25, 0.25, 0.28))
-	draw_style_box(weehoo_sb, d)
-	if Trainer.shift_flash > 0.0:   # big gear number just above the computer after a shift
+	var d := weehoo_rect()
+	var shell := Sprites.sheet("ui_weehoo_shell")
+	if shell != null:
+		draw_texture(shell, d.position)
+	else:
+		draw_style_box(weehoo_shadow, Rect2(d.position + Vector2(3, 3), d.size))
+		draw_style_box(weehoo_sb, d)
+	if Trainer.shift_flash > 0.0:   # big gear number beside the computer after a shift
 		var fa := clampf(Trainer.shift_flash / 0.3, 0.0, 1.0)
-		var gr := Rect2(d.position.x + 24, d.position.y - 30, 80, 26)
+		var gr := Rect2(d.end.x + 6, d.position.y + 40, 80, 26)
 		draw_rect(gr, Color(0.08, 0.08, 0.1, 0.85 * fa))
 		var lo := Trainer.gear == 1 or Trainer.gear == Trainer.GEARS
 		draw_string(font, Vector2(gr.position.x, gr.position.y + 19), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, gr.size.x, 16,
@@ -415,24 +430,19 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 			var tx := gr.position.x + 5 + i * 3.4
 			draw_rect(Rect2(tx, gr.end.y - 4, 2, 2), Color(1.0, 0.85, 0.3, fa) if i + 1 == Trainer.gear else Color(0.5, 0.5, 0.55, fa))
 	var dark := Color(0.12, 0.12, 0.15)
-	# LED strip: lights up left to right with power, coloured by zone
 	var frac := Trainer.power() / maxf(Game.ftp, 1.0)
-	for i in 8:
-		var lf := (i + 0.5) / 8.0 * 1.5
-		var lit := frac >= lf - 0.09
-		draw_rect(Rect2(d.position.x + 22 + i * 11, d.position.y + 4, 7, 2), _zone_col(lf) if lit else Color(0.27, 0.27, 0.3))
-	draw_string(font, Vector2(d.position.x, d.position.y + 17), "WEEHOO", HORIZONTAL_ALIGNMENT_CENTER, d.size.x, 9, Color(0.95, 0.95, 0.97))
-	# bottom buttons
-	for i in 3:
-		draw_rect(Rect2(d.position.x + 26 + i * 30, d.end.y - 10, 16, 4), Color(0.28, 0.28, 0.32))
-	draw_rect(Rect2(d.position.x + 26 + 30, d.end.y - 10, 16, 1), Color(0.95, 0.4, 0.15))
-
 	# screen
-	var sc := Rect2(d.position.x + 6, d.position.y + 21, d.size.x - 12, 157)
+	var sc := Rect2(d.position + WEEHOO_SCREEN.position, WEEHOO_SCREEN.size)
 	draw_rect(sc.grow(1.0), Color(0.05, 0.05, 0.07))
 	draw_rect(sc, Color(0.9, 0.92, 0.88))
 	var x := sc.position.x
 	var y := sc.position.y
+	# LED strip along the top of the screen: lights up left to right with power, coloured by zone
+	for i in 8:
+		var lf := (i + 0.5) / 8.0 * 1.5
+		var lit := frac >= lf - 0.09
+		var lw := (sc.size.x - 4.0) / 8.0
+		draw_rect(Rect2(x + 2 + i * lw, y - 4, lw - 3, 2), _zone_col(lf) if lit else Color(0.27, 0.27, 0.3))
 	# status bar: clock, link, battery
 	draw_rect(Rect2(x, y, sc.size.x, 10), dark)
 	var tm := Time.get_time_dict_from_system()
@@ -443,10 +453,11 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	draw_rect(Rect2(x + sc.size.x - 6, y + 4, 2, 2), Color(0.9, 0.9, 0.9))
 	draw_rect(Rect2(x + sc.size.x - 19, y + 4, 9, 2), Color(0.4, 1.0, 0.5))
 	draw_string(font, Vector2(x, y + 8), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
-	# map page
-	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, 56)
+	# map page: everything the fields and bars below don't need
+	var map_h := sc.size.y - 12.0 - 2.0 - 49.0 - 28.0
+	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, map_h)
 	map_fn.call(mr)
-	y += 70.0
+	y += map_h + 14.0
 	draw_rect(Rect2(x, y, sc.size.x, 1), dark)
 	# 2x2 fields
 	var gcol := Color(0.8, 0.2, 0.15) if grade_pct > 0.5 else (Color(0.1, 0.55, 0.25) if grade_pct < -0.5 else dark)
@@ -456,12 +467,12 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	var cw := sc.size.x * 0.5
 	for i in 4:
 		var fx := x + (i % 2) * cw
-		var fy := y + 1 + (i / 2) * 29
-		draw_string(font, Vector2(fx + 3, fy + 9), fields[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.4, 0.42, 0.45))
-		draw_string(font, Vector2(fx, fy + 25), fields[i][1], HORIZONTAL_ALIGNMENT_CENTER, cw, 16, fields[i][2])
-	draw_rect(Rect2(x + cw, y + 1, 1, 57), Color(0.7, 0.72, 0.7))
-	draw_rect(Rect2(x, y + 30, sc.size.x, 1), Color(0.7, 0.72, 0.7))
-	y += 59.0
+		var fy := y + 1 + (i / 2) * 24
+		draw_string(font, Vector2(fx + 3, fy + 8), fields[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.4, 0.42, 0.45))
+		draw_string(font, Vector2(fx, fy + 21), fields[i][1], HORIZONTAL_ALIGNMENT_CENTER, cw, 16, fields[i][2])
+	draw_rect(Rect2(x + cw, y + 1, 1, 47), Color(0.7, 0.72, 0.7))
+	draw_rect(Rect2(x, y + 25, sc.size.x, 1), Color(0.7, 0.72, 0.7))
+	y += 49.0
 	draw_rect(Rect2(x, y, sc.size.x, 1), dark)
 	# HP / legs bar, the power-up slot, cadence
 	var kind: String = pu["kind"]
@@ -499,18 +510,19 @@ func _draw_race_hud(w: float, h: float) -> void:
 	var race = main.race
 	var me: Dictionary = race.riders[0]
 	var order: Array = race.standings()
-	_panel(Rect2(4, 4, 112, 16 + order.size() * 10))
-	_text(race.course["name"].to_upper(), Vector2(9, 14), 8, Color(1.0, 0.85, 0.3))
+	var rb := Rect2(w - 116, h - 20 - order.size() * 10, 112, 16 + order.size() * 10)   # bottom right
+	_panel(rb)
+	_text(race.course["name"].to_upper(), rb.position + Vector2(5, 10), 8, Color(1.0, 0.85, 0.3))
 	for i in order.size():
 		var r: Dictionary = order[i]
 		var nm: String = "YOU" if r["player"] else r["short"]
 		var col: Color = Color(1, 1, 1) if r["player"] else r["color"]
 		if r["player"]:
-			draw_rect(Rect2(6, 17 + i * 10, 108, 10), Color(1, 1, 1, 0.18))
-		_text("%d %s" % [i + 1, nm], Vector2(9, 25 + i * 10), 8, col)
+			draw_rect(Rect2(rb.position + Vector2(2, 13 + i * 10), Vector2(108, 10)), Color(1, 1, 1, 0.18))
+		_text("%d %s" % [i + 1, nm], rb.position + Vector2(5, 21 + i * 10), 8, col)
 		var gap: float = race.time_gap(r)
 		var gtxt := "--" if r["player"] else ("%+ds" % int(gap))
-		_text(gtxt if not r["done"] else "FIN", Vector2(70, 25 + i * 10), 8, col, 40, HORIZONTAL_ALIGNMENT_RIGHT)
+		_text(gtxt if not r["done"] else "FIN", rb.position + Vector2(66, 21 + i * 10), 8, col, 40, HORIZONTAL_ALIGNMENT_RIGHT)
 
 	var pos := order.find(me) + 1
 	if float(me["draft"]) > 0.0:
@@ -572,7 +584,8 @@ func _draw_toasts(w: float) -> void:
 		var col: Color = t["color"]
 		col.a = a
 		var tw := minf(font.get_string_size(t["text"], HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x, 360.0)
-		var r := Rect2(floorf(w * 0.5 - tw * 0.5 - 6), y - 10, tw + 12, 14)
+		var mid := (weehoo_rect().end.x + w) * 0.5   # the space right of the WEEHOO
+		var r := Rect2(floorf(mid - tw * 0.5 - 6), y - 10, tw + 12, 14)
 		draw_rect(Rect2(r.position + Vector2(2, 2), r.size), Color(INK.r, INK.g, INK.b, a))
 		draw_rect(r, Color(0.1, 0.12, 0.3, 0.92 * a))
 		draw_rect(r, Color(col.r, col.g, col.b, a), false, 1.0)
@@ -588,7 +601,8 @@ func _draw_feed(h: float) -> void:
 		var a := clampf(f["t"], 0.0, 1.0)
 		var txt: String = f["text"] if f["who"] == "" else "%s: %s" % [f["who"], f["text"]]
 		var tw := minf(font.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x, 240.0)
-		draw_rect(Rect2(4, base - 8 - i * 11, tw + 8, 11), Color(0.08, 0.1, 0.22, 0.75 * a))
+		var fx := weehoo_rect().end.x + 6.0
+		draw_rect(Rect2(fx, base - 8 - i * 11, tw + 8, 11), Color(0.08, 0.1, 0.22, 0.75 * a))
 		var c: Color = f["color"]
 		c.a = a
-		draw_string(font, Vector2(8, base - i * 11), txt, HORIZONTAL_ALIGNMENT_LEFT, 240.0, 8, c)
+		draw_string(font, Vector2(fx + 4, base - i * 11), txt, HORIZONTAL_ALIGNMENT_LEFT, 240.0, 8, c)

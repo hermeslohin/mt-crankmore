@@ -1344,15 +1344,15 @@ func _spawn_life() -> void:
 	var shirts := [Color(0.95, 0.3, 0.3), Color(0.3, 0.6, 0.95), Color(1.0, 0.85, 0.2), Color(0.4, 0.85, 0.4), Color(0.95, 0.55, 0.85), Color(1, 1, 1)]
 	var hairs := [Color(0.3, 0.2, 0.1), Color(0.9, 0.75, 0.3), Color(0.1, 0.1, 0.1), Color(0.6, 0.3, 0.15), Color(0.85, 0.85, 0.85)]
 	var skins := [Color(0.96, 0.8, 0.65), Color(0.85, 0.62, 0.45), Color(0.62, 0.42, 0.3), Color(0.98, 0.86, 0.74)]
-	for k in 26:
+	for k in 55:
 		var a := randf() * TAU
 		peds.append({"pos": PLAZA + Vector2(cos(a), sin(a)) * randf_range(2.6, 6.0), "target": PLAZA, "col": shirts[k % shirts.size()],
-			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": k % Sprites.pedestrians().size(), "face": Vector2(1, 1),
+			"hair": hairs[k % hairs.size()], "skin": skins[k % skins.size()], "t": randf() * 5.0, "phase": randf() * TAU, "road": -1, "look": randi() % Sprites.pedestrians().size(), "face": Vector2(1, 1),
 			"cheer": 0.0, "cool": 0.0, "shout": "", "skis": randf() < 0.3})
 	# townsfolk strolling the pavements all over town
 	var made := 0
-	for tries in 800:
-		if made >= 110:
+	for tries in 4000:
+		if made >= 480:
 			break
 		var ri := randi() % roads.size()
 		var r: Dictionary = roads[ri]
@@ -1372,7 +1372,7 @@ func _spawn_life() -> void:
 	var idx := range(peds.size())
 	idx.shuffle()
 	for k in peds.size():
-		peds[idx[k]]["giver"] = k < ceili(peds.size() / float(PowerUps.GIVER_ODDS))
+		peds[idx[k]]["giver"] = k < mini(ceili(peds.size() / float(PowerUps.GIVER_ODDS)), 18)   # the crowd grew; the gifts didn't
 		peds[idx[k]]["gcool"] = 0.0
 	for k in 3:
 		boats.append({"a": randf() * TAU, "rf": randf_range(0.35, 0.65), "w": randf_range(0.05, 0.09) * (1.0 if k % 2 == 0 else -1.0), "col": PIZZA_COLORS[k]})
@@ -1924,7 +1924,7 @@ func _update_life(delta: float) -> void:
 			continue
 		if riding and p["cool"] <= 0.0 and p_pos.distance_to(p["pos"]) < 4.5:
 			p["cool"] = randf_range(14.0, 24.0)
-			if randf() < 0.7:
+			if randf() < 0.45:
 				p["cheer"] = 2.6
 				p["shout"] = String(CHEERS.pick_random()).replace("{n}", Game.player_name)
 				continue

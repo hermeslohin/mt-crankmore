@@ -22,14 +22,28 @@ const STRIP_FEET_MARGIN := 4.0   # pixels below the feet in a strip frame (see t
 const VEHICLE_LIFT := 4.0        # a vehicle sprite's middle sits this far above its spot on the ground
 
 ## Every pedestrian design there may be art for (art/ped_<design>_walk.png and _cheer.png): the townsfolk, spectators
-## and joggers. pedestrians() lists the ones that are actually there.
-const PEDESTRIAN_DESIGNS := ["kid", "jogger", "tourist", "hiker", "grandpa", "lady", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician", "baker", "cyclist_fan", "photographer", "mailman", "nurse", "dogwalker", "busker", "scout"]
+## and joggers. NORMAL_DESIGNS are ordinary people in everyday clothes; they make up most of any crowd (each counts
+## NORMAL_WEIGHT times in pedestrians()), the characters in costume or uniform are the odd one out.
+const NORMAL_DESIGNS := ["kid", "tourist", "grandpa", "lady", "teen", "grandma", "dad_stroller", "tourist_family",
+	"norm_man_jeans", "norm_woman_sundress", "norm_man_plaid", "norm_woman_jeans_jacket", "norm_old_man_cane", "norm_old_woman",
+	"norm_teen_girl", "norm_teen_boy", "norm_student", "norm_mom_bags", "norm_man_suit_casual", "norm_woman_sweater",
+	"norm_man_heavy", "norm_woman_tall", "norm_couple_kid", "norm_man_shorts"]
+const CHARACTER_DESIGNS := ["jogger", "hiker", "surfer", "artist", "skater_kid", "businesswoman", "doctor", "musician",
+	"baker", "cyclist_fan", "photographer", "mailman", "nurse", "dogwalker", "construction", "sweeper", "courier", "police",
+	"gardener", "newsboy", "crossing_guard", "barista"]
+const PEDESTRIAN_DESIGNS := NORMAL_DESIGNS + CHARACTER_DESIGNS
+const NORMAL_WEIGHT := 4
 static var _peds: Array = []
 
 
+## The pedestrian designs that have art, ordinary people NORMAL_WEIGHT times over, so picking one at random (or by an
+## index) mostly gives an everyday person.
 static func pedestrians() -> Array:
 	if _peds.is_empty():
-		_peds = PEDESTRIAN_DESIGNS.filter(func(d): return sheet("ped_%s_walk" % d) != null and sheet("ped_%s_cheer" % d) != null)
+		for d in PEDESTRIAN_DESIGNS:
+			if sheet("ped_%s_walk" % d) != null and sheet("ped_%s_cheer" % d) != null:
+				for k in (NORMAL_WEIGHT if d in NORMAL_DESIGNS else 1):
+					_peds.append(d)
 		if _peds.is_empty():
 			_peds = ["kid"]
 	return _peds

@@ -97,6 +97,7 @@ var hairpins: Array = []              # {s, i0, i1, left, n, c, called}
 var tunnels: Array = []               # {s0, s1, i0, i1, a (roof opacity), called}
 var ramps: Array = []                 # steep climbs and fast descents {s0, s1, g, called}
 var snow_called := false
+var life: RaceLife                    # the race-day crowds, motos, helicopter and the railway (see RaceLife)
 
 
 func _ready() -> void:
@@ -125,6 +126,8 @@ func setup(course_id: int) -> void:
 	_build_tunnels(rng)
 	_build_terrain()
 	_build_features(rng)
+	life = RaceLife.new(self)
+	life.build(rng)
 	_build_flora(rng)
 	_build_stream_geometry()
 	_build_road_geometry()
@@ -854,6 +857,11 @@ func _draw_board(e: Dictionary) -> void:
 		"tunnel":
 			draw_polyline(PackedVector2Array([ic + Vector2(-7, 7), ic + Vector2(-7, -1), ic + Vector2(-4, -5), ic + Vector2(4, -5), ic + Vector2(7, -1), ic + Vector2(7, 7)]), ink, 2.0)
 			draw_rect(Rect2(ic + Vector2(-3, 0), Vector2(6, 7)), ink)
+		"train":
+			draw_rect(Rect2(ic + Vector2(-7, -4), Vector2(14, 8)), ink)
+			draw_rect(Rect2(ic + Vector2(-5, -6), Vector2(5, 3)), ink)
+			draw_circle(ic + Vector2(-4, 5), 2.0, ink)
+			draw_circle(ic + Vector2(4, 5), 2.0, ink)
 		"snow":
 			for a in 3:
 				var d := Vector2.from_angle(a * PI / 3.0) * 7.0
@@ -913,7 +921,7 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
 			var sd := _stream_d(x, y)
-			if _rd(p) < 2.0 or sd < 1.0:
+			if _rd(p) < 2.0 or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1):
 				continue
 			var rock_chance := 0.09 if f > 0.85 else 0.04 if snow else 0.015
 			if roll < chance:
@@ -1253,6 +1261,8 @@ func _process(delta: float) -> void:
 			pops.remove_at(i)
 	kick_t = maxf(0.0, kick_t - delta)
 	_course_notices(delta)
+	if life != null:
+		life.update(delta)
 	var me: Dictionary = riders[0]
 	var g := PowerUps.felt_grade(_grade_at(me["s"]), me["roller"]) + (0.06 if kick_t > 0.0 else 0.0) + (0.03 if me["wet"] else 0.0)
 	Trainer.send_grade(g * 100.0 if countdown <= 0.0 and not over else 0.0)
@@ -1793,6 +1803,11 @@ func debug_spots() -> Array:
 		out.append(float(t["s1"]) + 10.0)
 	for r in ramps.slice(0, 1):
 		out.append(float(r["s0"]) - 5.0)
+	if life != null:
+		for c in life.crossings.slice(0, 1):
+			out.append(float(c["s"]) - 6.0)
+		if not life.devil.is_empty():
+			out.append(float(life.devil["s0"]) + 30.0)
 	for q in M:   # the first place with snow
 		if _snow_cover(pts[q].x, pts[q].y, elev[q] * vz / peak) > 0.6:
 			out.append(s_m[q] + 30.0)
@@ -1859,6 +1874,15 @@ func _draw() -> void:
 		if not buckets.has(d):
 			buckets[d] = []
 		buckets[d].append([2, g, gp])
+	if life != null:
+		for mv in life.movers():
+			var p: Vector2 = mv[0]
+			if absf(p.x - me_pos.x) > VIEW_R + 4 or absf(p.y - me_pos.y) > VIEW_R + 4:
+				continue
+			var d := _diag(p)
+			if not buckets.has(d):
+				buckets[d] = []
+			buckets[d].append([3, mv[1]])
 
 	# flat ground first (terrain, creeks, road, fords): the mountainside faces the camera, so nothing on the
 	# ground needs to hide the road. Then everything standing up, back to front.
@@ -1927,6 +1951,8 @@ func _draw() -> void:
 					for pb in seg["pebbles"]:
 						draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
 						pi_ += 1
+	if life != null:
+		life.draw_rails(self, vr)
 	for d in range(d0, d1 + 1):   # the grade chevrons on top of the road
 		if road_buckets.has(d):
 			for si in road_buckets[d]:
@@ -1958,7 +1984,10 @@ func _draw() -> void:
 					0: _draw_rider(it[1], it[2])
 					1: _draw_animal(it[1])
 					2: _draw_giver(it[1], it[2])
+					3: (it[1] as Callable).call()
 	_draw_birds(me_pos)
+	if life != null:
+		life.draw_helicopter(self)
 	_draw_flurries(vr, _snow_cover(me_pos.x, me_pos.y, _tz(me_pos) / peak))
 	for fz in frisbees:
 		var ra: Dictionary = riders[int(fz["from"])]
@@ -2111,6 +2140,10 @@ func _draw_deco(e: Dictionary) -> void:
 			draw_string(font, b + Vector2(-24, -33), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 48.0, 8, Color(0.1, 0.1, 0.15))
 		"board":
 			_draw_board(e)
+		"sprite":
+			Sprites.draw_image(self, e["name"], Iso.to_screen(e["pos"], e["z"]), e.get("flip", false))
+		"crossing":
+			life.draw_crossing(self, e)
 		"chevron":
 			_draw_chevron(e)
 		"warn":
@@ -2118,7 +2151,7 @@ func _draw_deco(e: Dictionary) -> void:
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))
 		"fan":
 			var b := Iso.to_screen(e["pos"], e["z"])
-			var design: String = Sprites.pedestrians()[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.pedestrians().size()]
+			var design: String = e["design"] if e.has("design") else Sprites.pedestrians()[int(absf((e["pos"] as Vector2).x * 3.0 + (e["pos"] as Vector2).y)) % Sprites.pedestrians().size()]
 			Sprites.draw_strip(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37, 10.0)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])

@@ -1,0 +1,49 @@
+{
+  "group_id": "67e7cc5f-0333-4383-b71c-ffe0109f643d",
+  "states": [
+    {
+      "character": {
+        "id": "769b163a-737e-43f3-9be2-0ea6c7715dff",
+        "name": "Idle",
+        "prompt": "cartoon press photographer kneeling on one knee, wearing a photographer vest and press lanyard, holding a big camera with a long telephoto lens up to the eye",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T03:08:27.958389+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "cheer": {
+            "south": [
+              "Idle/animations/cheer/south/frame_000.png",
+              "Idle/animations/cheer/south/frame_001.png",
+              "Idle/animations/cheer/south/frame_002.png",
+              "Idle/animations/cheer/south/frame_003.png",
+              "Idle/animations/cheer/south/frame_004.png",
+              "Idle/animations/cheer/south/frame_005.png",
+              "Idle/animations/cheer/south/frame_006.png",
+              "Idle/animations/cheer/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T03:15:24.774521"
+}

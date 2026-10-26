@@ -712,8 +712,9 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			elif (anim == "spray" or anim == "work") and Sprites.draw_person(ci, "ped_%s_%s" % [d, anim], ground, a["face"], ph, 9.0):
 				pass
 			elif anim == "cheer" or anim == "perform":
-				if anim == "cheer" or not Sprites.draw_strip(ci, "ped_%s_perform" % d, ground, ph, 10.0):
-					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground, ph)
+				var sat := Vector2(0, 7) if a.get("seated", false) else Vector2.ZERO   # cheering from where they sit
+				if anim == "cheer" or not Sprites.draw_strip(ci, "ped_%s_perform" % d, ground + sat, ph, 10.0):
+					Sprites.draw_cheer(ci, "ped_%s_cheer" % d, ground + sat, ph)
 			elif a.get("seated", false):   # sitting on the grass (movie night): just their top half shows over it
 				Sprites.draw_person(ci, "ped_%s_walk" % d, ground + Vector2(0, 7), a["face"], 0.0, 0.0, a.get("tint", Color.WHITE))
 			else:   # standing about: shifting their weight now and then

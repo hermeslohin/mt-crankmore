@@ -493,7 +493,8 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			for k in 3:
 				var rider := _extra(e, lead["pos"], lead["pos"])
 				rider["rider_k"] = k
-				rider["lift"] = 9.0
+				rider["lift"] = 27.0      # up on the wagon's bed (art/scenery_hay_wagon.png: the bed is ~30 px up)
+				rider["seated"] = true
 				rider["anim"] = "cheer" if k == 1 else "idle"
 			Game.toast.emit("All aboard the haunted hayride!", Color(1.0, 0.6, 0.2))
 		"harvest_festival":
@@ -851,8 +852,9 @@ func _step(e: Dictionary, delta: float) -> void:
 					a["pos"] = w[0]
 					a["flip"] = Iso.to_screen(w[1]).x < 0.0
 				elif a.has("rider_k"):
-					var w: Array = back.call(1.2 + float(a["rider_k"]) * 0.35)
-					a["pos"] = (w[0] as Vector2) + Vector2(0.02, 0.02)
+					# sitting on the hay, spread along the wagon, drawn just after it so they're on top of it
+					var w: Array = back.call(1.5)
+					a["pos"] = (w[0] as Vector2) + (w[1] as Vector2) * (float(a["rider_k"]) - 1.0) * 0.45 + Vector2(0.06, 0.06)
 					a["face"] = w[1]
 					if a["label_t"] <= 0.0 and randf() < delta * 0.1:
 						_say(a, ["Boo!", "Wheee!", "Spooky!", "Hold on to your hats!"].pick_random(), 1.5)

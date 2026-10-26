@@ -706,11 +706,12 @@ func _debug_events() -> void:
 		city.events.start(kind)
 		print("event %s: %s" % [kind, "started" if not city.events.events.is_empty() else "skipped (no art or no spot)"])
 		# the call-outs take a while to get going: wait for the truck / ambulance / police car
-		await get_tree().create_timer({"fire": 14.0, "ambulance": 16.0, "crime": 6.0, "fireworks": 5.0, "group_ride": 2.0}.get(kind, 1.2)).timeout
+		await get_tree().create_timer({"fire": 14.0, "ambulance": 16.0, "crime": 6.0, "hayride": 6.0, "fireworks": 5.0, "group_ride": 2.0}.get(kind, 1.2)).timeout
 		cam.position = city.cam_target()
 		if not city.events.events.is_empty():   # look at where it's happening (the fire, the robber)
 			var ev: Dictionary = city.events.events[0]
-			var focus: Vector2 = (ev["b"]["pos"] + ev["b"]["size"] * 0.5) if ev.has("b") else ev["actors"][1]["pos"] if kind == "crime" else Vector2.INF
+			var focus: Vector2 = (ev["b"]["pos"] + ev["b"]["size"] * 0.5) if ev.has("b") else ev["actors"][1]["pos"] if kind == "crime" \
+				else (ev["car"]["pos"] if ev.has("car") and not (ev["car"] as Dictionary).is_empty() else Vector2.INF)
 			if focus != Vector2.INF:
 				cam.position = Iso.to_screen(focus, 12.0 + Iso.ground_z(focus))
 				await get_tree().process_frame

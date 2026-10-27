@@ -6,3 +6,4 @@ bridge/devices.json
 bridge/buttons.json
 dist/
 bridge/inspect.log
+bridge/bridge.log

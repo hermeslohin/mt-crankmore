@@ -49,6 +49,7 @@ var trainer_power := 0.0
 var trainer_cadence := 0.0
 var trainer_speed_kmh := 0.0
 var trainer_live := false
+var _lost_trainer := false   # it dropped out and hasn't come back yet
 var controller_live := false
 var bridge_live := false
 var last_msg_ms := -100000
@@ -249,12 +250,20 @@ func _process(delta: float) -> void:
 		_autostart_clock -= delta
 		if _autostart_clock <= 0.0 and not bridge_live and helper_installed():
 			start_helper()
+	var had_trainer := trainer_live
 	if not bridge_live:
 		trainer_live = false
 		controller_live = false
 		_release_all()
 	elif now - last_trainer_ms > 2500:
 		trainer_live = false
+	# say so when the trainer drops out mid-ride (you'd otherwise just grind to a halt), and when it's back
+	if had_trainer and not trainer_live:
+		_lost_trainer = true
+		Game.toast.emit("Trainer signal lost - reconnecting... (W pedals meanwhile)", Color(1.0, 0.6, 0.4))
+	elif _lost_trainer and trainer_live:
+		_lost_trainer = false
+		Game.toast.emit("Trainer back!", Color(0.5, 1.0, 0.6))
 
 	# keyboard stand-in for the trainer: W rides at a steady 85% of your FTP, Shift sprints
 	# (that's in gear 11; easier gears push back less, so the same legs make fewer watts at a higher cadence)

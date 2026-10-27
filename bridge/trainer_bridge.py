@@ -73,6 +73,8 @@ LEARN_ORDER = ["LEFT", "RIGHT", "UP", "DOWN", "A", "B", "Y", "Z", "LS1", "LS2", 
                "POWERUP_L", "POWERUP_R"]
 BUTTONS_FILE = Path(__file__).with_name("buttons.json")
 DEVICES_FILE = Path(__file__).with_name("devices.json")
+LOG_FILE = Path(__file__).with_name("bridge.log")    # --managed: what happened, for when something goes wrong
+STALL_S = 8.0       # no data from the trainer / power meter this long while "connected": drop it and reconnect
 ROLES = ("trainer", "controller")
 
 
@@ -101,8 +103,18 @@ class State:
         self.quit = False
 
 
+_log_file = None
+
+
 def log(*a):
-    print(time.strftime("%H:%M:%S"), *a, flush=True)
+    line = " ".join(str(x) for x in (time.strftime("%H:%M:%S"),) + a)
+    print(line, flush=True)
+    if _log_file is not None:
+        try:
+            _log_file.write(line + "\n")
+            _log_file.flush()
+        except Exception:
+            pass
 
 
 def load_saved(state: State):
@@ -318,7 +330,11 @@ async def power_meter_session(client, state: State, addr: str):
     await client.start_notify(CP_MEASUREMENT, on_data)
     state.control_ready = False
     log("trainer: power meter (Cycling Power) - power and cadence only, no resistance control")
+    state.trainer_seen = time.time()
     while client.is_connected and state.want["trainer"] == addr and not state.quit:
+        if time.time() - state.trainer_seen > STALL_S:   # gone quiet (see trainer_session)
+            log(f"trainer: power meter sent nothing for {STALL_S:.0f} s - reconnecting")
+            break
         await asyncio.sleep(0.25)
     state.trainer = False
 
@@ -366,7 +382,13 @@ async def trainer_session(client, state: State, addr: str):
         log("trainer: no resistance control (", e, ") - power/cadence still work")
     last_sent = None
     last_time = 0.0
+    state.trainer_seen = time.time()
     while client.is_connected and state.want["trainer"] == addr and not state.quit:
+        # a trainer that has gone quiet but still looks connected (it glitched, or slept): drop it and reconnect,
+        # rather than sitting on a dead link with the rider stuck at 0 W
+        if time.time() - state.trainer_seen > STALL_S:
+            log(f"trainer: no data for {STALL_S:.0f} s - reconnecting")
+            break
         if state.control_ready:
             try:
                 if need_control["flag"]:
@@ -831,6 +853,12 @@ def main():
     ap.add_argument("--trainer", help="only auto-connect a trainer whose name contains this")
     ap.add_argument("--controller", help="only auto-connect a controller whose name contains this")
     args = ap.parse_args()
+    if args.managed:
+        global _log_file
+        try:
+            _log_file = open(LOG_FILE, "w")   # a fresh log each time the game starts the helper
+        except OSError:
+            pass
     try:
         asyncio.run(amain(args))
     except KeyboardInterrupt:

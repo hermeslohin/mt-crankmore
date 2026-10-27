@@ -441,6 +441,7 @@ static func draw_person(ci: CanvasItem, name: String, at: Vector2, w: Vector2, t
 ## Returns [view row, previous view row, how far the new one has faded in 0-1].
 const TURN_LAG := 0.12    # radians, about 7 degrees
 const TURN_FADE := 0.2    # seconds (a turn clip's 4 frames play over this too)
+const TURN_SETTLE := 0.35 # seconds a heading must stay in another view's range to turn to it inside the lag
 static var _rider_turns := {}
 
 
@@ -476,8 +477,16 @@ static func turn_rows(st: Dictionary, w: Vector2) -> Array:
 		st["_prev"] = want
 		st["_at"] = -10.0
 	var cur: int = st["_row"]
+	# a heading that has settled in another view's range turns too, even inside the lag: a road at an angle near the
+	# halfway point would otherwise keep the old view for as long as you're on it (a car sliding sideways)
+	if want == cur:
+		st["_want"] = -1
+	elif int(st.get("_want", -1)) != want:
+		st["_want"] = want
+		st["_want_at"] = now
+	var settled := want != cur and now - float(st.get("_want_at", now)) >= TURN_SETTLE
 	# a big swing (a U-turn, a hairpin) goes round one view at a time, each step finishing before the next
-	if want != cur and absf(angle_difference(cur * PI / 4.0, w.angle())) > PI / 8.0 + TURN_LAG and now - float(st["_at"]) >= TURN_FADE:
+	if want != cur and (settled or absf(angle_difference(cur * PI / 4.0, w.angle())) > PI / 8.0 + TURN_LAG) and now - float(st["_at"]) >= TURN_FADE:
 		var step := posmod(want - cur, DIRS)
 		var next := posmod(cur + (1 if step <= DIRS / 2 else -1), DIRS)
 		st["_prev"] = cur

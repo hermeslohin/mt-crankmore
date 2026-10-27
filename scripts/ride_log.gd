@@ -98,6 +98,10 @@ func description() -> String:
 ## Forget the current ride (after posting it, or when the rider throws it away). Screenshots of a posted ride are
 ## kept in `keep_dir` so they can still be added to the activity.
 func reset(keep_dir := "") -> void:
+	if Game.no_save:   # dev helpers: forget it in memory only, the player's files stay as they are
+		samples = []
+		shots = []
+		return
 	if keep_dir != "":
 		DirAccess.make_dir_recursive_absolute(keep_dir)
 	for s in shots:
@@ -123,7 +127,7 @@ func reset(keep_dir := "") -> void:
 ## Grab the screen `wait` seconds from now. Only MAX_SHOTS are kept: a new shot pushes out the oldest of the least
 ## interesting ones (scenery < deliveries < races < race wins), unless it is less interesting than all of them.
 func snap(kind: String, wait := 0.0) -> void:
-	if DisplayServer.get_name() == "headless":
+	if DisplayServer.get_name() == "headless" or Game.no_save:   # (dev helpers never add photos to your ride)
 		return
 	if wait > 0.0:
 		await get_tree().create_timer(wait).timeout
@@ -181,6 +185,8 @@ func to_tcx() -> String:
 # ---- save ------------------------------------------------------------------
 
 func save() -> void:
+	if Game.no_save:   # dev helpers (tests, screenshot runs, the event viewer) never touch the player's ride
+		return
 	_last_save = int(Time.get_unix_time_from_system())
 	var f := FileAccess.open(DIR.path_join("ride.json"), FileAccess.WRITE)
 	if f == null:

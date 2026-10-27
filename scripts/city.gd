@@ -1751,7 +1751,8 @@ func _update_player(delta: float) -> void:
 	# the paddles slide you across the road, kerb to kerb, oncoming lane and all (round a parked or queueing car);
 	# turns are picked with the D-pad / arrows only
 	p_lat = clampf(p_lat + Input.get_axis("lane_left", "lane_right") * 1.4 * delta, -(BIKE_LANE + ROAD_HW - 0.2), 0.0)
-	rail_pos = w[0] + Vector2(-p_fwd.y, p_fwd.x) * p_lat
+	var road_fwd: Vector2 = w[1]
+	rail_pos = w[0] + Vector2(-road_fwd.y, road_fwd.x) * p_lat   # across the road, not across the bike (which swings in a U-turn)
 	if not _uturn.is_empty():
 		# a U-turn: swing out ahead and round across the road to the other side, the bike turning with the curve
 		_uturn["t"] = float(_uturn["t"]) + delta / UTURN_TIME
@@ -1761,9 +1762,12 @@ func _update_player(delta: float) -> void:
 		var k: Vector2 = a + (_uturn["fwd"] as Vector2) * 1.6 + (rail_pos - a) * 0.5
 		var b: Vector2 = rail_pos
 		p_pos = a.lerp(k, u).lerp(k.lerp(b, u), u)
-		var tan := (k - a) * (1.0 - u) + (b - k) * u
-		if tan.length() > 0.01:
-			p_fwd = tan.normalized()
+		# the bike swings round steadily, the way the arc bends: the curve's own tangent lurches when its far end (your
+		# new line, moving on with you) shifts, and the camera looks ahead along your heading
+		var f0: Vector2 = _uturn["fwd"]
+		if not _uturn.has("side"):
+			_uturn["side"] = 1.0 if f0.cross(b - a) >= 0.0 else -1.0
+		p_fwd = f0.rotated(float(_uturn["side"]) * PI * u)
 		if float(_uturn["t"]) >= 1.0:
 			_uturn = {}
 	elif p_pos.distance_to(rail_pos) > 3.0:
@@ -4619,9 +4623,6 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 			if o["state"] == "open":
 				var mp := minimap_point(shops[o["shop"]]["window"], rect)
 				ci.draw_rect(Rect2(mp - Vector2(3, 3), Vector2(6, 6)), Color(1.0, 0.75, 0.1))
-		if not carry.is_empty():
-			var mp := minimap_point(spots[carry["dest"]]["pos"], rect)
-			ci.draw_rect(Rect2(mp - Vector2(3, 3), Vector2(6, 6)), Color(0.3, 1.0, 0.4))
 	# gift-givers waiting with a present: a little wrapped box
 	for p in peds:
 		if p["giver"] and p["state"] == "ready":
@@ -4633,6 +4634,14 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 			ci.draw_rect(Rect2(gp - Vector2(1, 4), Vector2(3, 1)), Color(1.0, 0.85, 0.2))
 	for i in rival_state.size():
 		ci.draw_rect(Rect2(minimap_point(rival_state[i]["pos"], rect) - Vector2(1, 1), Vector2(3, 3)), Talk.rivals[i]["color"])
+	# where the pizza you're carrying goes: a green dot with a dark edge and a white ring (it has to show on summer grass
+	# too), pulsing rather than blinking off
+	if not carry.is_empty():
+		var dp := minimap_point(spots[carry["dest"]]["pos"], rect).round()
+		var pulse := 1.0 if int(t_ * 3.0) % 2 == 0 else 0.0
+		ci.draw_circle(dp, 6.0 + pulse, Iso.OUTLINE)
+		ci.draw_circle(dp, 5.0 + pulse, Color.WHITE)
+		ci.draw_circle(dp, 3.5 + pulse, Color(0.15, 0.95, 0.3))
 	var pp := minimap_point(p_pos, rect)
 	ci.draw_circle(pp, 4.0, Iso.OUTLINE)
 	ci.draw_circle(pp, 3.0, Color(0.7, 0.25, 1.0))

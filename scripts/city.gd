@@ -1830,23 +1830,28 @@ func _rail_world() -> Array:
 
 ## Next junction ahead on the current road: [junction index, distance], or [-1, distance to a dead end].
 func _next_junction() -> Array:
-	var r: Dictionary = roads[rr]
+	return _next_junction_on(rr, rs, rdir, _from_j)
+
+
+## The same for anyone at `s` on `road` heading `dir`, just past junction `from_j`.
+func _next_junction_on(road: int, s: float, dir: float, from_j: int) -> Array:
+	var r: Dictionary = roads[road]
 	var length: float = r["len"]
 	var best := -1
 	var best_d := 1e9
-	for e in road_js[rr]:
-		var d: float = (e[0] - rs) * rdir
+	for e in road_js[road]:
+		var d: float = (e[0] - s) * dir
 		if r["closed"]:
 			d = fposmod(d, length)
-		if e[1] == _from_j and d < 0.5:
+		if e[1] == from_j and d < 0.5:
 			continue
 		if d >= 0.0 and d < best_d:
 			best_d = d
 			best = e[1]
 	if best < 0 and not r["closed"]:
-		return [-1, (length - rs) if rdir > 0.0 else rs]
+		return [-1, (length - s) if dir > 0.0 else s]
 	if not r["closed"]:
-		var to_end := (length - rs) if rdir > 0.0 else rs
+		var to_end := (length - s) if dir > 0.0 else s
 		if to_end < best_d - 0.05:
 			return [-1, to_end]
 	return [best, best_d]
@@ -2040,6 +2045,9 @@ func _update_pending() -> void:
 		if lab.size() > 1:
 			var gps := _gps_choice(lab)
 			pending = {"j": nj[0], "labels": lab, "gps": gps, "choice": "straight" if lab.has("straight") else gps}
+			var race_way: String = ((challenge.get("route", {}) as Dictionary).get("picks", {}) as Dictionary).get(nj[0], "")
+			if race_way != "" and lab.has(race_way):
+				pending["choice"] = race_way   # a race's route: the way its red arrow points
 			if queued != "" and lab.has(queued):
 				pending["choice"] = queued
 			queued = ""
@@ -2884,13 +2892,14 @@ const CHALLENGES := {
 	"thief": {"title": "CATCH THE THIEF", "pct": 1.10, "reward": 150, "gap": 12.0, "catch": 2.0, "lose": 45.0, "time": 80.0},
 	"bike_thief": {"title": "STOP THE BIKE THIEF", "pct": 1.30, "reward": 300, "gap": 14.0, "catch": 2.0, "lose": 55.0, "time": 100.0},
 	"dog": {"title": "CATCH THE DOG", "pct": 0.80, "reward": 50, "gap": 10.0, "catch": 1.5, "lose": 40.0, "time": 75.0},
-	"race": {"title": "BEAT THE HOT ROD", "pct": 1.20, "reward": 300, "dist": 110.0, "count": 3.0},
-	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 150.0, "count": 3.0},
+	"race": {"title": "BEAT THE HOT ROD", "pct": 1.20, "reward": 300, "dist": 220.0, "count": 3.0},
+	"kid_race": {"title": "RACE THE KID", "pct": 0.60, "reward": 20, "dist": 260.0, "count": 3.0},
 	"rush": {"title": "PIZZA RUSH", "pct": 0.80, "reward": 120, "stops": 5},
 	"climb": {"title": "HILL SPRINT", "pct": 1.05, "reward": 60},
 	"zombies": {"title": "ZOMBIE KIDS!", "pct": 0.50, "reward": 0, "gap": 6.0, "escape": 25.0, "time": 45.0},
 	"gulls": {"title": "SEAGULLS!", "pct": 0.90, "reward": 0, "gap": 15.0, "escape": 40.0, "time": 90.0},   # a head start, and time to get away
 }
+const RACE_RUNOUT := 40.0    # tiles of route past a race's finish line, for the loser to carry on along
 const RUSH_CHANCE := 0.12     # orders that are a pizza rush: five stops, paid a bonus for an 80% FTP average
 const CLIMB_EVERY := [150.0, 300.0]   # seconds between hill sprints showing up
 var climbs: Array = []        # {road, dir, s0, s1, name, start, end}: the hills a sprint can be on (found at generation)
@@ -2913,11 +2922,91 @@ func start_challenge(kind: String, extra := {}) -> bool:
 	challenge["p_sum"] = 0.0
 	challenge["p_t"] = 0.0
 	challenge["done"] = 0
-	if challenge.has("dist"):   # a race to a line up the road
-		var fin := _rail_ahead(float(challenge["dist"]) * TILES_PER_MS * PACE, 0.0)
-		challenge["finish"] = fin[0]
-		challenge["finish_fwd"] = fin[1]
+	if challenge.has("dist"):   # a race to a line along the roads from here
+		_race_route()
 	return true
+
+
+## Plots a race's route from where you are now: along the roads, straight on at junctions where it can, else the turn
+## that keeps going longest (never into a dead end if there's another way), a bit past the finish line so the loser
+## can carry on. Shortens the race if every way runs out.
+func _race_route() -> void:
+	var tpm := TILES_PER_MS * PACE
+	var want := float(challenge["dist"]) * tpm
+	var legs: Array = []      # {road, s, dir, len, at}: `at` tiles along the route where the leg starts
+	var turns: Array = []     # {j, side, pos, fwd_in, fwd_out, at}: where it turns, for the red arrows
+	var picks := {}           # junction -> "left" / "straight" / "right": the way the route goes there
+	var road := rr
+	var s := rs
+	var dir := rdir
+	var from_j := _from_j
+	var total := 0.0
+	for guard in 16:
+		var nj := _next_junction_on(road, s, dir, from_j)
+		var ahead: float = nj[1]
+		if total + ahead >= want + RACE_RUNOUT or int(nj[0]) < 0:
+			legs.append({"road": road, "s": s, "dir": dir, "len": minf(ahead, want + RACE_RUNOUT - total), "at": total})
+			total += minf(ahead, want + RACE_RUNOUT - total)
+			break
+		legs.append({"road": road, "s": s, "dir": dir, "len": ahead, "at": total})
+		total += ahead
+		var ji: int = nj[0]
+		var lab := _label_options(_options(ji, road, dir))
+		if lab.is_empty():
+			break
+		var best := ""
+		var best_run := -1.0
+		for side in ["straight", "left", "right"]:
+			if not lab.has(side):
+				continue
+			var o: Dictionary = lab[side]
+			var on := _next_junction_on(o["road"], o["s"], o["dir"], ji)
+			var run: float = 1000.0 if int(on[0]) >= 0 else float(on[1])   # a dead end only goes so far
+			if run >= want + RACE_RUNOUT - total:
+				run = 1000.0
+			if run > best_run + 0.5:
+				best_run = run
+				best = side
+		var pick: Dictionary = lab[best]
+		picks[ji] = best
+		var fin: Vector2 = (_road_at(roads[road], s + dir * (ahead - 1.0))[1] as Vector2) * dir
+		if best != "straight" and total < want:
+			turns.append({"j": ji, "side": best, "pos": junctions[ji]["pos"], "fwd_in": fin,
+				"fwd_out": (_road_at(roads[pick["road"]], pick["s"])[1] as Vector2) * float(pick["dir"]), "at": total})
+		road = pick["road"]
+		s = pick["s"]
+		dir = pick["dir"]
+		from_j = ji
+	var route := {"legs": legs, "turns": turns, "picks": picks}
+	if total - RACE_RUNOUT < want:   # it ran out: a shorter race
+		challenge["dist"] = maxf(40.0, (total - RACE_RUNOUT) / tpm)
+	challenge["route"] = route
+	var fin := route_at(route, float(challenge["dist"]) * tpm, 0.0)
+	challenge["finish"] = fin[0]
+	challenge["finish_fwd"] = fin[1]
+
+
+## A point `d` tiles along a race route, `lane` tiles right of the road's middle: [world position, heading].
+func route_at(route: Dictionary, d: float, lane: float) -> Array:
+	var legs: Array = route["legs"]
+	var leg: Dictionary = legs[legs.size() - 1]
+	for l in legs:
+		if d < float(l["at"]) + float(l["len"]):
+			leg = l
+			break
+	var r: Dictionary = roads[leg["road"]]
+	var at := _road_at(r, _wrap_s(r, float(leg["s"]) + float(leg["dir"]) * (d - float(leg["at"]))))
+	var fwd: Vector2 = (at[1] as Vector2) * float(leg["dir"])
+	return [at[0] + Vector2(-fwd.y, fwd.x) * lane, fwd]
+
+
+## The route leg `d` tiles along a race.
+func _route_leg(route: Dictionary, d: float) -> Dictionary:
+	var legs: Array = route["legs"]
+	for l in legs:
+		if d < float(l["at"]) + float(l["len"]):
+			return l
+	return legs[legs.size() - 1]
 
 
 ## The quarry's speed (m/s): yours at `pct` of your FTP on this grade.
@@ -2965,9 +3054,20 @@ func _update_challenge(delta: float) -> void:
 				if c["count"] <= 0.0:
 					c["state"] = "on"
 					c["t"] = 0.0
+					_race_route()   # from the start line, where you are now
 					Game.toast.emit("GO!!", Color(1.0, 0.85, 0.3))
 				return
 			c["me_m"] = float(c["me_m"]) + me * delta
+			# off the route: a wrong turn at a junction (a moment's grace while you cross one)
+			var leg := _route_leg(c["route"], float(c["me_m"]) * TILES_PER_MS * PACE)
+			if rr != int(leg["road"]) or rdir != float(leg["dir"]):
+				c["off_t"] = float(c.get("off_t", 0.0)) + delta
+				if float(c["off_t"]) > 1.5:
+					c["why"] = "Wrong way - you left the race route!"
+					_end_challenge(false)
+					return
+			else:
+				c["off_t"] = 0.0
 			c["them_m"] = float(c["them_m"]) + minf(them, float(c["t"]) * 4.0) * delta   # it pulls away from a standing start
 			if float(c["me_m"]) >= float(c["dist"]):
 				_end_challenge(true)
@@ -3024,7 +3124,7 @@ func _end_challenge(won: bool) -> void:
 		Game.save_game()
 		Game.toast.emit("%s! +$%d" % [{"thief": "You caught the thief", "bike_thief": "You caught the bike thief", "dog": "You caught the dog", "race": "You beat the hot rod", "kid_race": "You beat the kid"}[challenge["kind"]], int(challenge["reward"])], Color(0.4, 1.0, 0.5))
 	else:
-		Game.toast.emit({"thief": "The thief got away...", "bike_thief": "The bike thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!", "kid_race": "The kid beat you! Ouch."}[challenge["kind"]], Color(1.0, 0.6, 0.5))
+		Game.toast.emit(str(challenge.get("why", {"thief": "The thief got away...", "bike_thief": "The bike thief got away...", "dog": "The dog got away...", "race": "The hot rod wins. Eat its dust!", "kid_race": "The kid beat you! Ouch."}[challenge["kind"]])), Color(1.0, 0.6, 0.5))
 
 
 func _clock(t: float) -> String:
@@ -3122,10 +3222,14 @@ func _update_climb(c: Dictionary) -> void:
 ## you, in the car lane beside you).
 func challenge_pos() -> Array:
 	var tpm := TILES_PER_MS * PACE
-	if challenge.get("kind", "") == "race":
-		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm + 0.4, CAR_LANE)
+	if challenge.get("kind", "") == "race":   # waiting beside you for GO, then along the route
+		if challenge["state"] == "count":
+			return _rail_ahead(0.4, CAR_LANE)
+		return route_at(challenge["route"], float(challenge["them_m"]) * tpm + 0.4, CAR_LANE)
 	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
-		return _rail_ahead((float(challenge["them_m"]) - float(challenge["me_m"])) * tpm, BIKE_LANE - 0.4)
+		if challenge["state"] == "count":
+			return _rail_ahead(0.0, BIKE_LANE - 0.4)
+		return route_at(challenge["route"], float(challenge["them_m"]) * tpm, BIKE_LANE - 0.4)
 	if challenge.get("kind", "") == "gulls" or challenge.get("kind", "") == "zombies":
 		# they come in from out of sight behind you and close up to where they really are
 		var run_in := maxf(0.0, 45.0 - float(challenge["t"]) * 12.0)
@@ -3146,15 +3250,50 @@ func _draw_finish() -> void:
 	var kind: String = challenge.get("kind", "")
 	if kind == "climb" and challenge["state"] in ["armed", "on"]:
 		_draw_line_banner(challenge["start"], challenge["start_fwd"], "START", Color(0.2, 0.75, 0.3))
-		_draw_line_banner(challenge["end"], challenge["end_fwd"], "FINISH", Color(0.95, 0.2, 0.2))
+		_draw_line_banner(challenge["end"], challenge["end_fwd"], "FINISH", Color(0.95, 0.2, 0.2), false)
 		return
 	if not challenge.has("dist") or challenge["state"] == "lost":
 		return
-	_draw_line_banner(challenge["finish"], challenge["finish_fwd"], "FINISH", Color(0.95, 0.2, 0.2))
+	_draw_line_banner(challenge["finish"], challenge["finish_fwd"], "FINISH", Color(0.95, 0.2, 0.2), false)
+	# a big red arrow painted on the road before each turn the route takes
+	var done := float(challenge["me_m"]) * TILES_PER_MS * PACE
+	for t in (challenge["route"] as Dictionary)["turns"]:
+		if float(t["at"]) > done - 1.0:
+			_draw_turn_arrow(t["pos"], t["fwd_in"], t["fwd_out"])
 
 
-## A chequered line across the road at `f` with a banner over it on two poles.
-func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color) -> void:
+## A red arrow painted on the approach to junction `j`: up the right-hand lane, then round into the way out.
+func _draw_turn_arrow(j: Vector2, fin: Vector2, fout: Vector2) -> void:
+	var rt := Vector2(-fin.y, fin.x)
+	var pts: Array = []   # the arrow's middle line, world
+	for k in 7:   # straight up the lane
+		pts.append(j - fin * (4.2 - k * 0.45) + rt * 0.6)
+	var bend: Vector2 = pts[pts.size() - 1]
+	for k in range(1, 6):   # curving round into the exit
+		var u := k / 5.0
+		pts.append(bend + fin * sin(u * PI * 0.5) * 0.9 + fout * (1.0 - cos(u * PI * 0.5)) * 1.3)
+	var red := Color(0.9, 0.12, 0.1)
+	var edge := Color(0.45, 0.04, 0.04)
+	for pass_ in 2:   # a dark edge, then the red over it
+		var ww := 0.22 + (0.07 if pass_ == 0 else 0.0)
+		var left := PackedVector2Array()
+		var right := PackedVector2Array()
+		for i in pts.size():   # one ribbon down the middle line, each point pushed out along its corner's normal
+			var d: Vector2 = ((pts[mini(i + 1, pts.size() - 1)] as Vector2) - (pts[maxi(i - 1, 0)] as Vector2)).normalized()
+			left.append(pts[i] + d.orthogonal() * ww)
+			right.append(pts[i] - d.orthogonal() * ww)
+		right.reverse()
+		draw_colored_polygon(_to_screen_poly(left + right), edge if pass_ == 0 else red)
+		var tip: Vector2 = pts[pts.size() - 1]
+		var d: Vector2 = (tip - pts[pts.size() - 2]).normalized()
+		var hn := d.orthogonal() * (0.62 + (0.08 if pass_ == 0 else 0.0))
+		var head := PackedVector2Array([tip + hn, tip + d * (0.8 + (0.1 if pass_ == 0 else 0.0)), tip - hn])
+		draw_colored_polygon(_to_screen_poly(head), edge if pass_ == 0 else red)
+
+
+## A chequered line across the road at `f`; with `banner`, a banner over it on two poles, its top bar running across
+## the road from pole to pole.
+func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color, banner := true) -> void:
 	var n := Vector2(-fwd.y, fwd.x)
 	# two rows of squares straight across the road, kerb to kerb, centred on the middle of the road
 	var squares := 10
@@ -3164,12 +3303,17 @@ func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color) -> vo
 			var c: Vector2 = f + n * (-ROAD_HW + k * w) + fwd * ((row - 1) * 0.15)
 			var q := PackedVector2Array([Iso.to_screen(c), Iso.to_screen(c + n * w), Iso.to_screen(c + n * w + fwd * 0.15), Iso.to_screen(c + fwd * 0.15)])
 			draw_colored_polygon(q, Color.WHITE if (k + row) % 2 == 0 else Color(0.1, 0.1, 0.12))
+	if not banner:   # just the painted line, and its name over the middle of it
+		_label(text, Iso.to_screen(f) + Vector2(0, -10), 8, Color.WHITE)
+		return
 	# a banner on two poles, just outside the kerbs
 	var a := Iso.to_screen(f - n * (ROAD_HW + 0.25))
 	var b := Iso.to_screen(f + n * (ROAD_HW + 0.25))
 	draw_line(a, a + Vector2(0, -40), Iso.OUTLINE, 2.0)
 	draw_line(b, b + Vector2(0, -40), Iso.OUTLINE, 2.0)
-	draw_rect(Rect2(Vector2(minf(a.x, b.x), a.y - 46), Vector2(absf(b.x - a.x), 9)), col)
+	var bar := PackedVector2Array([a + Vector2(0, -46), b + Vector2(0, -46), b + Vector2(0, -37), a + Vector2(0, -37)])
+	draw_colored_polygon(bar, col)
+	draw_polyline(PackedVector2Array([bar[0], bar[1], bar[2], bar[3], bar[0]]), Iso.OUTLINE, 1.0)
 	_label(text, (a + b) * 0.5 + Vector2(0, -38), 8, Color.WHITE)
 
 

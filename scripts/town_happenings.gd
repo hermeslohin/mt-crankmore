@@ -985,11 +985,12 @@ func _step(e: Dictionary, delta: float) -> void:
 			var c: Dictionary = city.challenge
 			var kid: Dictionary = e["actors"][0]
 			if c.is_empty() or c["kind"] != "kid_race":
-				# pedals off up the road
+				# pedals off on along the race route (or up the road, if it never got going)
 				if not e.has("leave_d"):
-					e["leave_d"] = ((kid["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
-				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 1.5) * delta
-				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE - 0.4)
+					e["leave_d"] = float(e["route_d"]) if e.has("route") else ((kid["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+				e["leave_d"] = float(e["leave_d"]) + ((1.5 if e.has("route") else city.p_speed + 1.5)) * delta
+				var at: Array = city.route_at(e["route"], float(e["leave_d"]), city.BIKE_LANE - 0.4) if e.has("route") \
+					else city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE - 0.4)
 				_place(kid, at[0])
 				kid["face"] = at[1]
 				e["t"] = minf(float(e["t"]), 3.0)
@@ -1001,6 +1002,9 @@ func _step(e: Dictionary, delta: float) -> void:
 			_place(kid, at[0])
 			kid["face"] = at[1]
 			kid["pedal"] = float(kid["pedal"]) + delta * 8.0
+			if c["state"] != "count":   # where it is on the route, for riding off afterwards
+				e["route"] = c["route"]
+				e["route_d"] = float(c["them_m"]) * city.TILES_PER_MS * city.PACE
 			if c["state"] == "count":
 				if kid["label_t"] <= 0.0 and u > 0.6:
 					_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9)

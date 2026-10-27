@@ -1943,6 +1943,9 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 			var at: Array = city.challenge_pos()
 			_place(rod, at[0])
 			rod["face"] = at[1]
+			if c["state"] != "count":   # where it is on the route, for driving off afterwards
+				e["route"] = c["route"]
+				e["route_d"] = float(c["them_m"]) * city.TILES_PER_MS * city.PACE + 0.4
 			if c["state"] == "count" and rod["label_t"] <= 0.0:
 				_say(rod, str(int(ceil(float(c["count"])))) + "...", 0.9)
 			if c["state"] == "won":
@@ -1956,9 +1959,11 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 		"off":
 			# roars off up the road (following it, bends and all) and away
 			if not e.has("leave_d"):
-				e["leave_d"] = ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
-			e["leave_d"] = float(e["leave_d"]) + (city.p_speed + minf(float(e["clock"]) * 4.0, 7.0)) * delta
-			var at: Array = city._rail_ahead(float(e["leave_d"]), city.CAR_LANE)
+				e["leave_d"] = float(e["route_d"]) if e.has("route") else ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+			# on along the race route at full chat (or up your road, if the race never got going)
+			e["leave_d"] = float(e["leave_d"]) + (minf(3.0 + float(e["clock"]) * 4.0, 9.0) if e.has("route") else city.p_speed + minf(float(e["clock"]) * 4.0, 7.0)) * delta
+			var at: Array = city.route_at(e["route"], float(e["leave_d"]), city.CAR_LANE) if e.has("route") \
+				else city._rail_ahead(float(e["leave_d"]), city.CAR_LANE)
 			_place(rod, at[0])
 			rod["face"] = at[1]
 			if float(e["clock"]) > 5.0:

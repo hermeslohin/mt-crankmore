@@ -213,12 +213,14 @@ static func sheet(sheet_name: String) -> Texture2D:
 	var tex: Texture2D = null
 	for dir in ["user://art/", "res://art/"]:
 		var path: String = dir + sheet_name + ".png"
-		if dir == "res://art/" and ResourceLoader.exists(path):
-			tex = load(path)   # imported by Godot (exported builds, or after the editor has seen the file)
-		elif FileAccess.file_exists(path):
+		# the picture itself when it's there (running from the project folder): Godot's imported copy only catches up
+		# when the editor looks, so it can be an old version of art that's been changed since
+		if FileAccess.file_exists(path):
 			var img := Image.load_from_file(ProjectSettings.globalize_path(path))
 			if img != null:
 				tex = ImageTexture.create_from_image(img)
+		elif dir == "res://art/" and ResourceLoader.exists(path):
+			tex = load(path)   # imported by Godot (an exported build has only these)
 		if tex != null:
 			break
 	_cache[sheet_name] = tex

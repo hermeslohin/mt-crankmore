@@ -280,6 +280,9 @@ func _input(event: InputEvent) -> void:
 		_:
 			if capture["device"] == "key":
 				_end_capture(Controls.bind("key", capture["action"], capture["slot"], int(k.physical_keycode)))
+			else:   # a controller screen ignores keys: say so, or it looks like nothing happened
+				menu_note = {"text": "This screen sets controller buttons: press one on the controller (ESC cancels). Keyboard keys are under \"Keyboard: ...\" in Controls.", "color": Color(1.0, 0.6, 0.4), "t": 6.0}
+				_rebuild_menu()
 
 
 ## LEFT / RIGHT on a setting: one step per press, then auto-repeat while held (getting faster).

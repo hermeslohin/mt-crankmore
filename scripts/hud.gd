@@ -259,9 +259,19 @@ func _input(event: InputEvent) -> void:
 	if capture.is_empty():
 		return
 	var k := event as InputEventKey
-	if k == null or not k.pressed or k.echo or k.physical_keycode == KEY_NONE or k.physical_keycode == KEY_F11:
+	if k == null or k.echo or k.physical_keycode == KEY_NONE or k.physical_keycode == KEY_F11:
 		return
 	get_viewport().set_input_as_handled()
+	# Shift / Ctrl / Alt / Cmd wait for their release: typing "<" (Shift + comma) binds the comma key, and only a
+	# modifier pressed and let go on its own binds the modifier.
+	var modifier := k.physical_keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]
+	if not k.pressed:
+		if modifier and capture.get("mod", KEY_NONE) == k.physical_keycode and capture["device"] == "key":
+			_end_capture(Controls.bind("key", capture["action"], capture["slot"], int(k.physical_keycode)))
+		return
+	if modifier:
+		capture["mod"] = k.physical_keycode
+		return
 	match k.physical_keycode:
 		KEY_ESCAPE:
 			_end_capture("")

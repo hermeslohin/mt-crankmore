@@ -155,7 +155,7 @@ var rr := 0                 # rail state: road, distance along it, direction
 var rs := 0.0
 var rdir := 1.0
 var rail_pos := Vector2.ZERO
-var p_lat := 0.0              # tiles across your lane from the usual line (- towards the centre line, + the kerb)
+var p_lat := 0.0              # tiles across the road from the usual line (- towards the centre line and on over it, + the kerb)
 var p_fwd := Vector2.RIGHT
 var pending: Dictionary = {}  # the upcoming junction choice
 var queued := ""              # a turn pressed before the junction was announced; used at the next real junction
@@ -1748,8 +1748,9 @@ func _update_player(delta: float) -> void:
 	_update_pending()
 	var w := _update_turn(p_speed * delta)
 	p_fwd = p_fwd.slerp(w[1], 1.0 - exp(-10.0 * delta)).normalized()
-	# the paddles slide you across your lane; turns are picked with the D-pad / arrows only
-	p_lat = clampf(p_lat + Input.get_axis("lane_left", "lane_right") * 0.9 * delta, -0.75, 0.0)
+	# the paddles slide you across the road, kerb to kerb, oncoming lane and all (round a parked or queueing car);
+	# turns are picked with the D-pad / arrows only
+	p_lat = clampf(p_lat + Input.get_axis("lane_left", "lane_right") * 1.4 * delta, -(BIKE_LANE + ROAD_HW - 0.2), 0.0)
 	rail_pos = w[0] + Vector2(-p_fwd.y, p_fwd.x) * p_lat
 	if not _uturn.is_empty():
 		# a U-turn: swing out ahead and round across the road to the other side, the bike turning with the curve
@@ -2255,6 +2256,9 @@ func _update_cars(delta: float) -> void:
 			var ahead := rel.dot(f)
 			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction
 			if ahead > 0.0 and ahead < 2.4 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.8 and f.dot(p_fwd) > 0.5:
+				target = 0.0
+			# and an oncoming car brakes for a rider coming at it on its side of the road, and waits
+			elif ahead > 0.0 and ahead < 4.5 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.9 and f.dot(p_fwd) < -0.5:
 				target = 0.0
 		c["speed"] = move_toward(c["speed"], target, (4.0 if target > c["speed"] else 2.0 * CAR_BRAKE) * delta)
 		var moved: float = c["speed"] * delta

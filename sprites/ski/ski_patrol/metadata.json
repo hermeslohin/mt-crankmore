@@ -124,8 +124,172 @@
           }
         }
       }
+    },
+    {
+      "character": {
+        "id": "a96afdf2-05b8-460b-98e3-730ce98bc67b",
+        "name": "Pushing bike",
+        "prompt": "cheerful cartoon ski patrol rescuer in a bright red jacket with a big white cross on the chest and back, black ski pants, red helmet, holding a coiled rope that leads to an orange rescue toboggan sled",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-27T13:30:22.669962+00:00"
+      },
+      "folder": "Pushing_bike",
+      "frames": {
+        "rotations": {
+          "south": "Pushing_bike/rotations/south.png",
+          "south-east": "Pushing_bike/rotations/south-east.png",
+          "east": "Pushing_bike/rotations/east.png",
+          "north-east": "Pushing_bike/rotations/north-east.png",
+          "north": "Pushing_bike/rotations/north.png",
+          "north-west": "Pushing_bike/rotations/north-west.png",
+          "west": "Pushing_bike/rotations/west.png",
+          "south-west": "Pushing_bike/rotations/south-west.png"
+        },
+        "animations": {
+          "push": {
+            "south": [
+              "Pushing_bike/animations/push/south/frame_000.png",
+              "Pushing_bike/animations/push/south/frame_001.png",
+              "Pushing_bike/animations/push/south/frame_002.png",
+              "Pushing_bike/animations/push/south/frame_003.png",
+              "Pushing_bike/animations/push/south/frame_004.png",
+              "Pushing_bike/animations/push/south/frame_005.png",
+              "Pushing_bike/animations/push/south/frame_006.png",
+              "Pushing_bike/animations/push/south/frame_007.png"
+            ],
+            "north-east": [
+              "Pushing_bike/animations/push/north-east/frame_000.png",
+              "Pushing_bike/animations/push/north-east/frame_001.png",
+              "Pushing_bike/animations/push/north-east/frame_002.png",
+              "Pushing_bike/animations/push/north-east/frame_003.png",
+              "Pushing_bike/animations/push/north-east/frame_004.png",
+              "Pushing_bike/animations/push/north-east/frame_005.png",
+              "Pushing_bike/animations/push/north-east/frame_006.png",
+              "Pushing_bike/animations/push/north-east/frame_007.png"
+            ],
+            "east": [
+              "Pushing_bike/animations/push/east/frame_000.png",
+              "Pushing_bike/animations/push/east/frame_001.png",
+              "Pushing_bike/animations/push/east/frame_002.png",
+              "Pushing_bike/animations/push/east/frame_003.png",
+              "Pushing_bike/animations/push/east/frame_004.png",
+              "Pushing_bike/animations/push/east/frame_005.png",
+              "Pushing_bike/animations/push/east/frame_006.png",
+              "Pushing_bike/animations/push/east/frame_007.png"
+            ],
+            "south-east": [
+              "Pushing_bike/animations/push/south-east/frame_000.png",
+              "Pushing_bike/animations/push/south-east/frame_001.png",
+              "Pushing_bike/animations/push/south-east/frame_002.png",
+              "Pushing_bike/animations/push/south-east/frame_003.png",
+              "Pushing_bike/animations/push/south-east/frame_004.png",
+              "Pushing_bike/animations/push/south-east/frame_005.png",
+              "Pushing_bike/animations/push/south-east/frame_006.png",
+              "Pushing_bike/animations/push/south-east/frame_007.png"
+            ],
+            "north": [
+              "Pushing_bike/animations/push/north/frame_000.png",
+              "Pushing_bike/animations/push/north/frame_001.png",
+              "Pushing_bike/animations/push/north/frame_002.png",
+              "Pushing_bike/animations/push/north/frame_003.png",
+              "Pushing_bike/animations/push/north/frame_004.png",
+              "Pushing_bike/animations/push/north/frame_005.png",
+              "Pushing_bike/animations/push/north/frame_006.png",
+              "Pushing_bike/animations/push/north/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "1a3c035f-d32d-4eb5-aa06-bcbef76db698",
+        "name": "On foot",
+        "prompt": "cheerful cartoon ski patrol rescuer in a bright red jacket with a big white cross on the chest and back, black ski pants, red helmet, holding a coiled rope that leads to an orange rescue toboggan sled",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-27T13:30:23.012955+00:00"
+      },
+      "folder": "On_foot",
+      "frames": {
+        "rotations": {
+          "south": "On_foot/rotations/south.png",
+          "south-east": "On_foot/rotations/south-east.png",
+          "east": "On_foot/rotations/east.png",
+          "north-east": "On_foot/rotations/north-east.png",
+          "north": "On_foot/rotations/north.png",
+          "north-west": "On_foot/rotations/north-west.png",
+          "west": "On_foot/rotations/west.png",
+          "south-west": "On_foot/rotations/south-west.png"
+        },
+        "animations": {
+          "walk": {
+            "north-east": [
+              "On_foot/animations/walk/north-east/frame_000.png",
+              "On_foot/animations/walk/north-east/frame_001.png",
+              "On_foot/animations/walk/north-east/frame_002.png",
+              "On_foot/animations/walk/north-east/frame_003.png",
+              "On_foot/animations/walk/north-east/frame_004.png",
+              "On_foot/animations/walk/north-east/frame_005.png",
+              "On_foot/animations/walk/north-east/frame_006.png",
+              "On_foot/animations/walk/north-east/frame_007.png"
+            ],
+            "north": [
+              "On_foot/animations/walk/north/frame_000.png",
+              "On_foot/animations/walk/north/frame_001.png",
+              "On_foot/animations/walk/north/frame_002.png",
+              "On_foot/animations/walk/north/frame_003.png",
+              "On_foot/animations/walk/north/frame_004.png",
+              "On_foot/animations/walk/north/frame_005.png",
+              "On_foot/animations/walk/north/frame_006.png",
+              "On_foot/animations/walk/north/frame_007.png"
+            ],
+            "east": [
+              "On_foot/animations/walk/east/frame_000.png",
+              "On_foot/animations/walk/east/frame_001.png",
+              "On_foot/animations/walk/east/frame_002.png",
+              "On_foot/animations/walk/east/frame_003.png",
+              "On_foot/animations/walk/east/frame_004.png",
+              "On_foot/animations/walk/east/frame_005.png",
+              "On_foot/animations/walk/east/frame_006.png",
+              "On_foot/animations/walk/east/frame_007.png"
+            ],
+            "south": [
+              "On_foot/animations/walk/south/frame_000.png",
+              "On_foot/animations/walk/south/frame_001.png",
+              "On_foot/animations/walk/south/frame_002.png",
+              "On_foot/animations/walk/south/frame_003.png",
+              "On_foot/animations/walk/south/frame_004.png",
+              "On_foot/animations/walk/south/frame_005.png",
+              "On_foot/animations/walk/south/frame_006.png",
+              "On_foot/animations/walk/south/frame_007.png"
+            ],
+            "south-east": [
+              "On_foot/animations/walk/south-east/frame_000.png",
+              "On_foot/animations/walk/south-east/frame_001.png",
+              "On_foot/animations/walk/south-east/frame_002.png",
+              "On_foot/animations/walk/south-east/frame_003.png",
+              "On_foot/animations/walk/south-east/frame_004.png",
+              "On_foot/animations/walk/south-east/frame_005.png",
+              "On_foot/animations/walk/south-east/frame_006.png",
+              "On_foot/animations/walk/south-east/frame_007.png"
+            ]
+          }
+        }
+      }
     }
   ],
   "export_version": "3.1",
-  "export_date": "2026-10-26T03:57:33.194898"
+  "export_date": "2026-10-27T13:38:44.748321"
 }

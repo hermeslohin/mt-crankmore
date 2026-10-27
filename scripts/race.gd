@@ -116,6 +116,20 @@ var cell_cliff := PackedByteArray()   # per cell: 0 none, 1 rock on top of / bel
 var ramps: Array = []                 # steep climbs and fast descents {s0, s1, g, called}
 var snow_called := false
 var life: RaceLife                    # the race-day crowds, motos, helicopter and the railway (see RaceLife)
+## The bear caught you: you wipe out and lie there while a ski patroller wheels your bike away and comes back with a
+## new one (see _bear_wipeout and _patrol_at). {t: seconds since the catch, lie: where you lie, bike / bike_z: where
+## your bike lies, off: off screen, where the patroller fetches the new bike, st: their turning}. Empty when there's
+## none going on. Nobody waits: the race clock and the rivals carry on, so the whole scene costs you BEAR_DOWN seconds.
+var patrol: Dictionary = {}
+const BEAR_DOWN := 15.0       # seconds down after the bear catches you
+const SP_LIE := 1.3           # the wipe-out animation is over (13 frames at Sprites.FALL_FPS): lying there now
+const SP_IN := 1.4            # the patroller sets off from off screen
+const SP_WALK := 3.2          # seconds for each walk between off screen and your bike
+const SP_LIFT := 0.4          # standing over the old bike, picking it up
+const SP_AWAY := 0.6          # out of sight, fetching the new bike
+const SP_SET := 0.6           # setting the new bike down next to you before walking off
+const SP_GETUP := 1.3         # the wipe-out played backwards at the end of the BEAR_DOWN: you climb back on
+const SP_MARGIN := 40.0       # px past the edge of the screen the patroller walks to (their sprite is out of sight)
 
 
 func _ready() -> void:
@@ -163,6 +177,7 @@ func setup(course_id: int) -> void:
 	over_clock = 0.0
 	finish_count = 0
 	frisbees.clear()
+	patrol = {}
 	stamina = 1.0
 	kick_t = 0.0
 	lead_clock = 0.0
@@ -1483,6 +1498,7 @@ func _process(delta: float) -> void:
 		else:
 			_banter()
 	_step_animals(delta)
+	_step_patrol(delta)
 	for k in bubbles.keys():
 		bubbles[k]["t"] -= delta
 		if bubbles[k]["t"] <= 0.0:
@@ -1533,6 +1549,8 @@ func _step_riders(delta: float) -> void:
 	if float(me["air"]) <= 0.0:   # no traction in the air
 		me["v"] += (minf(mvt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
 	var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
+	if not patrol.is_empty() and float(me["down"]) > 0.0:
+		steer = 0.0   # lying in the road while the ski patrol sees to you
 	me["lat"] = clampf(me["lat"] + steer * 1.1 * delta, -0.4, 0.4)
 	me["s"] += me["v"] * delta
 	if me["s"] >= road_len:
@@ -1774,6 +1792,114 @@ func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 		Talk.say(int(r["idx"]), "pu_ouch", true)
 
 
+## The bear caught you: you wipe out and are down BEAR_DOWN seconds while the ski patrol swaps your bike for a new
+## one (see _patrol_at). The bike is replaced, so it isn't damaged.
+func _bear_wipeout() -> void:
+	var me: Dictionary = riders[0]
+	me["down"] = BEAR_DOWN
+	me["fall"] = 0.0
+	me["socks"] = 0.0
+	patrol = {"t": 0.0, "st": {}}
+	_pop(0, "CRASH!", Color(1.0, 0.5, 0.35))
+	Game.toast.emit("The bear got you! Wipe-out! Ski patrol is on the way...", Color(1.0, 0.45, 0.3))
+
+
+## Moves the bear rescue on (see patrol): where you and your bike lie is fixed once you've stopped sliding.
+func _step_patrol(delta: float) -> void:
+	if patrol.is_empty():
+		return
+	patrol["t"] = float(patrol["t"]) + delta
+	var t: float = patrol["t"]
+	var me: Dictionary = riders[0]
+	if t >= SP_LIE and not patrol.has("lie"):
+		var lp: Vector2 = _pose(me["s"], me["lat"])["pos"]
+		patrol["lie"] = lp
+		# the bike lies on the road a body's length behind or ahead of you, whichever is further across the screen
+		var back := _pose(float(me["s"]) - 2.6, me["lat"])
+		var ahead := _pose(float(me["s"]) + 2.6, me["lat"])
+		var wide := func(pz: Dictionary) -> float: return absf((pz["pos"] - lp).x - (pz["pos"] - lp).y)
+		var bz: Dictionary = back if float(wide.call(back)) >= float(wide.call(ahead)) else ahead
+		patrol["bike"] = bz["pos"]
+		patrol["bike_z"] = bz["z"]
+		# off screen straight across it, on the bike's side (along the hillside: downhill the ground drops away fast)
+		var side := 1.0 if (patrol["bike"] - lp).x - (patrol["bike"] - lp).y >= 0.0 else -1.0
+		var across := Vector2(side, -side).normalized()
+		var vr: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
+		var sx := Iso.to_screen(_patrol_stand(), patrol["bike_z"]).x
+		var px := absf((vr.end.x if side > 0.0 else vr.position.x) - sx) + SP_MARGIN
+		patrol["off"] = _patrol_stand() + across * maxf(px, 60.0) / (Iso.TW * 0.5 * (across.x - across.y) * side)
+	if float(me["down"]) <= 0.0 and t > _sp_leave() + SP_WALK:
+		patrol = {}
+	elif t >= _sp_back() and t < _sp_back() + delta:
+		Game.toast.emit("Ski patrol brought you a new bike!", Color(0.5, 1.0, 0.5))
+
+
+## Where the patroller stands to pick up or put down the bike: just in front of it (lower on screen), so they're
+## drawn over it.
+func _patrol_stand() -> Vector2:
+	return (patrol["bike"] as Vector2) + Vector2(0.45, 0.45)
+
+
+func _sp_gone() -> float:   # the patroller is off screen with your old bike
+	return SP_IN + SP_WALK + SP_LIFT + SP_WALK
+
+
+func _sp_back() -> float:   # back with the new bike and setting it down
+	return _sp_gone() + SP_AWAY + SP_WALK
+
+
+func _sp_leave() -> float:   # walking off, empty-handed
+	return _sp_back() + SP_SET
+
+
+## The patroller at the rescue's time `t`: {pos (world), dir (heading), look ("walk" empty-handed or "push" wheeling
+## a bike), moving}, or {} while they're out of the picture.
+func _patrol_at(t: float) -> Dictionary:
+	if not patrol.has("lie") or t < SP_IN:
+		return {}
+	var stand := _patrol_stand()
+	var off: Vector2 = patrol["off"]
+	var arrive := SP_IN + SP_WALK
+	if t < arrive:
+		return {"pos": off.lerp(stand, (t - SP_IN) / SP_WALK), "dir": stand - off, "look": "walk", "moving": true}
+	if t < arrive + SP_LIFT:   # bends over the bike, then turns round with it
+		var lifted := t >= arrive + SP_LIFT * 0.5
+		return {"pos": stand, "dir": off - stand if lifted else stand - off, "look": "push" if lifted else "walk", "moving": false}
+	if t < _sp_gone():
+		return {"pos": stand.lerp(off, (t - arrive - SP_LIFT) / SP_WALK), "dir": off - stand, "look": "push", "moving": true}
+	if t < _sp_gone() + SP_AWAY:
+		return {}
+	if t < _sp_back():
+		return {"pos": off.lerp(stand, (t - _sp_gone() - SP_AWAY) / SP_WALK), "dir": stand - off, "look": "push", "moving": true}
+	if t < _sp_leave():
+		return {"pos": stand, "dir": stand - off, "look": "walk", "moving": false}
+	if t < _sp_leave() + SP_WALK:
+		return {"pos": stand.lerp(off, (t - _sp_leave()) / SP_WALK), "dir": off - stand, "look": "walk", "moving": true}
+	return {}
+
+
+## Which bike is lying on the ground next to you at the rescue's time `t`: "old", "new" or "" (none).
+func _patrol_bike(t: float) -> String:
+	if not patrol.has("lie"):
+		return ""
+	if t < SP_IN + SP_WALK + SP_LIFT * 0.5:
+		return "old"
+	if t >= _sp_back() and float(riders[0]["down"]) > SP_GETUP:
+		return "new"
+	return ""
+
+
+func _draw_patroller(at: Dictionary) -> void:
+	var p: Vector2 = at["pos"]
+	var stand := _patrol_stand()
+	# on the road where they stand by you, the hillside further out
+	var z := lerpf(float(patrol["bike_z"]), _tz(p), clampf(p.distance_to(stand) / 2.0, 0.0, 1.0))
+	var base := Iso.to_screen(p, z).round()
+	_shadow(base, 9.0)
+	var t: float = patrol["t"] if at["moving"] else 0.0
+	Sprites.draw_person(self, "ped_ski_patrol_" + str(at["look"]), base, at["dir"], t, 12.0, Color.WHITE, patrol["st"])
+
+
 func _step_frisbees(delta: float) -> void:
 	for i in range(frisbees.size() - 1, -1, -1):
 		var fz: Dictionary = frisbees[i]
@@ -1867,10 +1993,8 @@ func _step_animals(delta: float) -> void:
 				_face(a, np - a["pos"])
 				a["pos"] = np
 				a["vel"] = Vector2.ZERO
-				if ms - cs < 1.6 and not me["done"]:
-					Game.damage_bike(3.0)
-					me["v"] = float(me["v"]) * 0.8
-					Game.toast.emit("SWIPE! The bear wants your pizza!", Color(1.0, 0.45, 0.3))
+				if ms - cs < 1.6 and not me["done"] and float(me["down"]) <= 0.0:
+					_bear_wipeout()
 					a["t"] = 0.0
 				if float(a["t"]) <= 0.0 or me["done"]:
 					a["state"] = "roar"
@@ -2132,6 +2256,13 @@ func _draw() -> void:
 			if not buckets.has(d):
 				buckets[d] = []
 			buckets[d].append([3, mv[1]])
+	if not patrol.is_empty():
+		var sp := _patrol_at(patrol["t"])
+		if not sp.is_empty():
+			var d := _diag(sp["pos"])
+			if not buckets.has(d):
+				buckets[d] = []
+			buckets[d].append([4, sp])
 
 	# flat ground first (terrain, creeks, road, fords): the mountainside faces the camera, so nothing on the
 	# ground needs to hide the road. Then everything standing up, back to front.
@@ -2236,6 +2367,7 @@ func _draw() -> void:
 					1: _draw_animal(it[1])
 					2: _draw_giver(it[1], it[2])
 					3: (it[1] as Callable).call()
+					4: _draw_patroller(it[1])
 	_draw_birds(me_pos)
 	if life != null:
 		life.draw_lift_cables(self)
@@ -2625,7 +2757,24 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 			draw_line(a, a - ds.normalized() * 10.0, Color(1, 1, 1, 0.7 * (1.0 - absf(u - 0.5) * 2.0)), 1.0)
 	var phase: float = r["phase"]
 	var fall_t := float(r["fall"]) if down else -1.0   # the wipe-out animation, then lying there until they get up
-	if kb != 1.0:
+	# the bear rescue (see patrol): lying there with your bike beside you, then without it, then climbing back on
+	# (the wipe-out played backwards)
+	var lying := false
+	if r["player"] and down and patrol.has("lie"):
+		if _patrol_bike(patrol["t"]) != "":
+			Sprites.draw_image(self, "obj_bike_lying_" + Sprites.player_sheet, Iso.to_screen(patrol["bike"], patrol["bike_z"]) + Vector2(0, 5))
+		if float(r["down"]) <= SP_GETUP:
+			fall_t = float(r["down"])
+		else:
+			lying = true
+			var lie := "rider_lying_" + Sprites.player_sheet
+			if Sprites.cold and Sprites.sheet("winter_" + lie) != null:
+				lie = "winter_" + lie
+			if not Sprites.draw_image(self, lie, c + Vector2(0, 5)):
+				lying = false
+	if lying:
+		pass   # drawn above, without the bike
+	elif kb != 1.0:
 		draw_set_transform(c, 0.0, Vector2(kb, kb))
 		BikeDraw.draw(self, Vector2.ZERO, ds, phase, false, "YOU" if r["player"] else r["short"], 1.0, false, fall_t)
 		draw_set_transform(Vector2.ZERO)
@@ -2634,13 +2783,13 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 	if down:
 		for q in 3:
 			var a := t_ * 5.0 + q * TAU / 3.0
-			var sp := c + Vector2(cos(a) * 9.0, -30.0 + sin(a) * 3.0)
+			var sp := c + Vector2(cos(a) * 9.0, (-16.0 if lying else -30.0) + sin(a) * 3.0)
 			draw_rect(Rect2(sp - Vector2(1, 1), Vector2(3, 3)), Iso.OUTLINE)
 			draw_rect(Rect2(sp, Vector2(1, 1)), Color(1.0, 0.95, 0.3))
 	if r["player"] or not _crowded(k):
 		var label: String = "YOU" if r["player"] else r["short"]
 		var outline_col: Color = Color(1, 1, 1) if r["player"] else r["color"]
-		var p := c + Vector2(-100, -54 * kb)
+		var p := c + Vector2(-100, -28.0 if lying else -54.0 * kb)
 		draw_string_outline(font, p, label, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 8, 4, Iso.OUTLINE)
 		draw_string(font, p, label, HORIZONTAL_ALIGNMENT_CENTER, 200.0, 8, outline_col)
 	var dust := clampf(float(r["v"]) / 5.0, 0.0, 1.0) * (0.0 if air > 0.0 or r["wet"] else 1.0)

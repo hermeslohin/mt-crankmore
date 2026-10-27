@@ -702,6 +702,35 @@
           }
         }
       }
+    },
+    {
+      "character": {
+        "id": "3551451f-2ae6-417a-b75c-7b11f2a57a58",
+        "name": "Lying",
+        "prompt": "A cool young pizza delivery cyclist riding a red road bike, wearing a red baseball cap and a yellow scarf blowing behind him, light blue shirt and dark blue shorts. A pizza is strapped on a rack on the back of his bike. Seated on the bike with hands on the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it.",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-27T13:37:30.436863+00:00"
+      },
+      "folder": "Lying",
+      "frames": {
+        "rotations": {
+          "south": "Lying/rotations/south.png",
+          "south-east": "Lying/rotations/south-east.png",
+          "east": "Lying/rotations/east.png",
+          "north-east": "Lying/rotations/north-east.png",
+          "north": "Lying/rotations/north.png",
+          "north-west": "Lying/rotations/north-west.png",
+          "west": "Lying/rotations/west.png",
+          "south-west": "Lying/rotations/south-west.png"
+        },
+        "animations": {}
+      }
     }
   ],
   "export_version": "3.1",

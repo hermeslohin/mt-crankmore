@@ -10,6 +10,8 @@ extends SceneTree
 ##     8 rows (the rider row order: down-right, down, down-left, left, up-left, up, up-right, right), feet at the bottom
 ##     centre of each frame: a person walking in every direction. <dir> holds rotations/ and animations/<anim>/<direction>/;
 ##     "still" packs just the rotations (one column), for a pose that doesn't animate (a skier).
+##     A direction with no animation frames is the mirror image of the opposite one (west of east, south-west of
+##     south-east, north-west of north-east), so a walk only needs animating in 5 directions.
 ##   godot --headless -s tools/import_sprite.gd -- vehicle <dir> <anim> <out name>
 ##     8 rows of directions (as rotations), one column per frame of animations/<anim>/<direction>/, each frame centred
 ##     on the same spot as the still: a vehicle's driving animation.
@@ -19,6 +21,7 @@ extends SceneTree
 
 const ROW_DIRS := ["south-east", "south", "south-west", "west", "north-west", "north", "north-east", "east"]
 const FEET_MARGIN := 4   # pixels below the feet in a "feet" frame
+const MIRROR := {"west": "east", "south-west": "south-east", "north-west": "north-east"}   # see people
 
 
 func _initialize() -> void:
@@ -70,17 +73,23 @@ func _strip(dir: String, direction: String, anim: String, out: String, center: b
 
 func _people(dir: String, anim: String, out: String) -> void:
 	var rows: Array = []   # per row: the frames
+	var stills: Array = []   # per row: the still that places them
 	var size := 0
 	for d in ROW_DIRS:
 		var frames: Array[Image] = []
+		var still := _load("%s/rotations/%s.png" % [dir, d])
 		if anim == "still":
-			frames.append(_load("%s/rotations/%s.png" % [dir, d]))
+			frames.append(still)
 		else:
-			var folder := "%s/animations/%s/%s" % [dir, anim, d]
-			var files := Array(DirAccess.get_files_at(folder)).filter(func(f): return f.ends_with(".png"))
-			files.sort()
-			for f in files:
-				frames.append(_load("%s/%s" % [folder, f]))
+			frames = _frames("%s/animations/%s/%s" % [dir, anim, d])
+			if frames.is_empty() and MIRROR.has(d):
+				frames = _frames("%s/animations/%s/%s" % [dir, anim, MIRROR[d]])
+				still = _load("%s/rotations/%s.png" % [dir, MIRROR[d]])
+				for img in frames:
+					img.flip_x()
+				if still != null:
+					still.flip_x()
+		stills.append(still)
 		if frames.is_empty() or frames[0] == null:
 			printerr("missing frames for ", d)
 			return
@@ -92,7 +101,7 @@ func _people(dir: String, anim: String, out: String) -> void:
 	var sheet := Image.create(size * cols, size * rows.size(), false, Image.FORMAT_RGBA8)
 	for row in rows.size():
 		var frames: Array = rows[row]
-		var still := _load("%s/rotations/%s.png" % [dir, ROW_DIRS[row]])
+		var still: Image = stills[row]
 		var first_rect: Rect2i = frames[0].get_used_rect()
 		var ref: Rect2i = still.get_used_rect() if still != null else first_rect
 		var shift := Vector2i(size / 2 - (ref.position.x + ref.size.x / 2), size - FEET_MARGIN - ref.end.y)
@@ -150,6 +159,18 @@ func _vehicle(dir: String, anim: String, out: String) -> void:
 			sheet.blend_rect(frames[i], Rect2i(Vector2i.ZERO, frames[i].get_size()), Vector2i(i * size, row * size) + off)
 	print("%s: %d frame(s) x 8 directions of %d px" % [out, cols, size])
 	sheet.save_png(out)
+
+
+## The frames in an animation folder (frame_NNN.png), in order; none if there's no such folder.
+func _frames(folder: String) -> Array[Image]:
+	var frames: Array[Image] = []
+	if not DirAccess.dir_exists_absolute(folder):
+		return frames
+	var files := Array(DirAccess.get_files_at(folder)).filter(func(f): return f.ends_with(".png"))
+	files.sort()
+	for f in files:
+		frames.append(_load("%s/%s" % [folder, f]))
+	return frames
 
 
 func _load(path: String) -> Image:

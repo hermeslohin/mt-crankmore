@@ -702,6 +702,35 @@
           }
         }
       }
+    },
+    {
+      "character": {
+        "id": "026ecfa2-de99-40dc-928e-9b3e260e563e",
+        "name": "Lying",
+        "prompt": "cool athletic young woman cyclist riding a bicycle, seated on the bike with both hands on the handlebars, a fit rookie delivery rider with brown hair in a ponytail, wearing a purple shirt and a green baseball cap, athletic build, dark shorts; a red insulated food delivery bag is strapped on a rack on the back of the bike. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-27T13:37:30.728516+00:00"
+      },
+      "folder": "Lying",
+      "frames": {
+        "rotations": {
+          "south": "Lying/rotations/south.png",
+          "south-east": "Lying/rotations/south-east.png",
+          "east": "Lying/rotations/east.png",
+          "north-east": "Lying/rotations/north-east.png",
+          "north": "Lying/rotations/north.png",
+          "north-west": "Lying/rotations/north-west.png",
+          "west": "Lying/rotations/west.png",
+          "south-west": "Lying/rotations/south-west.png"
+        },
+        "animations": {}
+      }
     }
   ],
   "export_version": "3.1",

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sprite Viewer</title>
+<!--
+  Mt. Crankmore sprite viewer: every picture in art/, grouped (a vehicle with its colour versions and turn clips, a
+  rider with their delivery, fall and throw sheets, a person with their walk and cheer...). Open this file in a
+  browser straight from the repo; it reads the pictures from ../../art/. The list of pictures is manifest.js, made by
+    godot --headless -s tools/build_sprite_viewer.gd
+  Run that again after adding art.
+-->
+<style>
+:root {
+  --bg: #1b1f27; --panel: #252b36; --panel2: #2e3542; --line: #3a4250; --fg: #e9ecf2; --muted: #9aa3b2;
+  --accent: #f08a3c; --focus: #e8c547;
+  --display: "Press Start 2P", ui-monospace, monospace; --body: "IBM Plex Sans", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--body); }
+header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 16px; display: grid; gap: 10px; }
+h1 { font: 14px/1.5 var(--display); margin: 0; letter-spacing: 0.02em; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: 600 13px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #1b1f27; }
+button:focus-visible, input:focus-visible, .card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button .n { font-weight: 400; opacity: 0.75; margin-left: 4px; }
+input[type="search"] { font: 14px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; min-width: 0; flex: 1 1 180px; max-width: 320px; }
+label { color: var(--muted); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; }
+@media (min-width: 980px) { main.open { grid-template-columns: minmax(0, 1fr) 460px; } }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; align-content: start; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; cursor: pointer; display: grid; gap: 4px; text-align: center; }
+.card:hover { border-color: var(--muted); }
+.card[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; background: var(--panel2); border-radius: 4px; }
+.card .name { font-size: 12px; color: var(--fg); overflow-wrap: anywhere; }
+.card .meta { font-size: 11px; color: var(--muted); }
+.empty { color: var(--muted); padding: 24px 0; }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 12px; align-content: start; }
+@media (min-width: 980px) { aside { position: sticky; top: 120px; max-height: calc(100vh - 136px); overflow: auto; } }
+aside[hidden] { display: none; }
+aside h2 { font: 12px/1.6 var(--display); margin: 0; overflow-wrap: anywhere; }
+.stage { background: var(--panel2); border-radius: 6px; display: grid; place-items: center; padding: 8px; overflow: auto; }
+.stage canvas { image-rendering: pixelated; max-width: 100%; height: auto; }
+.stage.grass { background: #4f7a3a; } .stage.snow { background: #dfe7ef; } .stage.road { background: #5a5f69; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.k { color: var(--muted); font-size: 12px; min-width: 64px; }
+.readout { font: 12px ui-monospace, monospace; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.4em; }
+.files { font: 11px ui-monospace, monospace; color: var(--muted); overflow-wrap: anywhere; margin: 0; }
+.close { margin-left: auto; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Sans:wght@400;600&display=swap">
+</head>
+<body>
+<header>
+  <div class="bar"><h1>Mt. Crankmore sprites</h1><span class="readout" id="count"></span></div>
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Category" id="cats"></div>
+  </div>
+  <div class="bar">
+    <input type="search" id="q" placeholder="Search names…" aria-label="Search sprites">
+    <label><input type="checkbox" id="colours"> Colour versions as cards</label>
+    <label><input type="checkbox" id="spin" checked> Turn cards round</label>
+  </div>
+</header>
+<main id="main">
+  <div class="grid" id="grid" role="list"></div>
+  <aside id="detail" hidden aria-live="polite">
+    <div class="row"><h2 id="d-title"></h2><button class="close" id="d-close" aria-label="Close">Close</button></div>
+    <div class="stage" id="stage"><canvas id="d-canvas" width="320" height="320"></canvas></div>
+    <div class="readout" id="d-read"></div>
+    <div class="row" id="r-clip"><span class="k">Sheet</span><div class="seg" id="d-clips"></div></div>
+    <div class="row" id="r-col"><span class="k">Colour</span><div class="seg" id="d-cols"></div></div>
+    <div class="row" id="r-win"><span class="k">Season</span><div class="seg" id="d-wins"></div></div>
+    <div class="row"><span class="k">View</span><div class="seg" id="d-modes"></div></div>
+    <div class="row" id="r-turn"><span class="k">Turns</span><div class="seg" id="d-turns"></div></div>
+    <div class="row"><span class="k">Ground</span><div class="seg" id="d-bgs"></div></div>
+    <div class="row">
+      <label>Speed <input id="d-speed" type="range" min="0.1" max="2" step="0.1" value="1"></label>
+      <label>Zoom <input id="d-zoom" type="range" min="1" max="8" step="1" value="3"></label>
+    </div>
+    <p class="files" id="d-files"></p>
+  </aside>
+</main>
+<script src="manifest.js"></script>
+<script>
+const ART = "../../art/";
+const VIEWS = ["down-right", "down", "down-left", "left", "up-left", "up", "up-right", "right"];
+const FPS = 10, HOLD_S = 0.9, TURN_S = 0.2;   // frames a second; seconds on each view and per turn, as in the game
+const CATS = [
+  ["vehicle", "Vehicles", n => n.startsWith("vehicle_")],
+  ["rider", "Riders", n => n.startsWith("bike_")],
+  ["people", "People", n => /^(ped|person|giver|chef|mascot|santa)_/.test(n)],
+  ["animal", "Animals", n => n.startsWith("animal_")],
+  ["race", "Race & ski", n => /^(race|ski|obj)_/.test(n)],
+  ["building", "Buildings", n => n.startsWith("building_") || n === "hospital"],
+  ["scenery", "Scenery", n => /^(scenery|flora)_/.test(n)],
+  ["ground", "Ground", n => n.startsWith("ground_")],
+  ["other", "Other", n => true],
+];
+const RIDER_BITS = ["boxed", "pizza", "fall", "throw"];
+const ACTION_PREFIX = /^(ped|animal|chef|giver)_/;
+
+// ---------------------------------------------------------------- sheets and groups
+// A sheet's layout from its size: 8 rows of square cells (one row per view) for anything that turns, a strip of
+// square frames, or a single picture.
+function layout(w, h, name) {
+  const c = h / 8;
+  if (h % 8 === 0 && c >= 24 && w % c === 0 && !/^(building|scenery|flora|ground|race|ski)_/.test(name)) return { kind: "dirs", cell: c, frames: w / c };
+  if (w > h && w % h === 0) return { kind: "strip", cell: h, frames: w / h };
+  return { kind: "still", cell: Math.max(w, h), frames: 1 };
+}
+const sheets = {};
+for (const [name, w, h] of window.SPRITES || []) sheets[name] = { name, w, h, ...layout(w, h, name) };
+
+// group key + clip label for a plain (not winter, not colour, not turn) sheet name
+function split(name) {
+  if (name.startsWith("vehicle_")) return [name, "drive"];
+  if (name.startsWith("bike_")) {
+    const parts = name.slice(5).split("_");
+    const who = parts.filter(p => !RIDER_BITS.includes(p)), bits = parts.filter(p => RIDER_BITS.includes(p));
+    return ["bike_" + who.join("_"), bits.length ? bits.join(" ") : "ride"];
+  }
+  if (ACTION_PREFIX.test(name)) {
+    const i = name.lastIndexOf("_");
+    if (i > name.indexOf("_")) return [name.slice(0, i), name.slice(i + 1)];
+  }
+  return [name, "picture"];
+}
+const groups = {};
+for (const name of Object.keys(sheets)) {
+  let plain = name.replace(/^winter_/, "");
+  if (/_turn$/.test(plain) || /_c\d+(_turn)?$/.test(plain)) continue;   // found through their base sheet
+  if (name.startsWith("winter_") && sheets[plain]) continue;           // a season of the plain sheet
+  const [key, clip] = split(plain);
+  const cat = CATS.find(c => c[2](plain))[0];
+  const g = groups[key] || (groups[key] = { key, cat, clips: {} });
+  g.clips[clip] = sheets[plain] ? plain : name;   // winter-only sheets stand for themselves
+}
+// clip order: the main one first
+const CLIP_ORDER = ["drive", "ride", "boxed", "pizza", "walk", "idle", "run", "cheer", "still", "wave", "dance", "tap"];
+for (const g of Object.values(groups)) {
+  g.clipNames = Object.keys(g.clips).sort((a, b) => (CLIP_ORDER.indexOf(a) + 99) % 99 - (CLIP_ORDER.indexOf(b) + 99) % 99 || a.localeCompare(b));
+  g.label = pretty(g.key);
+}
+function pretty(key) { return key.replace(/^(vehicle|bike|ped|animal|building|scenery|flora|ground|race|ski|obj|chef|giver|person)_/, "").replace(/_/g, " "); }
+function colours(base) { const out = [base]; for (let i = 1; sheets[`${base}_c${i}`]; i++) out.push(`${base}_c${i}`); return out; }
+function seasonOf(name, winter) { return winter && sheets["winter_" + name] ? "winter_" + name : name; }
+
+// ---------------------------------------------------------------- images
+const imgs = {};
+function img(name) {
+  if (!sheets[name]) return null;
+  if (!imgs[name]) { imgs[name] = new Image(); imgs[name].src = ART + name + ".png"; }
+  return imgs[name].complete && imgs[name].naturalWidth ? imgs[name] : null;
+}
+// draws cell (col,row) of a sheet, scaled by s, its bottom middle at (x,y)
+function drawCell(g, name, col, row, x, y, s, alpha = 1) {
+  const sh = sheets[name], im = img(name);
+  if (!sh || !im) return false;
+  const cw = sh.kind === "still" ? sh.w : sh.cell, ch = sh.kind === "still" ? sh.h : sh.cell;
+  g.globalAlpha = alpha;
+  g.drawImage(im, col * cw, row * ch, cw, ch, Math.round(x - cw * s / 2), Math.round(y - ch * s), cw * s, ch * s);
+  g.globalAlpha = 1;
+  return true;
+}
+
+// ---------------------------------------------------------------- the grid
+const grid = document.getElementById("grid"), q = document.getElementById("q");
+const colourCards = document.getElementById("colours"), spin = document.getElementById("spin");
+let cat = "vehicle", selected = null, cards = [];
+const catBar = document.getElementById("cats");
+for (const [id, label] of CATS) {
+  const n = Object.values(groups).filter(g => g.cat === id).length;
+  if (!n) continue;
+  const b = document.createElement("button");
+  b.innerHTML = `${label}<span class="n">${n}</span>`;
+  b.dataset.cat = id;
+  b.onclick = () => { cat = id; build(); };
+  catBar.appendChild(b);
+}
+const seen = new Set();
+const io = new IntersectionObserver(es => { for (const e of es) e.isIntersecting ? seen.add(e.target) : seen.delete(e.target); });
+function build() {
+  for (const b of catBar.children) b.setAttribute("aria-pressed", b.dataset.cat === cat ? "true" : "false");
+  grid.textContent = ""; seen.clear(); io.disconnect(); cards = [];
+  const term = q.value.trim().toLowerCase();
+  const list = Object.values(groups).filter(g => (term ? true : g.cat === cat) && (!term || g.key.includes(term.replace(/ /g, "_")) || g.label.includes(term)))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  for (const g of list) {
+    const main = g.clips[g.clipNames[0]];
+    for (const sheet of (colourCards.checked ? colours(main) : [main])) {
+      const card = document.createElement("div");
+      card.className = "card"; card.tabIndex = 0; card.setAttribute("role", "listitem");
+      const cv = document.createElement("canvas"); cv.width = 96; cv.height = 96;
+      const sh = sheets[sheet];
+      const extra = sheet === main ? "" : " · " + sheet.slice(main.length + 1);
+      card.innerHTML = `<div class="name"></div><div class="meta"></div>`;
+      card.prepend(cv);
+      card.querySelector(".name").textContent = g.label + extra;
+      card.querySelector(".meta").textContent = `${g.clipNames.length > 1 ? g.clipNames.length + " sheets · " : ""}${sh.kind === "dirs" ? "8 views" : sh.kind === "strip" ? sh.frames + " frames" : sh.w + "×" + sh.h}`;
+      card.onclick = () => open(g.key, sheet);
+      card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(g.key, sheet); } };
+      card._g = g; card._sheet = sheet; card._cv = cv;
+      grid.appendChild(card); io.observe(card); cards.push(card);
+    }
+  }
+  if (!list.length) grid.innerHTML = `<p class="empty">Nothing matches “${q.value.replace(/</g, "&lt;")}”.</p>`;
+  document.getElementById("count").textContent = `${Object.keys(sheets).length} pictures · ${Object.keys(groups).length} sprites`;
+  mark();
+}
+function mark() { for (const c of cards) c.setAttribute("aria-current", selected && c._g.key === selected.key ? "true" : "false"); }
+q.oninput = build; colourCards.onchange = build;
+
+function drawThumb(card, t) {
+  const g = card._cv.getContext("2d"), sh = sheets[card._sheet];
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, 96, 96);
+  const s = Math.max(1, Math.min(4, Math.floor(88 / (sh.kind === "still" ? Math.max(sh.w, sh.h) : sh.cell)))) || 1;
+  const fit = sh.kind === "still" ? Math.min(1, 88 / Math.max(sh.w, sh.h)) : 1;
+  if (sh.kind === "dirs") {
+    const row = spin.checked ? Math.floor(t / 1.2) % 8 : 0;
+    drawCell(g, card._sheet, Math.floor(t * FPS) % sh.frames, row, 48, 92, s);
+  } else if (sh.kind === "strip") drawCell(g, card._sheet, Math.floor(t * FPS) % sh.frames, 0, 48, 92, s);
+  else drawCell(g, card._sheet, 0, 0, 48, 92, s >= 1 && fit === 1 ? s : fit);
+}
+
+// ---------------------------------------------------------------- the detail panel
+const dv = document.getElementById("d-canvas"), dg = dv.getContext("2d"), stage = document.getElementById("stage");
+const speed = document.getElementById("d-speed"), zoom = document.getElementById("d-zoom"), read = document.getElementById("d-read");
+let clip = "", colour = 0, winter = false, mode = "turn", turnMode = "clip", bg = "dark", t0 = performance.now();
+
+function segment(el, items, current, pick) {
+  el.textContent = "";
+  for (const [id, label] of items) {
+    const b = document.createElement("button");
+    b.textContent = label; b.setAttribute("aria-pressed", id === current ? "true" : "false");
+    b.onclick = () => pick(id);
+    el.appendChild(b);
+  }
+}
+function open(key, sheet) {
+  selected = groups[key];
+  const main = selected.clips[selected.clipNames[0]];
+  clip = selected.clipNames[0];
+  colour = sheet && sheet !== main ? colours(main).indexOf(sheet) : 0;
+  winter = false;
+  const sh = sheets[main];
+  mode = sh.kind === "dirs" ? "turn" : "play";
+  zoom.value = String(Math.max(1, Math.min(8, Math.floor(300 / (sh.kind === "still" ? Math.max(sh.w, sh.h) : sh.cell)))));
+  document.getElementById("main").classList.add("open");
+  document.getElementById("detail").hidden = false;
+  history.replaceState(null, "", "#" + key);
+  mark(); controls(); t0 = performance.now();
+  if (window.innerWidth < 980) document.getElementById("detail").scrollIntoView({ behavior: "smooth" });
+}
+document.getElementById("d-close").onclick = () => {
+  selected = null; document.getElementById("detail").hidden = true; document.getElementById("main").classList.remove("open");
+  history.replaceState(null, "", location.pathname); mark();
+};
+// the sheet now shown: clip, then colour, then season
+function current() {
+  const plain = selected.clips[clip];
+  const cols = colours(plain);
+  return seasonOf(cols[Math.min(colour, cols.length - 1)], winter);
+}
+function controls() {
+  const g = selected, plain = g.clips[clip], name = current(), sh = sheets[name];
+  document.getElementById("d-title").textContent = g.label;
+  document.getElementById("r-clip").hidden = g.clipNames.length < 2;
+  segment(document.getElementById("d-clips"), g.clipNames.map(c => [c, c]), clip, c => { clip = c; controls(); });
+  const cols = colours(plain);
+  document.getElementById("r-col").hidden = cols.length < 2;
+  segment(document.getElementById("d-cols"), cols.map((c, i) => [i, i ? "Colour " + i : "Original"]), Math.min(colour, cols.length - 1), i => { colour = i; controls(); });
+  document.getElementById("r-win").hidden = !sheets["winter_" + plain];
+  segment(document.getElementById("d-wins"), [[false, "Summer"], [true, "Winter"]], winter, w => { winter = w; controls(); });
+  const modes = sh.kind === "dirs" ? [["turn", "Turn round"], ["all", "All 8 views"], ["sheet", "Whole sheet"]] : sh.kind === "strip" ? [["play", "Play"], ["sheet", "Whole sheet"]] : [["sheet", "Picture"]];
+  if (!modes.some(m => m[0] === mode)) mode = modes[0][0];
+  segment(document.getElementById("d-modes"), modes, mode, m => { mode = m; controls(); });
+  const turn = sheets[name + "_turn"];
+  document.getElementById("r-turn").hidden = mode !== "turn";
+  const tms = turn ? [["clip", "In-betweens"], ["fade", "Cross-fade"], ["snap", "Snap"]] : [["fade", "Cross-fade"], ["snap", "Snap"]];
+  if (!tms.some(m => m[0] === turnMode)) turnMode = tms[0][0];
+  segment(document.getElementById("d-turns"), tms, turnMode, m => { turnMode = m; controls(); });
+  segment(document.getElementById("d-bgs"), [["dark", "Dark"], ["grass", "Grass"], ["road", "Road"], ["snow", "Snow"]], bg, b => { bg = b; controls(); });
+  stage.className = "stage " + bg;
+  const files = [name, turn ? name + "_turn" : ""].filter(Boolean).map(f => `art/${f}.png (${sheets[f].w}×${sheets[f].h})`);
+  document.getElementById("d-files").textContent = files.join("  ·  ");
+}
+
+function drawDetail(t) {
+  const name = current(), sh = sheets[name], s = +zoom.value, sp = +speed.value;
+  const cell = sh.kind === "still" ? 0 : sh.cell;
+  let w, h;
+  if (mode === "sheet") { w = sh.w * s; h = sh.h * s; }
+  else if (mode === "all") { w = cell * s * 4; h = cell * s * 2; }
+  else if (sh.kind === "still") { w = sh.w * s; h = sh.h * s; }
+  else { w = cell * s; h = cell * s; }
+  w = Math.max(64, Math.round(w)); h = Math.max(64, Math.round(h));
+  if (dv.width !== w || dv.height !== h) { dv.width = w; dv.height = h; }
+  dg.imageSmoothingEnabled = false;
+  dg.clearRect(0, 0, w, h);
+  const frame = Math.floor(t * FPS * sp) % (sh.frames || 1);
+  if (mode === "sheet") {
+    const im = img(name); if (im) dg.drawImage(im, 0, 0, sh.w * s, sh.h * s);
+    read.textContent = sh.kind === "dirs" ? `rows: ${VIEWS.join(", ")} · ${sh.frames} frames of ${sh.cell}px` : `${sh.w}×${sh.h}`;
+  } else if (mode === "all") {
+    for (let k = 0; k < 8; k++) drawCell(dg, name, frame, k, (k % 4 + 0.5) * cell * s, (Math.floor(k / 4) + 1) * cell * s, s);
+    read.textContent = `top: ${VIEWS.slice(0, 4).join(", ")} · bottom: ${VIEWS.slice(4).join(", ")}`;
+  } else if (mode === "play") {
+    drawCell(dg, name, frame, 0, w / 2, h, s);
+    read.textContent = `frame ${frame + 1} of ${sh.frames}`;
+  } else {
+    // turn round: ride each view a while, then turn to the next with the in-betweens, a cross-fade or a snap
+    const turn = sheets[name + "_turn"];
+    const turnLen = TURN_S / sp, step = HOLD_S + turnLen, tt = t;
+    const k = Math.floor(tt / step) % 8, u = (tt % step) - HOLD_S;
+    if (u < 0) { drawCell(dg, name, frame, k, w / 2, h, s); read.textContent = VIEWS[k]; }
+    else {
+      const p = u / turnLen, n = (k + 1) % 8;
+      if (turnMode === "clip" && turn) {
+        const i = Math.min(turn.frames - 1, Math.floor(p * turn.frames));
+        const ts = s * sh.cell / turn.cell;
+        drawCell(dg, name + "_turn", i, k, w / 2, h, ts);
+        read.textContent = `${VIEWS[k]} → ${VIEWS[n]}, in-between ${i + 1} of ${turn.frames}`;
+      } else if (turnMode === "fade") {
+        drawCell(dg, name, frame, k, w / 2, h, s); drawCell(dg, name, frame, n, w / 2, h, s, p);
+        read.textContent = `${VIEWS[k]} → ${VIEWS[n]}, fading`;
+      } else { drawCell(dg, name, frame, p < 0.5 ? k : n, w / 2, h, s); read.textContent = `${VIEWS[k]} → ${VIEWS[n]}, snap`; }
+    }
+  }
+}
+
+function tick(now) {
+  requestAnimationFrame(tick);
+  const t = (now - t0) / 1000;
+  for (const c of seen) drawThumb(c, t);
+  if (selected) drawDetail(t);
+}
+if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { speed.value = "0.3"; spin.checked = false; }
+
+if (!window.SPRITES) grid.innerHTML = `<p class="empty">manifest.js is missing: run <code>godot --headless -s tools/build_sprite_viewer.gd</code> in the repo.</p>`;
+else {
+  const want = decodeURIComponent(location.hash.slice(1));
+  if (groups[want]) cat = groups[want].cat;
+  build();
+  if (groups[want]) open(want);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

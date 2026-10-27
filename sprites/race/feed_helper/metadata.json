@@ -1,0 +1,49 @@
+{
+  "group_id": "f056c760-a697-40bd-aa30-6340e754be7a",
+  "states": [
+    {
+      "character": {
+        "id": "04f1af8b-789a-4814-97b9-ce980e270d93",
+        "name": "Idle",
+        "prompt": "cartoon cycling team helper in a team polo shirt and cap, one arm held out offering a water bottle, a cloth musette bag in the other hand",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T03:02:08.977763+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "cheer": {
+            "south": [
+              "Idle/animations/cheer/south/frame_000.png",
+              "Idle/animations/cheer/south/frame_001.png",
+              "Idle/animations/cheer/south/frame_002.png",
+              "Idle/animations/cheer/south/frame_003.png",
+              "Idle/animations/cheer/south/frame_004.png",
+              "Idle/animations/cheer/south/frame_005.png",
+              "Idle/animations/cheer/south/frame_006.png",
+              "Idle/animations/cheer/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T03:09:17.397571"
+}

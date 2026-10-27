@@ -1,7 +1,8 @@
 extends Node
 ## Talks to bridge/trainer_bridge.py over localhost UDP, and runs that bridge ("the Bluetooth helper")
 ## for the player: it installs it into bridge/.venv, launches it in --managed mode, and sends it
-## scan / connect / disconnect commands from the Connect Trainer screen.
+## scan / connect / disconnect commands from the Connect Trainer screen. The helper also finds and
+## connects Wi-Fi trainers (Direct Connect); to the game they are just devices with "wifi": true.
 ## Bridge -> game (port 9871): {"type":"data", "power","cadence","speed","buttons":[...],"trainer","controller"}
 ##                             {"type":"status", "scanning", "devices":[...], "trainer":{...}, "controller":{...}, "error"}
 ## Game -> bridge (port 9872): {"grade": percent, "gear": ratio, "mass": kg} or {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}
@@ -15,12 +16,14 @@ const TX_PORT := 9872
 
 const GEARS := 21
 const START_GEAR := 11
-const EASIEST := 0.33    # gear 1, ratio to gear 11
-const HARDEST := 2.55    # gear 21
+const EASIEST := 0.27    # gear 1, ratio to gear 11 (the range, hardest over easiest, is about 11.6x)
+const HARDEST := 3.12    # gear 21
 const FIXED_GEAR := 9     # the fixie's one and only gear
 
 ## Shifter buttons: LS1 = easier, RS1 = harder.
 const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}
+const SHIFT_HOLD := 1.0       # seconds a shifter (or key) is held before it starts shifting again by itself
+const SHIFT_REPEAT := 0.5     # then one more gear every this many seconds
 
 ## Controller button name -> game action.
 const BUTTON_ACTIONS := {
@@ -47,6 +50,7 @@ var trainer_power := 0.0
 var trainer_cadence := 0.0
 var trainer_speed_kmh := 0.0
 var trainer_live := false
+var _lost_trainer := false   # it dropped out and hasn't come back yet
 var controller_live := false
 var bridge_live := false
 var last_msg_ms := -100000
@@ -64,10 +68,14 @@ var helper_state := "stopped"     # stopped | installing | starting | running | 
 var helper_msg := ""
 var _install_thread: Thread
 var _install_log := ""
+var _update_tried := false        # this session already tried to bring an installed helper up to date
 var _ping_clock := 0.0
 var _autostart_clock := 1.5
 
 var _held: Dictionary = {}
+var _rep_dir := 0             # the shifter being held: -1 easier, 1 harder, 0 none
+var _rep_t := 0.0             # how long it's been held
+var _rep_next := SHIFT_HOLD   # when the next repeat shift is due
 var _pressed_frame: Dictionary = {}   # action -> process frame it was pressed in
 var _release_later: Array = []         # releases that arrived in the same frame as their press
 var _grade_sent := 999.0
@@ -126,8 +134,28 @@ func helper_installed() -> bool:
 	return venv_python() != ""
 
 
+## The requirements.txt the helper was installed from. When the game's differs (an update needs another library,
+## like zeroconf for Wi-Fi trainers) the helper is updated once before it starts.
+func _stamp_path() -> String:
+	return bridge_dir() + "/.venv/installed-requirements.txt"
+
+
+func helper_outdated() -> bool:
+	return helper_installed() and FileAccess.get_file_as_string(_stamp_path()) != FileAccess.get_file_as_string(bridge_dir() + "/requirements.txt")
+
+
+func _write_stamp() -> void:
+	var f := FileAccess.open(_stamp_path(), FileAccess.WRITE)
+	if f != null:
+		f.store_string(FileAccess.get_file_as_string(bridge_dir() + "/requirements.txt"))
+
+
 func start_helper() -> void:
 	if bridge_live or helper_state == "installing":
+		return
+	if helper_outdated() and not _update_tried:
+		_update_tried = true
+		install_helper()   # starts the helper when it's done, even if the update fails
 		return
 	var py := venv_python()
 	if py == "":
@@ -150,17 +178,21 @@ func stop_helper() -> void:
 		helper_pid = -1
 
 
-## One-time setup: a private Python environment in bridge/.venv with the Bluetooth library.
+## One-time setup: a private Python environment in bridge/.venv with the Bluetooth (and Wi-Fi discovery) libraries.
+## Also updates an installed helper in place (see helper_outdated).
 func install_helper() -> void:
 	if helper_state == "installing":
 		return
 	var py := system_python()
-	if py == "":
+	if py == "" and not helper_installed():   # an update only needs the helper's own Python
 		helper_state = "error"
 		helper_msg = "Python 3 was not found. Install it from python.org, then try again."
 		return
 	helper_state = "installing"
-	helper_msg = "Installing the Bluetooth helper (about a minute, needs internet)..."
+	if helper_installed():
+		helper_msg = "Updating the Bluetooth helper (about a minute, needs internet)..."
+	else:
+		helper_msg = "Installing the Bluetooth helper (about a minute, needs internet)..."
 	_install_thread = Thread.new()
 	_install_thread.start(_install.bind(py))
 
@@ -168,9 +200,11 @@ func install_helper() -> void:
 func _install(py: String) -> int:
 	var out: Array = []
 	var venv := bridge_dir() + "/.venv"
-	var code := OS.execute(py, ["-m", "venv", venv], out, true)
+	var vpy := venv + ("/Scripts/python.exe" if OS.get_name() == "Windows" else "/bin/python")
+	var code := 0
+	if not FileAccess.file_exists(vpy):   # an update reuses the venv as it is
+		code = OS.execute(py, ["-m", "venv", venv], out, true)
 	if code == 0:
-		var vpy := venv + ("/Scripts/python.exe" if OS.get_name() == "Windows" else "/bin/python")
 		code = OS.execute(vpy, ["-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", bridge_dir() + "/requirements.txt"], out, true)
 	_install_log = "\n".join(out)
 	return code
@@ -233,6 +267,11 @@ func _process(delta: float) -> void:
 		var code: int = _install_thread.wait_to_finish()
 		_install_thread = null
 		if code == 0:
+			_write_stamp()
+			helper_state = "stopped"
+			start_helper()
+		elif _update_tried and helper_installed():
+			# the update failed (offline?): run the helper as it was; Bluetooth works, Wi-Fi trainers wait for the update
 			helper_state = "stopped"
 			start_helper()
 		else:
@@ -244,12 +283,20 @@ func _process(delta: float) -> void:
 		_autostart_clock -= delta
 		if _autostart_clock <= 0.0 and not bridge_live and helper_installed():
 			start_helper()
+	var had_trainer := trainer_live
 	if not bridge_live:
 		trainer_live = false
 		controller_live = false
 		_release_all()
 	elif now - last_trainer_ms > 2500:
 		trainer_live = false
+	# say so when the trainer drops out mid-ride (you'd otherwise just grind to a halt), and when it's back
+	if had_trainer and not trainer_live:
+		_lost_trainer = true
+		Game.toast.emit("Trainer signal lost - reconnecting... (W pedals meanwhile)", Color(1.0, 0.6, 0.4))
+	elif _lost_trainer and trainer_live:
+		_lost_trainer = false
+		Game.toast.emit("Trainer back!", Color(0.5, 1.0, 0.6))
 
 	# keyboard stand-in for the trainer: W rides at a steady 85% of your FTP, Shift sprints
 	# (that's in gear 11; easier gears push back less, so the same legs make fewer watts at a higher cadence)
@@ -268,6 +315,7 @@ func _process(delta: float) -> void:
 		shift(1)
 	if Input.is_action_just_pressed("shift_down"):
 		shift(-1)
+	_shift_repeat(delta)
 	shift_flash = maxf(0.0, shift_flash - delta)
 	_grade_clock += delta
 
@@ -342,6 +390,26 @@ func gear_ratio(g: int = gear) -> float:
 	if g <= START_GEAR:
 		return pow(EASIEST, float(START_GEAR - g) / (START_GEAR - 1))
 	return pow(HARDEST, float(g - START_GEAR) / (GEARS - START_GEAR))
+
+
+## Holding a shifter (the controller's LS1 / RS1 or the shift keys) keeps shifting: once more after SHIFT_HOLD, then
+## every SHIFT_REPEAT until it's let go. (The first shift happens on the press itself.)
+func _shift_repeat(delta: float) -> void:
+	var live := Time.get_ticks_msec() - last_msg_ms < 600   # the controller's buttons only count while it's talking
+	var dir := 0
+	if Input.is_action_pressed("shift_up") or (live and pressed_names.has("RS1")):
+		dir += 1
+	if Input.is_action_pressed("shift_down") or (live and pressed_names.has("LS1")):
+		dir -= 1
+	if dir == 0 or dir != _rep_dir:
+		_rep_dir = dir
+		_rep_t = 0.0
+		_rep_next = SHIFT_HOLD
+		return
+	_rep_t += delta
+	if _rep_t >= _rep_next:
+		_rep_next += SHIFT_REPEAT
+		shift(dir)
 
 
 func shift(step: int) -> void:

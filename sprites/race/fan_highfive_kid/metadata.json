@@ -1,0 +1,49 @@
+{
+  "group_id": "24d921f6-e4e4-4276-bd31-516f61b80427",
+  "states": [
+    {
+      "character": {
+        "id": "dbc0d4a7-1917-49f9-a82a-c32b8c7f37e3",
+        "name": "Idle",
+        "prompt": "cheerful cartoon little kid standing on foot in sneakers, shorts and a bright t-shirt with a cap, one arm stretched out with an open palm offering a high-five, no bicycle",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T03:02:30.637318+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "cheer": {
+            "south": [
+              "Idle/animations/cheer/south/frame_000.png",
+              "Idle/animations/cheer/south/frame_001.png",
+              "Idle/animations/cheer/south/frame_002.png",
+              "Idle/animations/cheer/south/frame_003.png",
+              "Idle/animations/cheer/south/frame_004.png",
+              "Idle/animations/cheer/south/frame_005.png",
+              "Idle/animations/cheer/south/frame_006.png",
+              "Idle/animations/cheer/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T03:08:01.195336"
+}

@@ -1,0 +1,36 @@
+{
+  "group_id": "1f78de7b-3e26-4211-92bd-3f365cc72caa",
+  "states": [
+    {
+      "character": {
+        "id": "4584a25a-2de4-4db4-8379-d4e2857d9d47",
+        "name": "Idle",
+        "prompt": "alpine skier in a bright red jacket and goggles, crouched on skis holding ski poles",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:25:38.218670+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:29:02.762431"
+}

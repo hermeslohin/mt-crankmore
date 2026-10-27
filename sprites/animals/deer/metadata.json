@@ -1,0 +1,64 @@
+{
+  "group_id": "f8ce8d3a-58c8-46b0-a2f1-5fdb8e30e098",
+  "states": [
+    {
+      "character": {
+        "id": "f2c9d681-b54b-4217-9d5d-f6c529dd68a5",
+        "name": "Idle",
+        "prompt": "a graceful deer standing on all four legs, tan-brown coat with a white tail patch and a pair of branching antlers, friendly cartoon style",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "horse",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:49:59.719116+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png",
+              "Idle/animations/idle/east/frame_008.png",
+              "Idle/animations/idle/east/frame_009.png",
+              "Idle/animations/idle/east/frame_010.png"
+            ]
+          },
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:00:29.541461"
+}

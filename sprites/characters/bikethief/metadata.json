@@ -1,0 +1,447 @@
+{
+  "group_id": "95b6d3f8-d941-4ec6-af4f-52eb9a70c30f",
+  "states": [
+    {
+      "character": {
+        "id": "b329956e-ae42-4700-a96c-51fa47011f86",
+        "name": "Idle",
+        "prompt": "cyclist riding a bicycle, seated on the bike with both hands on the handlebars, a sneaky cartoon bike thief in a black hoodie, black balaclava and black gloves, dark trousers; riding a shiny brand-new red racing road bike with drop handlebars, the price tag still dangling from the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T20:25:25.851981+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "fall": {
+            "north-west": [
+              "Idle/animations/fall/north-west/frame_000.png",
+              "Idle/animations/fall/north-west/frame_001.png",
+              "Idle/animations/fall/north-west/frame_002.png",
+              "Idle/animations/fall/north-west/frame_003.png",
+              "Idle/animations/fall/north-west/frame_004.png",
+              "Idle/animations/fall/north-west/frame_005.png",
+              "Idle/animations/fall/north-west/frame_006.png",
+              "Idle/animations/fall/north-west/frame_007.png",
+              "Idle/animations/fall/north-west/frame_008.png",
+              "Idle/animations/fall/north-west/frame_009.png",
+              "Idle/animations/fall/north-west/frame_010.png",
+              "Idle/animations/fall/north-west/frame_011.png",
+              "Idle/animations/fall/north-west/frame_012.png"
+            ],
+            "east": [
+              "Idle/animations/fall/east/frame_000.png",
+              "Idle/animations/fall/east/frame_001.png",
+              "Idle/animations/fall/east/frame_002.png",
+              "Idle/animations/fall/east/frame_003.png",
+              "Idle/animations/fall/east/frame_004.png",
+              "Idle/animations/fall/east/frame_005.png",
+              "Idle/animations/fall/east/frame_006.png",
+              "Idle/animations/fall/east/frame_007.png",
+              "Idle/animations/fall/east/frame_008.png",
+              "Idle/animations/fall/east/frame_009.png",
+              "Idle/animations/fall/east/frame_010.png",
+              "Idle/animations/fall/east/frame_011.png",
+              "Idle/animations/fall/east/frame_012.png"
+            ],
+            "south": [
+              "Idle/animations/fall/south/frame_000.png",
+              "Idle/animations/fall/south/frame_001.png",
+              "Idle/animations/fall/south/frame_002.png",
+              "Idle/animations/fall/south/frame_003.png",
+              "Idle/animations/fall/south/frame_004.png",
+              "Idle/animations/fall/south/frame_005.png",
+              "Idle/animations/fall/south/frame_006.png",
+              "Idle/animations/fall/south/frame_007.png",
+              "Idle/animations/fall/south/frame_008.png",
+              "Idle/animations/fall/south/frame_009.png",
+              "Idle/animations/fall/south/frame_010.png",
+              "Idle/animations/fall/south/frame_011.png",
+              "Idle/animations/fall/south/frame_012.png"
+            ],
+            "north-east": [
+              "Idle/animations/fall/north-east/frame_000.png",
+              "Idle/animations/fall/north-east/frame_001.png",
+              "Idle/animations/fall/north-east/frame_002.png",
+              "Idle/animations/fall/north-east/frame_003.png",
+              "Idle/animations/fall/north-east/frame_004.png",
+              "Idle/animations/fall/north-east/frame_005.png",
+              "Idle/animations/fall/north-east/frame_006.png",
+              "Idle/animations/fall/north-east/frame_007.png",
+              "Idle/animations/fall/north-east/frame_008.png",
+              "Idle/animations/fall/north-east/frame_009.png",
+              "Idle/animations/fall/north-east/frame_010.png",
+              "Idle/animations/fall/north-east/frame_011.png",
+              "Idle/animations/fall/north-east/frame_012.png"
+            ],
+            "north": [
+              "Idle/animations/fall/north/frame_000.png",
+              "Idle/animations/fall/north/frame_001.png",
+              "Idle/animations/fall/north/frame_002.png",
+              "Idle/animations/fall/north/frame_003.png",
+              "Idle/animations/fall/north/frame_004.png",
+              "Idle/animations/fall/north/frame_005.png",
+              "Idle/animations/fall/north/frame_006.png",
+              "Idle/animations/fall/north/frame_007.png",
+              "Idle/animations/fall/north/frame_008.png",
+              "Idle/animations/fall/north/frame_009.png",
+              "Idle/animations/fall/north/frame_010.png",
+              "Idle/animations/fall/north/frame_011.png",
+              "Idle/animations/fall/north/frame_012.png"
+            ],
+            "south-west": [
+              "Idle/animations/fall/south-west/frame_000.png",
+              "Idle/animations/fall/south-west/frame_001.png",
+              "Idle/animations/fall/south-west/frame_002.png",
+              "Idle/animations/fall/south-west/frame_003.png",
+              "Idle/animations/fall/south-west/frame_004.png",
+              "Idle/animations/fall/south-west/frame_005.png",
+              "Idle/animations/fall/south-west/frame_006.png",
+              "Idle/animations/fall/south-west/frame_007.png",
+              "Idle/animations/fall/south-west/frame_008.png",
+              "Idle/animations/fall/south-west/frame_009.png",
+              "Idle/animations/fall/south-west/frame_010.png",
+              "Idle/animations/fall/south-west/frame_011.png",
+              "Idle/animations/fall/south-west/frame_012.png"
+            ],
+            "south-east": [
+              "Idle/animations/fall/south-east/frame_000.png",
+              "Idle/animations/fall/south-east/frame_001.png",
+              "Idle/animations/fall/south-east/frame_002.png",
+              "Idle/animations/fall/south-east/frame_003.png",
+              "Idle/animations/fall/south-east/frame_004.png",
+              "Idle/animations/fall/south-east/frame_005.png",
+              "Idle/animations/fall/south-east/frame_006.png",
+              "Idle/animations/fall/south-east/frame_007.png",
+              "Idle/animations/fall/south-east/frame_008.png",
+              "Idle/animations/fall/south-east/frame_009.png",
+              "Idle/animations/fall/south-east/frame_010.png",
+              "Idle/animations/fall/south-east/frame_011.png",
+              "Idle/animations/fall/south-east/frame_012.png"
+            ],
+            "west": [
+              "Idle/animations/fall/west/frame_000.png",
+              "Idle/animations/fall/west/frame_001.png",
+              "Idle/animations/fall/west/frame_002.png",
+              "Idle/animations/fall/west/frame_003.png",
+              "Idle/animations/fall/west/frame_004.png",
+              "Idle/animations/fall/west/frame_005.png",
+              "Idle/animations/fall/west/frame_006.png",
+              "Idle/animations/fall/west/frame_007.png",
+              "Idle/animations/fall/west/frame_008.png",
+              "Idle/animations/fall/west/frame_009.png",
+              "Idle/animations/fall/west/frame_010.png",
+              "Idle/animations/fall/west/frame_011.png",
+              "Idle/animations/fall/west/frame_012.png"
+            ]
+          },
+          "pedaling": {
+            "north": [
+              "Idle/animations/pedaling/north/frame_000.png",
+              "Idle/animations/pedaling/north/frame_001.png",
+              "Idle/animations/pedaling/north/frame_002.png",
+              "Idle/animations/pedaling/north/frame_003.png",
+              "Idle/animations/pedaling/north/frame_004.png",
+              "Idle/animations/pedaling/north/frame_005.png",
+              "Idle/animations/pedaling/north/frame_006.png",
+              "Idle/animations/pedaling/north/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/pedaling/north-east/frame_000.png",
+              "Idle/animations/pedaling/north-east/frame_001.png",
+              "Idle/animations/pedaling/north-east/frame_002.png",
+              "Idle/animations/pedaling/north-east/frame_003.png",
+              "Idle/animations/pedaling/north-east/frame_004.png",
+              "Idle/animations/pedaling/north-east/frame_005.png",
+              "Idle/animations/pedaling/north-east/frame_006.png",
+              "Idle/animations/pedaling/north-east/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/pedaling/west/frame_000.png",
+              "Idle/animations/pedaling/west/frame_001.png",
+              "Idle/animations/pedaling/west/frame_002.png",
+              "Idle/animations/pedaling/west/frame_003.png",
+              "Idle/animations/pedaling/west/frame_004.png",
+              "Idle/animations/pedaling/west/frame_005.png",
+              "Idle/animations/pedaling/west/frame_006.png",
+              "Idle/animations/pedaling/west/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/pedaling/north-west/frame_000.png",
+              "Idle/animations/pedaling/north-west/frame_001.png",
+              "Idle/animations/pedaling/north-west/frame_002.png",
+              "Idle/animations/pedaling/north-west/frame_003.png",
+              "Idle/animations/pedaling/north-west/frame_004.png",
+              "Idle/animations/pedaling/north-west/frame_005.png",
+              "Idle/animations/pedaling/north-west/frame_006.png",
+              "Idle/animations/pedaling/north-west/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/pedaling/south-east/frame_000.png",
+              "Idle/animations/pedaling/south-east/frame_001.png",
+              "Idle/animations/pedaling/south-east/frame_002.png",
+              "Idle/animations/pedaling/south-east/frame_003.png",
+              "Idle/animations/pedaling/south-east/frame_004.png",
+              "Idle/animations/pedaling/south-east/frame_005.png",
+              "Idle/animations/pedaling/south-east/frame_006.png",
+              "Idle/animations/pedaling/south-east/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/pedaling/east/frame_000.png",
+              "Idle/animations/pedaling/east/frame_001.png",
+              "Idle/animations/pedaling/east/frame_002.png",
+              "Idle/animations/pedaling/east/frame_003.png",
+              "Idle/animations/pedaling/east/frame_004.png",
+              "Idle/animations/pedaling/east/frame_005.png",
+              "Idle/animations/pedaling/east/frame_006.png",
+              "Idle/animations/pedaling/east/frame_007.png"
+            ],
+            "south-west": [
+              "Idle/animations/pedaling/south-west/frame_000.png",
+              "Idle/animations/pedaling/south-west/frame_001.png",
+              "Idle/animations/pedaling/south-west/frame_002.png",
+              "Idle/animations/pedaling/south-west/frame_003.png",
+              "Idle/animations/pedaling/south-west/frame_004.png",
+              "Idle/animations/pedaling/south-west/frame_005.png",
+              "Idle/animations/pedaling/south-west/frame_006.png",
+              "Idle/animations/pedaling/south-west/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/pedaling/south/frame_000.png",
+              "Idle/animations/pedaling/south/frame_001.png",
+              "Idle/animations/pedaling/south/frame_002.png",
+              "Idle/animations/pedaling/south/frame_003.png",
+              "Idle/animations/pedaling/south/frame_004.png",
+              "Idle/animations/pedaling/south/frame_005.png",
+              "Idle/animations/pedaling/south/frame_006.png",
+              "Idle/animations/pedaling/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "ccfcb293-003a-4302-aa61-83834b67d87c",
+        "name": "On foot",
+        "prompt": "cyclist riding a bicycle, seated on the bike with both hands on the handlebars, a sneaky cartoon bike thief in a black hoodie, black balaclava and black gloves, dark trousers; riding a shiny brand-new red racing road bike with drop handlebars, the price tag still dangling from the handlebars. In the south view the bike points straight at the viewer: front wheel directly in front, facing straight down, rear wheel hidden directly behind it",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T20:29:29.311222+00:00"
+      },
+      "folder": "On_foot",
+      "frames": {
+        "rotations": {
+          "south": "On_foot/rotations/south.png",
+          "south-east": "On_foot/rotations/south-east.png",
+          "east": "On_foot/rotations/east.png",
+          "north-east": "On_foot/rotations/north-east.png",
+          "north": "On_foot/rotations/north.png",
+          "north-west": "On_foot/rotations/north-west.png",
+          "west": "On_foot/rotations/west.png",
+          "south-west": "On_foot/rotations/south-west.png"
+        },
+        "animations": {
+          "run": {
+            "north": [
+              "On_foot/animations/run/north/frame_000.png",
+              "On_foot/animations/run/north/frame_001.png",
+              "On_foot/animations/run/north/frame_002.png",
+              "On_foot/animations/run/north/frame_003.png",
+              "On_foot/animations/run/north/frame_004.png",
+              "On_foot/animations/run/north/frame_005.png",
+              "On_foot/animations/run/north/frame_006.png",
+              "On_foot/animations/run/north/frame_007.png"
+            ],
+            "south-west": [
+              "On_foot/animations/run/south-west/frame_000.png",
+              "On_foot/animations/run/south-west/frame_001.png",
+              "On_foot/animations/run/south-west/frame_002.png",
+              "On_foot/animations/run/south-west/frame_003.png",
+              "On_foot/animations/run/south-west/frame_004.png",
+              "On_foot/animations/run/south-west/frame_005.png",
+              "On_foot/animations/run/south-west/frame_006.png",
+              "On_foot/animations/run/south-west/frame_007.png"
+            ],
+            "south": [
+              "On_foot/animations/run/south/frame_000.png",
+              "On_foot/animations/run/south/frame_001.png",
+              "On_foot/animations/run/south/frame_002.png",
+              "On_foot/animations/run/south/frame_003.png",
+              "On_foot/animations/run/south/frame_004.png",
+              "On_foot/animations/run/south/frame_005.png",
+              "On_foot/animations/run/south/frame_006.png",
+              "On_foot/animations/run/south/frame_007.png"
+            ],
+            "south-east": [
+              "On_foot/animations/run/south-east/frame_000.png",
+              "On_foot/animations/run/south-east/frame_001.png",
+              "On_foot/animations/run/south-east/frame_002.png",
+              "On_foot/animations/run/south-east/frame_003.png",
+              "On_foot/animations/run/south-east/frame_004.png",
+              "On_foot/animations/run/south-east/frame_005.png",
+              "On_foot/animations/run/south-east/frame_006.png",
+              "On_foot/animations/run/south-east/frame_007.png"
+            ],
+            "north-east": [
+              "On_foot/animations/run/north-east/frame_000.png",
+              "On_foot/animations/run/north-east/frame_001.png",
+              "On_foot/animations/run/north-east/frame_002.png",
+              "On_foot/animations/run/north-east/frame_003.png",
+              "On_foot/animations/run/north-east/frame_004.png",
+              "On_foot/animations/run/north-east/frame_005.png",
+              "On_foot/animations/run/north-east/frame_006.png",
+              "On_foot/animations/run/north-east/frame_007.png"
+            ],
+            "east": [
+              "On_foot/animations/run/east/frame_000.png",
+              "On_foot/animations/run/east/frame_001.png",
+              "On_foot/animations/run/east/frame_002.png",
+              "On_foot/animations/run/east/frame_003.png",
+              "On_foot/animations/run/east/frame_004.png",
+              "On_foot/animations/run/east/frame_005.png",
+              "On_foot/animations/run/east/frame_006.png",
+              "On_foot/animations/run/east/frame_007.png"
+            ],
+            "north-west": [
+              "On_foot/animations/run/north-west/frame_000.png",
+              "On_foot/animations/run/north-west/frame_001.png",
+              "On_foot/animations/run/north-west/frame_002.png",
+              "On_foot/animations/run/north-west/frame_003.png",
+              "On_foot/animations/run/north-west/frame_004.png",
+              "On_foot/animations/run/north-west/frame_005.png",
+              "On_foot/animations/run/north-west/frame_006.png",
+              "On_foot/animations/run/north-west/frame_007.png"
+            ],
+            "west": [
+              "On_foot/animations/run/west/frame_000.png",
+              "On_foot/animations/run/west/frame_001.png",
+              "On_foot/animations/run/west/frame_002.png",
+              "On_foot/animations/run/west/frame_003.png",
+              "On_foot/animations/run/west/frame_004.png",
+              "On_foot/animations/run/west/frame_005.png",
+              "On_foot/animations/run/west/frame_006.png",
+              "On_foot/animations/run/west/frame_007.png"
+            ]
+          },
+          "caught2": {
+            "south": [
+              "On_foot/animations/caught2/south/frame_000.png",
+              "On_foot/animations/caught2/south/frame_001.png",
+              "On_foot/animations/caught2/south/frame_002.png",
+              "On_foot/animations/caught2/south/frame_003.png",
+              "On_foot/animations/caught2/south/frame_004.png",
+              "On_foot/animations/caught2/south/frame_005.png",
+              "On_foot/animations/caught2/south/frame_006.png",
+              "On_foot/animations/caught2/south/frame_007.png"
+            ]
+          },
+          "walk": {
+            "north-west": [
+              "On_foot/animations/walk/north-west/frame_000.png",
+              "On_foot/animations/walk/north-west/frame_001.png",
+              "On_foot/animations/walk/north-west/frame_002.png",
+              "On_foot/animations/walk/north-west/frame_003.png",
+              "On_foot/animations/walk/north-west/frame_004.png",
+              "On_foot/animations/walk/north-west/frame_005.png",
+              "On_foot/animations/walk/north-west/frame_006.png",
+              "On_foot/animations/walk/north-west/frame_007.png"
+            ],
+            "north": [
+              "On_foot/animations/walk/north/frame_000.png",
+              "On_foot/animations/walk/north/frame_001.png",
+              "On_foot/animations/walk/north/frame_002.png",
+              "On_foot/animations/walk/north/frame_003.png",
+              "On_foot/animations/walk/north/frame_004.png",
+              "On_foot/animations/walk/north/frame_005.png",
+              "On_foot/animations/walk/north/frame_006.png",
+              "On_foot/animations/walk/north/frame_007.png"
+            ],
+            "east": [
+              "On_foot/animations/walk/east/frame_000.png",
+              "On_foot/animations/walk/east/frame_001.png",
+              "On_foot/animations/walk/east/frame_002.png",
+              "On_foot/animations/walk/east/frame_003.png",
+              "On_foot/animations/walk/east/frame_004.png",
+              "On_foot/animations/walk/east/frame_005.png",
+              "On_foot/animations/walk/east/frame_006.png",
+              "On_foot/animations/walk/east/frame_007.png"
+            ],
+            "north-east": [
+              "On_foot/animations/walk/north-east/frame_000.png",
+              "On_foot/animations/walk/north-east/frame_001.png",
+              "On_foot/animations/walk/north-east/frame_002.png",
+              "On_foot/animations/walk/north-east/frame_003.png",
+              "On_foot/animations/walk/north-east/frame_004.png",
+              "On_foot/animations/walk/north-east/frame_005.png",
+              "On_foot/animations/walk/north-east/frame_006.png",
+              "On_foot/animations/walk/north-east/frame_007.png"
+            ],
+            "south-west": [
+              "On_foot/animations/walk/south-west/frame_000.png",
+              "On_foot/animations/walk/south-west/frame_001.png",
+              "On_foot/animations/walk/south-west/frame_002.png",
+              "On_foot/animations/walk/south-west/frame_003.png",
+              "On_foot/animations/walk/south-west/frame_004.png",
+              "On_foot/animations/walk/south-west/frame_005.png",
+              "On_foot/animations/walk/south-west/frame_006.png",
+              "On_foot/animations/walk/south-west/frame_007.png"
+            ],
+            "south": [
+              "On_foot/animations/walk/south/frame_000.png",
+              "On_foot/animations/walk/south/frame_001.png",
+              "On_foot/animations/walk/south/frame_002.png",
+              "On_foot/animations/walk/south/frame_003.png",
+              "On_foot/animations/walk/south/frame_004.png",
+              "On_foot/animations/walk/south/frame_005.png",
+              "On_foot/animations/walk/south/frame_006.png",
+              "On_foot/animations/walk/south/frame_007.png"
+            ],
+            "south-east": [
+              "On_foot/animations/walk/south-east/frame_000.png",
+              "On_foot/animations/walk/south-east/frame_001.png",
+              "On_foot/animations/walk/south-east/frame_002.png",
+              "On_foot/animations/walk/south-east/frame_003.png",
+              "On_foot/animations/walk/south-east/frame_004.png",
+              "On_foot/animations/walk/south-east/frame_005.png",
+              "On_foot/animations/walk/south-east/frame_006.png",
+              "On_foot/animations/walk/south-east/frame_007.png"
+            ],
+            "west": [
+              "On_foot/animations/walk/west/frame_000.png",
+              "On_foot/animations/walk/west/frame_001.png",
+              "On_foot/animations/walk/west/frame_002.png",
+              "On_foot/animations/walk/west/frame_003.png",
+              "On_foot/animations/walk/west/frame_004.png",
+              "On_foot/animations/walk/west/frame_005.png",
+              "On_foot/animations/walk/west/frame_006.png",
+              "On_foot/animations/walk/west/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T20:51:01.474673"
+}

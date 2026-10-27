@@ -22,7 +22,7 @@ const DIFFICULTIES := {
 	"ludicrous": {"label": "Ludicrous", "wkg": 1.2, "tier": 2, "race": 0.8, "blurb": "Rivals race at 80% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
-const MAX_RIVALS := 7
+const MAX_RIVALS := 8
 
 var bikes: Array = [
 	{"name": "Rusty Trash Bike", "price": 0, "mass": 18.0, "cda": 0.52, "crr": 0.013, "hp": 60.0, "gravel": 1.0, "turn": 0.85,
@@ -38,7 +38,11 @@ var bikes: Array = [
 	# "fixed": one gear (Trainer.FIXED_GEAR), no shifting and no brakes
 	{"name": "Fixie", "price": 2000, "mass": 8.6, "cda": 0.36, "crr": 0.006, "hp": 95.0, "gravel": 1.1, "turn": 1.1, "fixed": true,
 		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome."},
+	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
+	{"name": "Hoofy Bike", "price": 0, "gift": true, "mass": 16.5, "cda": 0.49, "crr": 0.0115, "hp": 70.0, "gravel": 0.95, "turn": 0.9,
+		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
 ]
+const HOOFY := 6   # the Hoofy Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
@@ -51,6 +55,8 @@ var equipped := 0
 var deliveries := 0
 var race_wins := 0
 var player_name := "Rookie"
+const RIDERS := {"boy": {"label": "Rookie Boy", "sheet": "rookie_boy"}, "girl": {"label": "Rookie Girl", "sheet": "rookie_girl"}}
+var rider := "boy"            # which Rookie you ride as: "boy" or "girl" (picked in the rider setup)
 
 # rider settings
 var ftp := 200.0              # watts
@@ -138,6 +144,17 @@ func buy_bike(i: int) -> bool:
 	return true
 
 
+## A bike given for free (Santa's present): yours, fresh, and ridden away. False if you already have it.
+func give_bike(i: int) -> bool:
+	if owned.has(i):
+		return false
+	owned.append(i)
+	hp[i] = bikes[i]["hp"]
+	equipped = i
+	save_game()
+	return true
+
+
 func repair_cost() -> int:
 	return int(ceilf((float(bike()["hp"]) - bike_hp()) * 1.5))
 
@@ -189,6 +206,11 @@ func fixed_gear() -> bool:
 	return bike().get("fixed", false)
 
 
+func set_rider(r: String) -> void:
+	rider = r if RIDERS.has(r) else "boy"
+	Sprites.player_sheet = RIDERS[rider]["sheet"]
+
+
 func set_rival_count(n: int) -> void:
 	rival_count = clampi(n, 1, MAX_RIVALS)
 	Talk.set_count(rival_count)
@@ -234,7 +256,12 @@ func new_game() -> void:
 	money_changed.emit()
 
 
+var no_save := OS.has_environment("PIZZA_NO_SAVE")
+
+
 func save_game() -> void:
+	if no_save:   # dev helpers (tests, screenshot runs, the event viewer) never touch the player's save
+		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		return
@@ -243,7 +270,7 @@ func save_game() -> void:
 		hp_out[str(k)] = hp[k]
 	f.store_string(JSON.stringify({"money": money, "owned": owned, "hp": hp_out, "equipped": equipped,
 		"deliveries": deliveries, "race_wins": race_wins,
-		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done,
+		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done, "rider": rider,
 		"season": Season.choice}))
 
 
@@ -277,6 +304,7 @@ func load_game() -> void:
 	difficulty = d.get("difficulty", difficulty) if DIFFICULTIES.has(d.get("difficulty", "")) else "medium"
 	rival_count = clampi(int(d.get("rival_count", rival_count)), 1, MAX_RIVALS)
 	setup_done = bool(d.get("setup_done", false))
+	set_rider(str(d.get("rider", "boy")))
 	Season.set_choice(str(d.get("season", "auto")))
 	if not owned.has(equipped):
 		equipped = 0

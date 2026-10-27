@@ -1,0 +1,61 @@
+{
+  "group_id": "f6638099-f27b-40dc-9966-8990c808cfae",
+  "states": [
+    {
+      "character": {
+        "id": "06607f07-72e6-442a-9337-e7c0508f64b3",
+        "name": "Idle",
+        "prompt": "cheerful cartoon friendly older man in a green cardigan and flat cap, holding a wrapped gift box with a bow high above their head with both hands, arms raised overhead",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T18:34:58.550731+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "wave": {
+            "south": [
+              "Idle/animations/wave/south/frame_000.png",
+              "Idle/animations/wave/south/frame_001.png",
+              "Idle/animations/wave/south/frame_002.png",
+              "Idle/animations/wave/south/frame_003.png",
+              "Idle/animations/wave/south/frame_004.png",
+              "Idle/animations/wave/south/frame_005.png",
+              "Idle/animations/wave/south/frame_006.png",
+              "Idle/animations/wave/south/frame_007.png"
+            ]
+          },
+          "idle": {
+            "south": [
+              "Idle/animations/idle/south/frame_000.png",
+              "Idle/animations/idle/south/frame_001.png",
+              "Idle/animations/idle/south/frame_002.png",
+              "Idle/animations/idle/south/frame_003.png",
+              "Idle/animations/idle/south/frame_004.png",
+              "Idle/animations/idle/south/frame_005.png",
+              "Idle/animations/idle/south/frame_006.png",
+              "Idle/animations/idle/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T18:42:03.563522"
+}

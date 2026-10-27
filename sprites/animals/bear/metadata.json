@@ -1,0 +1,81 @@
+{
+  "group_id": "32fe26da-0337-40a9-ba53-5489af3efc0e",
+  "states": [
+    {
+      "character": {
+        "id": "5a73efe1-8f12-488c-abc6-4379a7b8e367",
+        "name": "Idle",
+        "prompt": "a big brown bear standing on all four legs, thick fur, round ears, lighter tan muzzle, friendly cartoon style",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "bear",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:49:59.522475+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "east": [
+              "Idle/animations/idle/east/frame_000.png",
+              "Idle/animations/idle/east/frame_001.png",
+              "Idle/animations/idle/east/frame_002.png",
+              "Idle/animations/idle/east/frame_003.png",
+              "Idle/animations/idle/east/frame_004.png",
+              "Idle/animations/idle/east/frame_005.png",
+              "Idle/animations/idle/east/frame_006.png",
+              "Idle/animations/idle/east/frame_007.png",
+              "Idle/animations/idle/east/frame_008.png",
+              "Idle/animations/idle/east/frame_009.png",
+              "Idle/animations/idle/east/frame_010.png",
+              "Idle/animations/idle/east/frame_011.png",
+              "Idle/animations/idle/east/frame_012.png",
+              "Idle/animations/idle/east/frame_013.png",
+              "Idle/animations/idle/east/frame_014.png"
+            ]
+          },
+          "run": {
+            "east": [
+              "Idle/animations/run/east/frame_000.png",
+              "Idle/animations/run/east/frame_001.png",
+              "Idle/animations/run/east/frame_002.png",
+              "Idle/animations/run/east/frame_003.png",
+              "Idle/animations/run/east/frame_004.png",
+              "Idle/animations/run/east/frame_005.png",
+              "Idle/animations/run/east/frame_006.png",
+              "Idle/animations/run/east/frame_007.png"
+            ]
+          },
+          "roar": {
+            "east": [
+              "Idle/animations/roar/east/frame_000.png",
+              "Idle/animations/roar/east/frame_001.png",
+              "Idle/animations/roar/east/frame_002.png",
+              "Idle/animations/roar/east/frame_003.png",
+              "Idle/animations/roar/east/frame_004.png",
+              "Idle/animations/roar/east/frame_005.png",
+              "Idle/animations/roar/east/frame_006.png",
+              "Idle/animations/roar/east/frame_007.png",
+              "Idle/animations/roar/east/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:00:27.920548"
+}

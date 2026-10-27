@@ -1,0 +1,36 @@
+{
+  "group_id": "62461a24-7b9c-4672-9069-600adca8b5a9",
+  "states": [
+    {
+      "character": {
+        "id": "6fc36819-5eca-4d47-aeef-9bf6ee51af5c",
+        "name": "Idle",
+        "prompt": "ice skater in a blue scarf and beanie gliding on ice skates with arms held out",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:25:38.487506+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:29:21.124519"
+}

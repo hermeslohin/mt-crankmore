@@ -1,0 +1,91 @@
+{
+  "group_id": "1902a0de-0b27-41a4-9fae-9517d72886e1",
+  "states": [
+    {
+      "character": {
+        "id": "74fcfa11-791e-4d6c-b4a5-bb23bcd9ef60",
+        "name": "Idle",
+        "prompt": "cheerful elderly Italian grandmother pizza baker (nonna) with a grey hair bun, a floral apron over a red cardigan, a wooden rolling pin tucked in the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:22:42.272016+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "tap": {
+            "south": [
+              "Idle/animations/tap/south/frame_000.png",
+              "Idle/animations/tap/south/frame_001.png",
+              "Idle/animations/tap/south/frame_002.png",
+              "Idle/animations/tap/south/frame_003.png",
+              "Idle/animations/tap/south/frame_004.png",
+              "Idle/animations/tap/south/frame_005.png",
+              "Idle/animations/tap/south/frame_006.png",
+              "Idle/animations/tap/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "83f619e4-e93e-4362-9662-b8a84eaab4c3",
+        "name": "Holding pizza",
+        "prompt": "cheerful elderly Italian grandmother pizza baker (nonna) with a grey hair bun, a floral apron over a red cardigan, a wooden rolling pin tucked in the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:25:33.360345+00:00"
+      },
+      "folder": "Holding_pizza",
+      "frames": {
+        "rotations": {
+          "south": "Holding_pizza/rotations/south.png",
+          "south-east": "Holding_pizza/rotations/south-east.png",
+          "east": "Holding_pizza/rotations/east.png",
+          "north-east": "Holding_pizza/rotations/north-east.png",
+          "north": "Holding_pizza/rotations/north.png",
+          "north-west": "Holding_pizza/rotations/north-west.png",
+          "west": "Holding_pizza/rotations/west.png",
+          "south-west": "Holding_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "dance": {
+            "south": [
+              "Holding_pizza/animations/dance/south/frame_000.png",
+              "Holding_pizza/animations/dance/south/frame_001.png",
+              "Holding_pizza/animations/dance/south/frame_002.png",
+              "Holding_pizza/animations/dance/south/frame_003.png",
+              "Holding_pizza/animations/dance/south/frame_004.png",
+              "Holding_pizza/animations/dance/south/frame_005.png",
+              "Holding_pizza/animations/dance/south/frame_006.png",
+              "Holding_pizza/animations/dance/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-25T23:35:24.163966"
+}

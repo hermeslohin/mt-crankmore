@@ -1,0 +1,313 @@
+{
+  "group_id": "78bb0528-9b30-4aee-aff4-6c05d4808a74",
+  "states": [
+    {
+      "character": {
+        "id": "461a206e-22a2-4c65-9bfe-d78f8f5ddd5f",
+        "name": "Idle",
+        "prompt": "cheerful cartoon firefighter woman in a dark navy turnout coat with yellow reflective stripes, yellow fire helmet, black boots, carrying an axe",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T18:35:17.722162+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "walk": {
+            "north-west": [
+              "Idle/animations/walk/north-west/frame_000.png",
+              "Idle/animations/walk/north-west/frame_001.png",
+              "Idle/animations/walk/north-west/frame_002.png",
+              "Idle/animations/walk/north-west/frame_003.png",
+              "Idle/animations/walk/north-west/frame_004.png",
+              "Idle/animations/walk/north-west/frame_005.png",
+              "Idle/animations/walk/north-west/frame_006.png",
+              "Idle/animations/walk/north-west/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/walk/north-east/frame_000.png",
+              "Idle/animations/walk/north-east/frame_001.png",
+              "Idle/animations/walk/north-east/frame_002.png",
+              "Idle/animations/walk/north-east/frame_003.png",
+              "Idle/animations/walk/north-east/frame_004.png",
+              "Idle/animations/walk/north-east/frame_005.png",
+              "Idle/animations/walk/north-east/frame_006.png",
+              "Idle/animations/walk/north-east/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png",
+              "Idle/animations/walk/east/frame_006.png",
+              "Idle/animations/walk/east/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/walk/south-east/frame_000.png",
+              "Idle/animations/walk/south-east/frame_001.png",
+              "Idle/animations/walk/south-east/frame_002.png",
+              "Idle/animations/walk/south-east/frame_003.png",
+              "Idle/animations/walk/south-east/frame_004.png",
+              "Idle/animations/walk/south-east/frame_005.png",
+              "Idle/animations/walk/south-east/frame_006.png",
+              "Idle/animations/walk/south-east/frame_007.png"
+            ],
+            "south-west": [
+              "Idle/animations/walk/south-west/frame_000.png",
+              "Idle/animations/walk/south-west/frame_001.png",
+              "Idle/animations/walk/south-west/frame_002.png",
+              "Idle/animations/walk/south-west/frame_003.png",
+              "Idle/animations/walk/south-west/frame_004.png",
+              "Idle/animations/walk/south-west/frame_005.png",
+              "Idle/animations/walk/south-west/frame_006.png",
+              "Idle/animations/walk/south-west/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png",
+              "Idle/animations/walk/west/frame_006.png",
+              "Idle/animations/walk/west/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png",
+              "Idle/animations/walk/north/frame_006.png",
+              "Idle/animations/walk/north/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png",
+              "Idle/animations/walk/south/frame_006.png",
+              "Idle/animations/walk/south/frame_007.png"
+            ]
+          },
+          "spray": {
+            "south-west": [
+              "Idle/animations/spray/south-west/frame_000.png",
+              "Idle/animations/spray/south-west/frame_001.png",
+              "Idle/animations/spray/south-west/frame_002.png",
+              "Idle/animations/spray/south-west/frame_003.png",
+              "Idle/animations/spray/south-west/frame_004.png",
+              "Idle/animations/spray/south-west/frame_005.png",
+              "Idle/animations/spray/south-west/frame_006.png",
+              "Idle/animations/spray/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "Idle/animations/spray/north-east/frame_000.png",
+              "Idle/animations/spray/north-east/frame_001.png",
+              "Idle/animations/spray/north-east/frame_002.png",
+              "Idle/animations/spray/north-east/frame_003.png",
+              "Idle/animations/spray/north-east/frame_004.png",
+              "Idle/animations/spray/north-east/frame_005.png",
+              "Idle/animations/spray/north-east/frame_006.png",
+              "Idle/animations/spray/north-east/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/spray/south-east/frame_000.png",
+              "Idle/animations/spray/south-east/frame_001.png",
+              "Idle/animations/spray/south-east/frame_002.png",
+              "Idle/animations/spray/south-east/frame_003.png",
+              "Idle/animations/spray/south-east/frame_004.png",
+              "Idle/animations/spray/south-east/frame_005.png",
+              "Idle/animations/spray/south-east/frame_006.png",
+              "Idle/animations/spray/south-east/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/spray/north/frame_000.png",
+              "Idle/animations/spray/north/frame_001.png",
+              "Idle/animations/spray/north/frame_002.png",
+              "Idle/animations/spray/north/frame_003.png",
+              "Idle/animations/spray/north/frame_004.png",
+              "Idle/animations/spray/north/frame_005.png",
+              "Idle/animations/spray/north/frame_006.png",
+              "Idle/animations/spray/north/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/spray/south/frame_000.png",
+              "Idle/animations/spray/south/frame_001.png",
+              "Idle/animations/spray/south/frame_002.png",
+              "Idle/animations/spray/south/frame_003.png",
+              "Idle/animations/spray/south/frame_004.png",
+              "Idle/animations/spray/south/frame_005.png",
+              "Idle/animations/spray/south/frame_006.png",
+              "Idle/animations/spray/south/frame_007.png"
+            ],
+            "west": [
+              "Idle/animations/spray/west/frame_000.png",
+              "Idle/animations/spray/west/frame_001.png",
+              "Idle/animations/spray/west/frame_002.png",
+              "Idle/animations/spray/west/frame_003.png",
+              "Idle/animations/spray/west/frame_004.png",
+              "Idle/animations/spray/west/frame_005.png",
+              "Idle/animations/spray/west/frame_006.png",
+              "Idle/animations/spray/west/frame_007.png"
+            ],
+            "north-west": [
+              "Idle/animations/spray/north-west/frame_000.png",
+              "Idle/animations/spray/north-west/frame_001.png",
+              "Idle/animations/spray/north-west/frame_002.png",
+              "Idle/animations/spray/north-west/frame_003.png",
+              "Idle/animations/spray/north-west/frame_004.png",
+              "Idle/animations/spray/north-west/frame_005.png",
+              "Idle/animations/spray/north-west/frame_006.png",
+              "Idle/animations/spray/north-west/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/spray/east/frame_000.png",
+              "Idle/animations/spray/east/frame_001.png",
+              "Idle/animations/spray/east/frame_002.png",
+              "Idle/animations/spray/east/frame_003.png",
+              "Idle/animations/spray/east/frame_004.png",
+              "Idle/animations/spray/east/frame_005.png",
+              "Idle/animations/spray/east/frame_006.png",
+              "Idle/animations/spray/east/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "b6e1b737-fce5-4119-afab-4cfffdfb4f6d",
+        "name": "with hose",
+        "prompt": "cheerful cartoon firefighter woman in a dark navy turnout coat with yellow reflective stripes, yellow fire helmet, black boots, carrying an axe",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T19:11:32.299512+00:00"
+      },
+      "folder": "with_hose",
+      "frames": {
+        "rotations": {
+          "south": "with_hose/rotations/south.png",
+          "south-east": "with_hose/rotations/south-east.png",
+          "east": "with_hose/rotations/east.png",
+          "north-east": "with_hose/rotations/north-east.png",
+          "north": "with_hose/rotations/north.png",
+          "north-west": "with_hose/rotations/north-west.png",
+          "west": "with_hose/rotations/west.png",
+          "south-west": "with_hose/rotations/south-west.png"
+        },
+        "animations": {
+          "spray": {
+            "south": [
+              "with_hose/animations/spray/south/frame_000.png",
+              "with_hose/animations/spray/south/frame_001.png",
+              "with_hose/animations/spray/south/frame_002.png",
+              "with_hose/animations/spray/south/frame_003.png",
+              "with_hose/animations/spray/south/frame_004.png",
+              "with_hose/animations/spray/south/frame_005.png",
+              "with_hose/animations/spray/south/frame_006.png",
+              "with_hose/animations/spray/south/frame_007.png"
+            ],
+            "west": [
+              "with_hose/animations/spray/west/frame_000.png",
+              "with_hose/animations/spray/west/frame_001.png",
+              "with_hose/animations/spray/west/frame_002.png",
+              "with_hose/animations/spray/west/frame_003.png",
+              "with_hose/animations/spray/west/frame_004.png",
+              "with_hose/animations/spray/west/frame_005.png",
+              "with_hose/animations/spray/west/frame_006.png",
+              "with_hose/animations/spray/west/frame_007.png"
+            ],
+            "south-west": [
+              "with_hose/animations/spray/south-west/frame_000.png",
+              "with_hose/animations/spray/south-west/frame_001.png",
+              "with_hose/animations/spray/south-west/frame_002.png",
+              "with_hose/animations/spray/south-west/frame_003.png",
+              "with_hose/animations/spray/south-west/frame_004.png",
+              "with_hose/animations/spray/south-west/frame_005.png",
+              "with_hose/animations/spray/south-west/frame_006.png",
+              "with_hose/animations/spray/south-west/frame_007.png"
+            ],
+            "north-west": [
+              "with_hose/animations/spray/north-west/frame_000.png",
+              "with_hose/animations/spray/north-west/frame_001.png",
+              "with_hose/animations/spray/north-west/frame_002.png",
+              "with_hose/animations/spray/north-west/frame_003.png",
+              "with_hose/animations/spray/north-west/frame_004.png",
+              "with_hose/animations/spray/north-west/frame_005.png",
+              "with_hose/animations/spray/north-west/frame_006.png",
+              "with_hose/animations/spray/north-west/frame_007.png"
+            ],
+            "north": [
+              "with_hose/animations/spray/north/frame_000.png",
+              "with_hose/animations/spray/north/frame_001.png",
+              "with_hose/animations/spray/north/frame_002.png",
+              "with_hose/animations/spray/north/frame_003.png",
+              "with_hose/animations/spray/north/frame_004.png",
+              "with_hose/animations/spray/north/frame_005.png",
+              "with_hose/animations/spray/north/frame_006.png",
+              "with_hose/animations/spray/north/frame_007.png"
+            ],
+            "east": [
+              "with_hose/animations/spray/east/frame_000.png",
+              "with_hose/animations/spray/east/frame_001.png",
+              "with_hose/animations/spray/east/frame_002.png",
+              "with_hose/animations/spray/east/frame_003.png",
+              "with_hose/animations/spray/east/frame_004.png",
+              "with_hose/animations/spray/east/frame_005.png",
+              "with_hose/animations/spray/east/frame_006.png",
+              "with_hose/animations/spray/east/frame_007.png"
+            ],
+            "north-east": [
+              "with_hose/animations/spray/north-east/frame_000.png",
+              "with_hose/animations/spray/north-east/frame_001.png",
+              "with_hose/animations/spray/north-east/frame_002.png",
+              "with_hose/animations/spray/north-east/frame_003.png",
+              "with_hose/animations/spray/north-east/frame_004.png",
+              "with_hose/animations/spray/north-east/frame_005.png",
+              "with_hose/animations/spray/north-east/frame_006.png",
+              "with_hose/animations/spray/north-east/frame_007.png"
+            ],
+            "south-east": [
+              "with_hose/animations/spray/south-east/frame_000.png",
+              "with_hose/animations/spray/south-east/frame_001.png",
+              "with_hose/animations/spray/south-east/frame_002.png",
+              "with_hose/animations/spray/south-east/frame_003.png",
+              "with_hose/animations/spray/south-east/frame_004.png",
+              "with_hose/animations/spray/south-east/frame_005.png",
+              "with_hose/animations/spray/south-east/frame_006.png",
+              "with_hose/animations/spray/south-east/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T19:26:08.374534"
+}

@@ -1,0 +1,175 @@
+{
+  "group_id": "59073e16-891e-46c7-b648-d0194474911c",
+  "states": [
+    {
+      "character": {
+        "id": "39fe3bb3-bc52-4a28-89ec-c977c1643e04",
+        "name": "Idle",
+        "prompt": "musical pizza baker, a purple beret, a bright pink vest with a bow tie over a white shirt, a small gold musical note pin, flour on the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:25:19.493217+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "tap": {
+            "south": [
+              "Idle/animations/tap/south/frame_000.png",
+              "Idle/animations/tap/south/frame_001.png",
+              "Idle/animations/tap/south/frame_002.png",
+              "Idle/animations/tap/south/frame_003.png",
+              "Idle/animations/tap/south/frame_004.png",
+              "Idle/animations/tap/south/frame_005.png",
+              "Idle/animations/tap/south/frame_006.png",
+              "Idle/animations/tap/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "6c885d9c-ed20-466c-9296-40c15f437596",
+        "name": "Holding pizza",
+        "prompt": "musical pizza baker, a purple beret, a bright pink vest with a bow tie over a white shirt, a small gold musical note pin, flour on the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-25T23:30:19.412289+00:00"
+      },
+      "folder": "Holding_pizza",
+      "frames": {
+        "rotations": {
+          "south": "Holding_pizza/rotations/south.png",
+          "south-east": "Holding_pizza/rotations/south-east.png",
+          "east": "Holding_pizza/rotations/east.png",
+          "north-east": "Holding_pizza/rotations/north-east.png",
+          "north": "Holding_pizza/rotations/north.png",
+          "north-west": "Holding_pizza/rotations/north-west.png",
+          "west": "Holding_pizza/rotations/west.png",
+          "south-west": "Holding_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "dance": {
+            "south": [
+              "Holding_pizza/animations/dance/south/frame_000.png",
+              "Holding_pizza/animations/dance/south/frame_001.png",
+              "Holding_pizza/animations/dance/south/frame_002.png",
+              "Holding_pizza/animations/dance/south/frame_003.png",
+              "Holding_pizza/animations/dance/south/frame_004.png",
+              "Holding_pizza/animations/dance/south/frame_005.png",
+              "Holding_pizza/animations/dance/south/frame_006.png",
+              "Holding_pizza/animations/dance/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "de9aa6e3-3a1c-4abe-b3f0-15d28c4f2024",
+        "name": "Winter",
+        "prompt": "musical pizza baker, a purple beret, a bright pink vest with a bow tie over a white shirt, a small gold musical note pin, flour on the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:41:18.369108+00:00"
+      },
+      "folder": "Winter",
+      "frames": {
+        "rotations": {
+          "south": "Winter/rotations/south.png",
+          "south-east": "Winter/rotations/south-east.png",
+          "east": "Winter/rotations/east.png",
+          "north-east": "Winter/rotations/north-east.png",
+          "north": "Winter/rotations/north.png",
+          "north-west": "Winter/rotations/north-west.png",
+          "west": "Winter/rotations/west.png",
+          "south-west": "Winter/rotations/south-west.png"
+        },
+        "animations": {
+          "tap": {
+            "south": [
+              "Winter/animations/tap/south/frame_000.png",
+              "Winter/animations/tap/south/frame_001.png",
+              "Winter/animations/tap/south/frame_002.png",
+              "Winter/animations/tap/south/frame_003.png",
+              "Winter/animations/tap/south/frame_004.png",
+              "Winter/animations/tap/south/frame_005.png",
+              "Winter/animations/tap/south/frame_006.png",
+              "Winter/animations/tap/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "character": {
+        "id": "688f8ddc-6f60-47ba-bd20-2256a15024a0",
+        "name": "Winter holding pizza",
+        "prompt": "musical pizza baker, a purple beret, a bright pink vest with a bow tie over a white shirt, a small gold musical note pin, flour on the apron, standing facing the viewer",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-26T00:42:43.790569+00:00"
+      },
+      "folder": "Winter_holding_pizza",
+      "frames": {
+        "rotations": {
+          "south": "Winter_holding_pizza/rotations/south.png",
+          "south-east": "Winter_holding_pizza/rotations/south-east.png",
+          "east": "Winter_holding_pizza/rotations/east.png",
+          "north-east": "Winter_holding_pizza/rotations/north-east.png",
+          "north": "Winter_holding_pizza/rotations/north.png",
+          "north-west": "Winter_holding_pizza/rotations/north-west.png",
+          "west": "Winter_holding_pizza/rotations/west.png",
+          "south-west": "Winter_holding_pizza/rotations/south-west.png"
+        },
+        "animations": {
+          "dance": {
+            "south": [
+              "Winter_holding_pizza/animations/dance/south/frame_000.png",
+              "Winter_holding_pizza/animations/dance/south/frame_001.png",
+              "Winter_holding_pizza/animations/dance/south/frame_002.png",
+              "Winter_holding_pizza/animations/dance/south/frame_003.png",
+              "Winter_holding_pizza/animations/dance/south/frame_004.png",
+              "Winter_holding_pizza/animations/dance/south/frame_005.png",
+              "Winter_holding_pizza/animations/dance/south/frame_006.png",
+              "Winter_holding_pizza/animations/dance/south/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-26T00:47:45.841476"
+}

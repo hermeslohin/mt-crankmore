@@ -10,11 +10,11 @@ var race: Node2D
 var hud: Control
 var title_t := 0.0
 var shot_at := Vector2.INF   # dev helper: camera pinned on a world point for screenshots
-var quitting := false
+var viewer := {}             # dev helper: the event viewer (PIZZA_DEBUG=eventviewer), see _debug_viewer
 
 
 func _ready() -> void:
-	get_tree().auto_accept_quit = false   # closing the window goes through _quit, so the ride gets posted first
+	get_tree().auto_accept_quit = false   # closing the window goes through _quit, so the game gets saved
 	# fill the screen (the dev helpers keep the plain window so screenshots stay predictable)
 	if not OS.has_environment("PIZZA_DEBUG") and DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -33,6 +33,18 @@ func _ready() -> void:
 	sky.add_child(weather)
 	if OS.has_environment("PIZZA_SEASON"):   # dev helper: PIZZA_SEASON=spring|summer|fall|winter
 		Season.set_choice(OS.get_environment("PIZZA_SEASON"))
+	var dusk := CanvasLayer.new()   # night and rain clouds over the world and the weather, under the HUD
+	dusk.layer = 6
+	add_child(dusk)
+	var night := preload("res://scripts/night.gd").new()
+	night.source = func(): return city.night_lights() if mode == Mode.CITY else race.night_lights() if mode == Mode.RACE else []
+	dusk.add_child(night)
+	var fx_layer := CanvasLayer.new()   # fireworks, bright over the dark
+	fx_layer.layer = 7
+	add_child(fx_layer)
+	var fx := preload("res://scripts/sky_fx.gd").new()
+	fx.city = city
+	fx_layer.add_child(fx)
 	var layer := CanvasLayer.new()
 	layer.layer = 10
 	add_child(layer)
@@ -93,10 +105,24 @@ func _ready() -> void:
 			_debug_gears()
 		"ride":
 			_debug_ride()
+		"events":
+			_debug_events()
+		"eventviewer":
+			_debug_viewer()
+		"wipeout":
+			_debug_wipeout()
+		"animals":
+			_debug_animals()
+		"buildings":
+			_start_game()
+			var count := {}
+			for b in city.buildings:
+				var key := "%s %dx%d" % [b["kind"], int(b["size"].x), int(b["size"].y)]
+				count[key] = int(count.get(key, 0)) + 1
+			print("BUILDINGS total=%d %s" % [city.buildings.size(), count])
+			get_tree().quit()
 		"seasons":
 			_debug_seasons()
-		"bake_bike":
-			_debug_bake_bike()
 		"link":
 			await get_tree().create_timer(3.0).timeout
 			print("LINK: ", Trainer.status_text(), " power=", int(Trainer.power()), " cadence=", int(Trainer.cadence()),
@@ -132,29 +158,32 @@ func _notification(what: int) -> void:
 		_quit()
 
 
-## Quitting (the title screen's Quit or closing the window) posts the ride to Strava first when you're linked.
-## If posting fails the ride stays saved and can be posted next time.
+## Quitting (the title screen's Quit or closing the window) saves the game. The ride isn't posted: it stays saved
+## until you post it from the Strava menu or the pause menu.
 func _quit() -> void:
-	if quitting:
-		return
-	quitting = true
-	Game.save_game()
-	if not Strava.linked() or not Ride.can_post() or Strava.busy():
+	if not viewer.is_empty():   # the event viewer never saves (Game.no_save), so there's nothing to put back
 		get_tree().quit()
 		return
-	city.active = false
-	race.active = false
-	hud.open_menu(func():
-		return {"title": "Posting to Strava", "sub": "%s\n%s" % [Ride.summary(), Strava.msg],
-			"items": [{"label": "Quit without waiting", "fn": get_tree().quit,
-				"detail": "The ride stays saved and is posted next time you quit."}], "live": true}, true)
-	await Strava.post_ride()
-	await get_tree().create_timer(1.5 if Strava.state == "done" else 5.0).timeout
+	Game.save_game()
 	get_tree().quit()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
+	if not viewer.is_empty() and k != null and k.pressed and not k.echo:
+		match k.keycode:
+			KEY_BRACKETRIGHT, KEY_N, KEY_PAGEDOWN:
+				_viewer_go(int(viewer["i"]) + 1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_BRACKETLEFT, KEY_P, KEY_PAGEUP:
+				_viewer_go(int(viewer["i"]) - 1)
+				get_viewport().set_input_as_handled()
+				return
+			KEY_R:
+				_viewer_go(int(viewer["i"]))
+				get_viewport().set_input_as_handled()
+				return
 	if k != null and k.pressed and not k.echo and (k.keycode == KEY_F11 or (k.keycode == KEY_ENTER and k.alt_pressed)):
 		var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -163,6 +192,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	title_t += delta
+	if OS.has_environment("PIZZA_FPS") and Engine.get_process_frames() % 60 == 0:   # dev helper: print the frame rate
+		print("fps %d" % Engine.get_frames_per_second())
 	var target: Vector2
 	match mode:
 		Mode.TITLE:
@@ -237,18 +268,36 @@ func _open_trainer_menu() -> void:
 	hud.open_menu(_trainer_menu)
 
 
+## A device's name as the player sees it: Wi-Fi trainers (Direct Connect) say so, Bluetooth ones don't.
+func _device_name(dev_name: String, address: String) -> String:
+	return dev_name + " (Wi-Fi)" if address.begins_with("wifi:") else dev_name
+
+
+## Disconnecting a connected device takes two presses within 4 s, so a stray press doesn't drop your trainer.
+var _disconnect_armed := ""
+var _disconnect_at := 0
+func _confirm_disconnect(role: String) -> void:
+	if _disconnect_armed == role and Time.get_ticks_msec() - _disconnect_at < 4000:
+		_disconnect_armed = ""
+		Trainer.disconnect_device(role)
+	else:
+		_disconnect_armed = role
+		_disconnect_at = Time.get_ticks_msec()
+
+
 func _role_line(label: String, role: String, live_text: String) -> String:
 	var info := Trainer.role_info(role)
 	var st: String = info.get("state", "idle")
+	var nm := _device_name(info.get("name", ""), info.get("address", ""))
 	match st:
 		"connected":
-			return "%s: %s - CONNECTED %s" % [label, info.get("name", ""), live_text]
+			return "%s: %s - CONNECTED %s" % [label, nm, live_text]
 		"connecting":
-			return "%s: connecting to %s..." % [label, info.get("name", "")]
+			return "%s: connecting to %s..." % [label, nm]
 		"searching":
-			return "%s: looking for %s... (wake it up)" % [label, info.get("name", "your device")]
+			return "%s: looking for %s... (wake it up)" % [label, nm if nm != "" else "your device"]
 		"failed":
-			return "%s: couldn't connect to %s - retrying" % [label, info.get("name", "")]
+			return "%s: couldn't connect to %s - retrying" % [label, nm]
 	return "%s: not connected" % label
 
 
@@ -256,7 +305,7 @@ func _trainer_menu() -> Dictionary:
 	var items: Array = []
 	var lines: Array = []
 	if not Trainer.bridge_live:
-		lines.append("Your game talks to your bicycle trainer through a small Bluetooth helper.")
+		lines.append("Your game talks to your bicycle trainer through a small Bluetooth helper (it finds Wi-Fi trainers too).")
 		if Trainer.helper_state == "installing" or Trainer.helper_state == "starting":
 			items.append({"label": "Please wait...", "fn": func(): pass, "enabled": false})
 		elif not Trainer.helper_installed():
@@ -279,7 +328,7 @@ func _trainer_menu() -> Dictionary:
 			lines.append("! " + err)
 		var scanning: bool = Trainer.status.get("scanning", false)
 		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Trainer.scan(true),
-			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: Bluetooth devices only accept one connection."})
+			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer."})
 		var shown := {}
 		for d in Trainer.devices():
 			var role: String = d["kind"]
@@ -287,21 +336,30 @@ func _trainer_menu() -> Dictionary:
 			shown[addr] = true
 			var info := Trainer.role_info(role)
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
-			var tag := "TRAINER " if role == "trainer" else "CONTROLS"
-			var signal_bars := "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
-			if connected:
-				items.append({"label": "%s  %s  [connected - disconnect]" % [tag, d["name"]], "fn": Trainer.disconnect_device.bind(role),
-					"detail": "Select to disconnect this device."})
+			var pm: bool = d.get("power_meter", false)   # power and cadence only: no resistance for hills or gears
+			var wifi: bool = d.get("wifi", false)         # Direct Connect over the network: no signal strength to show
+			var tag := ("POWER   " if pm else "TRAINER ") if role == "trainer" else "CONTROLS"
+			var nm := _device_name(d["name"], addr)
+			var signal_bars := "" if wifi else "  " + "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
+			if connected and info.get("state", "") != "connected":
+				# still connecting (it can take 10 s): selecting it again must not cancel it
+				items.append({"label": "%s  %s  [connecting...]" % [tag, nm], "fn": func(): pass,
+					"detail": "Connecting - give it a few seconds. (Pedal or press a button if it's asleep.)"})
+			elif connected:
+				var armed: bool = _disconnect_armed == role and Time.get_ticks_msec() - _disconnect_at < 4000
+				items.append({"label": "%s  %s  [connected%s]" % [tag, nm, " - select again to disconnect" if armed else ""],
+					"fn": _confirm_disconnect.bind(role), "detail": "Select twice to disconnect this device."})
 			else:
-				items.append({"label": "%s  %s  %s" % [tag, d["name"], signal_bars], "fn": Trainer.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % ("trainer (power, cadence, climbs)" if role == "trainer" else "handlebar controllers (buttons)")})
+				items.append({"label": "%s  %s%s" % [tag, nm, signal_bars], "fn": Trainer.connect_device.bind(role, addr),
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")
+						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")})
 		for role in ["trainer", "controller"]:
 			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
-				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", info.get("name", "device")],
+				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", _device_name(info.get("name", "device"), info.get("address", ""))],
 					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
 		if Trainer.devices().is_empty():
-			lines.append("No trainers or handlebar controllers found yet.")
+			lines.append("No trainers, power meters or handlebar controllers found yet.")
 	items.append({"label": "Back", "fn": func():
 		Trainer.scan(false)
 		_show_title(), "detail": ""})
@@ -336,7 +394,7 @@ func _strava_menu(back: Callable) -> Dictionary:
 			Strava.client_secret = ""
 			Strava._save(), "detail": "Clears the Client Secret so you can paste new app details."})
 	else:
-		lines.append(Strava.status_text() + ". Your ride is posted automatically when you quit the game.")
+		lines.append(Strava.status_text() + ". Post your ride here or from the pause menu; it's kept until you do.")
 		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
 		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
 			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
@@ -379,7 +437,7 @@ func _start_or_setup() -> void:
 
 # ---- rider setup ---------------------------------------------------------
 
-## FTP, weight (kg or lbs), difficulty and how many rivals ride. Everything is changed with LEFT / RIGHT,
+## Rider (boy or girl), FTP, weight (kg or lbs), difficulty and how many rivals ride. Everything is changed with LEFT / RIGHT,
 ## so it works from the handlebar D-pad as well as the keyboard. `done` runs when the rider confirms.
 func _open_setup(done: Callable) -> void:
 	var before := {"n": Game.rival_count}
@@ -399,6 +457,9 @@ func _setup_menu(finish: Callable) -> Dictionary:
 	var diff: Dictionary = Game.DIFFICULTIES[Game.difficulty]
 	var names: Array = Talk.roster.slice(0, Game.rival_count).map(func(r): return r["short"])
 	var items: Array = [
+		{"label": "Rider: %s" % Game.RIDERS[Game.rider]["label"], "fn": func(): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
+			"adjust": func(_d: int): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
+			"detail": "Who you ride as: Rookie Boy or Rookie Girl."},
 		{"label": "FTP: %d W" % int(Game.ftp), "fn": func(): pass,
 			"adjust": func(d: int): Game.ftp = clampf(Game.ftp + d * 5.0, 50.0, 600.0),
 			"detail": "Your Functional Threshold Power: roughly the best power you can hold for an hour. Hold LEFT / RIGHT to change it faster. Your W/kg sets how strong the rivals are."},
@@ -434,11 +495,33 @@ func _open_pause() -> void:
 		return {"title": "Paused", "sub": "Money: $%d    Deliveries: %d    Races won: %d" % [Game.money, Game.deliveries, Game.race_wins],
 			"items": [
 				{"label": "Resume", "fn": func(): hud.close_menu(); on_menu_closed()},
+				{"label": "My bikes", "fn": _open_garage, "detail": "Riding the %s. Pick any bike you own." % Game.bike()["name"]},
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
 				_season_item(),
 				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
 				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
 			]})
+
+
+## The garage: every bike you own, the one you're riding marked; pick one to ride it.
+func _open_garage() -> void:
+	hud.open_menu(func():
+		var items: Array = []
+		for i in Game.owned:
+			var b: Dictionary = Game.bikes[i]
+			var riding: bool = i == Game.equipped
+			var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
+			var hp_now: float = Game.hp.get(i, 0.0)
+			items.append({"label": ("%s   [riding]" if riding else "%s") % b["name"], "enabled": not riding,
+				"fn": func():
+					Game.equipped = i
+					Game.save_game()
+					Game.toast.emit("Now riding the %s" % b["name"], Color(0.5, 1.0, 0.6))
+					_open_garage(),
+				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"],
+					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"]]})
+		items.append({"label": "Back", "fn": _open_pause, "detail": ""})
+		return {"title": "My bikes", "sub": "%d bike%s in the garage. Riding: %s" % [Game.owned.size(), "" if Game.owned.size() == 1 else "s", Game.bike()["name"]], "items": items})
 
 
 ## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
@@ -469,6 +552,8 @@ func _on_interact(kind: String) -> void:
 			hud.open_menu(_bike_shop_menu)
 		"race":
 			hud.open_menu(_race_menu)
+		"rescue":
+			_start_rescue()
 
 
 func _bike_shop_menu() -> Dictionary:
@@ -479,6 +564,8 @@ func _bike_shop_menu() -> Dictionary:
 	for i in order:
 		var b: Dictionary = Game.bikes[i]
 		var owned := Game.owned.has(i)
+		if b.get("gift", false) and not owned:
+			continue   # not for sale
 		var label := ""
 		var enabled := true
 		var fn := func(): pass
@@ -519,7 +606,25 @@ func _race_menu() -> Dictionary:
 	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
 
 
+## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
+## quarter of the way up; afterwards you're back where you were in town.
+var rescue_from := {}
+
+func _start_rescue() -> void:
+	rescue_from = {"road": city.rr, "s": city.rs}
+	hud.close_menu()
+	mode = Mode.RACE
+	city.active = false
+	city.visible = false
+	race.visible = true
+	race.rescue = true
+	race.setup(0)
+	race.active = true
+	cam.position = race.cam_target()
+
+
 func _start_race(i: int) -> void:
+	race.rescue = false
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -533,6 +638,13 @@ func _start_race(i: int) -> void:
 
 
 func _on_race_finished(result: Dictionary) -> void:
+	if result.get("rescue", false):
+		hud.open_menu(func():
+			var t: float = result["time"]
+			return {"title": "You saved the skier on Mt. Crankmore!",
+				"sub": "The ski patrol take it from here.\nUp the mountain in %d:%04.1f.     Reward: $%d" % [int(t) / 60, fmod(t, 60.0), result["prize"]],
+				"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
+		return
 	Ride.on_race_finished(result["place"])
 	hud.open_menu(func():
 		var lines := ""
@@ -552,7 +664,9 @@ func _leave_race() -> void:
 	city.visible = true
 	mode = Mode.CITY
 	city.active = true
-	city.place_on(city.zone_anchor("race"))
+	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("race"))
+	race.rescue = false
+	rescue_from = {}
 	city.invuln = 1.5
 	cam.position = city.cam_target()
 
@@ -581,7 +695,7 @@ func _debug_ride() -> void:
 		print("RIDE shot: ", s["kind"], " ", s["file"])
 	Game.deliveries -= 2
 	Ride.reset()
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(path, FileAccess.WRITE).store_string(backup)
 		Ride._load()
 	get_tree().quit()
@@ -612,74 +726,232 @@ func _debug_seasons() -> void:
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s.png" % [out, se, e["kind"]])
 		shot_at = Vector2.INF
 		print("SEASON %s: %s" % [se, seen.keys()])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
 
-## Dev helper: PIZZA_DEBUG=bake_bike [PIZZA_WHO=YOU|Dave|...] [PIZZA_OUT=dir] draws the procedural bike into the sprite
-## sheet format Sprites reads (default output: art/templates/), as a template to paint over: bike.png plus the
-## greyscale _jersey and _frame layers and the _box layer. The layers come from drawing the sheet four times (jersey /
-## frame white or black, box on or off) and keeping the pixels that change. Needs a window (no --headless).
-func _debug_bake_bike() -> void:
-	const FW := 64
-	const FH := 64
-	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else ProjectSettings.globalize_path("res://art/templates")
-	var who := OS.get_environment("PIZZA_WHO") if OS.has_environment("PIZZA_WHO") else "YOU"
+## Dev helper: PIZZA_DEBUG=wipeout [PIZZA_OUT=dir] knocks the player and the first rival down (a frisbee-style hit), then
+## runs the player over with a car, saving a screenshot at several moments of each wipe-out animation.
+## Dev helper: PIZZA_DEBUG=events [PIZZA_OUT=dir] [PIZZA_EVENTS=fire,crime,...] sets off every kind of town happening (see TownEvents) right next to
+## the player and saves a screenshot of each. The player's save file is put back afterwards.
+func _debug_events() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
-	var vp := SubViewport.new()
-	vp.size = Vector2i(FW * Sprites.FRAMES, FH * Sprites.DIRS)
-	vp.transparent_bg = true
-	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	add_child(vp)
-	var canvas := Node2D.new()
-	vp.add_child(canvas)
-	var cfg := {"frame": Color.WHITE, "shirt": Color.WHITE, "box": false}
-	canvas.draw.connect(func():
-		for row in Sprites.DIRS:
-			var w := Vector2.from_angle(row * PI / 4.0)
-			for col in Sprites.FRAMES:
-				var c := Vector2(col * FW + FW / 2, row * FH + FH - Sprites.ANCHOR_UP)
-				BikeDraw.draw(canvas, c, Vector2(w.x - w.y, (w.x + w.y) * 0.5), cfg["frame"], cfg["shirt"], (col + 0.5) * TAU / Sprites.FRAMES, cfg["box"], who, 0.0))
-	var grab := func(frame: Color, shirt: Color, box: bool) -> Image:
-		cfg["frame"] = frame
-		cfg["shirt"] = shirt
-		cfg["box"] = box
-		canvas.queue_redraw()
+	Trainer._autostart_clock = 0.0
+	_start_game()
+	await get_tree().create_timer(1.0).timeout
+	city.events.near = 2.5
+	city.events.far = 5.0
+	city.events.allow_in_view = true
+	city.events.next_t = 999.0
+	var kinds: Array = ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade", "soapbox", "group_ride", "fire", "ambulance", "crime", "fireworks"]
+	if OS.has_environment("PIZZA_EVENTS"):   # just these (comma separated)
+		kinds = Array(OS.get_environment("PIZZA_EVENTS").split(",", false))
+	for kind in kinds:
+		city.events.events.clear()
+		city.events.start(kind)
+		print("event %s: %s" % [kind, "started" if not city.events.events.is_empty() else "skipped (no art or no spot)"])
+		# the call-outs take a while to get going: wait for the truck / ambulance / police car
+		await get_tree().create_timer({"fire": 14.0, "ambulance": 16.0, "crime": 6.0, "hayride": 6.0, "fireworks": 5.0, "group_ride": 2.0}.get(kind, 1.2)).timeout
+		cam.position = city.cam_target()
+		if not city.events.events.is_empty():   # look at where it's happening (the fire, the robber)
+			var ev: Dictionary = city.events.events[0]
+			var focus: Vector2 = (ev["b"]["pos"] + ev["b"]["size"] * 0.5) if ev.has("b") else ev["actors"][1]["pos"] if kind == "crime" \
+				else (ev["car"]["pos"] if ev.has("car") and not (ev["car"] as Dictionary).is_empty() else Vector2.INF)
+			if focus != Vector2.INF:
+				cam.position = Iso.to_screen(focus, 12.0 + Iso.ground_z(focus))
+				await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/event_%s.png" % [out, kind])
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
+		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+		f.store_string(backup)
+		f.close()
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=eventviewer (or tools/event_viewer.sh) is the event viewer: ride around town and step
+## through every happening, call-out and challenge one at a time with ] / N (next), [ / P (back) and R (again).
+## Each starts right by you, in the season and at the time of day it needs, at its place (the town hall, the lake...)
+## if it has one. Nothing in here is saved.
+const VIEWER_SEASON := {"snowball_fight": "winter", "sledding": "winter", "tree_lighting": "winter", "egg_hunt": "spring",
+	"duck_crossing": "spring", "volleyball": "summer", "fishing": "summer", "lemonade": "summer", "trick_or_treat": "fall",
+	"hayride": "fall", "harvest_festival": "fall", "zombie_kids": "fall", "santa": "winter"}
+const VIEWER_HOUR := {"santa": 22.0, "fireworks": 22.0, "movie_night": 20.5, "hot_air_balloon": 6.5, "tree_lighting": 18.5, "trick_or_treat": 18.0, "outage": 22.0}
+
+func _debug_viewer() -> void:
+	Game.no_save = true   # nothing that happens in here touches your save
+	city.events.allow_in_view = true   # start everything right where you can see it
+	viewer = {"i": -1, "status": "",
+		"kinds": ["crowd", "dog", "pigeons", "cat", "band", "busker", "mime", "truck", "ball", "balloon", "siren", "parade",
+			"soapbox", "group_ride", "fire", "ambulance", "crime", "bike_theft", "runaway_dog", "hotrod", "fireworks", "pizza_rush", "hill_sprint", "rescue_run"]
+			+ city.events.all_kinds()}
+	_start_game()
+	Game.toast.emit("EVENT VIEWER: ] or N for the next event, [ or P to go back, R to run it again", Color(1.0, 0.85, 0.3))
+
+
+func _viewer_go(i: int) -> void:
+	var kinds: Array = viewer["kinds"]
+	i = posmod(i, kinds.size())
+	if mode == Mode.RACE:   # back down from the mountain first
+		_leave_race()
+	viewer["i"] = i
+	var kind: String = kinds[i]
+	# clear the stage: whatever was going on, any challenge, the clocks for anything else
+	for e in city.events.events:
+		city.events._end(e)
+	city.events.events.clear()
+	city.events.leaving.clear()
+	city.challenge = {}
+	city.outage_t = 0.0
+	city.events.next_t = 1e9
+	city.events.parade_t = 1e9
+	city.events.happen_t = 1e9
+	city.events.gulls_t = 1e9
+	city.events.kid_t = 1e9
+	for k in city.events.SPECIALS:
+		city.events.special_t[k] = 1e9
+	for k in city.events.CHAOS:
+		city.events.chaos_t[k] = 1e9
+	city.events.fw_done = true
+	city.climb_t = 1e9
+	Season.set_choice(VIEWER_SEASON.get(kind, "auto"))
+	Skies.hour = VIEWER_HOUR.get(kind, 12.0)
+	# go where it happens
+	var where := ""
+	match kind:
+		"wedding":
+			where = "Town Hall"
+		"arcade_queue":
+			where = "Pixel Palace"
+		"video_rush":
+			where = "Rewind Video"
+		"crime":
+			where = "Bank"
+		"bike_theft":
+			where = "Spokes"
+	if where != "":
+		for b in city.buildings:
+			if str(b.get("name", "")).contains(where) and int(b.get("road", -1)) >= 0:
+				city.place_on({"road": b["road"], "s": float(b["s"]) + 3.0})
+				break
+	elif kind in ["parade", "parade_float", "flash_mob", "tree_lighting"]:
+		city.place_on({"road": 0, "s": 2.0})
+	elif kind == "mountain_rescue" and not city.lifts.is_empty():
+		var lb: Vector2 = city.lifts[0]["base"]
+		var best := {"road": 0, "s": 0.0}
+		var bd := 1e9
+		for ri in city.roads.size():
+			var r: Dictionary = city.roads[ri]
+			var q := 0.0
+			while q < float(r["len"]):
+				var dd: float = (city._road_at(r, q)[0] as Vector2).distance_to(lb)
+				if dd < bd:
+					bd = dd
+					best = {"road": ri, "s": q}
+				q += 1.0
+		city.place_on(best)
+	elif kind in ["fishing", "volleyball"]:
+		city.place_on({"road": 1, "s": 20.0})
+	elif kind == "eating_contest":
+		city.place_on(city.shops[0])
+	match kind:
+		"pizza_rush":
+			city.orders.clear()
+			for _try in 40:
+				city._post_order()
+				if not city.orders.is_empty() and city.orders[-1].has("rush"):
+					break
+				city.orders.clear()
+			if not city.orders.is_empty():
+				city._take_order(city.orders[-1])
+		"hill_sprint":
+			city.climb_t = 0.0
+			city._update_climbs(0.0)
+		"rescue_run":   # straight up the mountain with the medical kit
+			_start_rescue()
+		"seagulls":
+			if city.carry.is_empty():
+				city._post_order()
+				city._take_order(city.orders[-1])
+			city.events.start(kind)
+		_:
+			city.p_speed = maxf(city.p_speed, 1.5)   # a hot rod or a kid only races you on the move
+			for _try in 8:   # some need the right bit of road nearby: try a few spots
+				city.events.start(kind)
+				if not city.events.events.is_empty():
+					break
+	var on: bool = not city.events.events.is_empty() or not city.challenge.is_empty()
+	viewer["status"] = "%d/%d  %s%s" % [i + 1, kinds.size(), kind, "" if on else "  (couldn't start here - ride somewhere else and press R)"]
+
+
+func _debug_wipeout() -> void:
+	var backup := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	Trainer._autostart_clock = 0.0
+	_start_game()
+	Input.action_press("pedal")
+	await get_tree().create_timer(1.5).timeout
+	Input.action_release("pedal")
+	var r: Dictionary = city.rival_state[0]
+	r["pos"] = city.p_pos + city.p_fwd * 3.0
+	r["path"] = []
+	r["state"] = "idle"
+	r["idle"] = 99.0
+	city._knock_down(0, 5.0, -1, "")
+	city._knock_down(-1, 5.0, 0, "beaned you")
+	var shot := func(file: String) -> void:
+		cam.position = city.cam_target()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	var at := 0.0
+	for t in [0.05, 0.3, 0.6, 1.0, 2.0]:
+		await get_tree().create_timer(t - at).timeout
+		at = t
+		await shot.call("wipe_pu_%.2f.png" % t)
+	city.p_down = 0.0
+	city._hit_by_car({"speed": 0.0})
+	at = 0.0
+	for t in [0.05, 0.5, 1.2, 2.5]:
+		await get_tree().create_timer(t - at).timeout
+		at = t
+		await shot.call("wipe_car_%.2f.png" % t)
+	print("WIPEOUT: p_fall=%.2f er_timer=%.2f" % [city.p_fall, city.er_timer])
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
+		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=animals [PIZZA_OUT=dir] lines up one of every animal beside the player in a race (standing,
+## then running; the bear also roaring) and saves a screenshot of each.
+func _debug_animals() -> void:
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	Trainer._autostart_clock = 0.0
+	Game.money = maxi(Game.money, 1000)
+	_start_race(0)
+	await get_tree().create_timer(0.3).timeout
+	var kinds := ["bear", "deer", "moose", "goat", "marmot", "rabbit", "squirrel", "fox", "elk", "wolf", "raccoon", "hedgehog", "chipmunk", "skunk", "bighorn", "badger", "mountain_lion", "porcupine", "otter", "beaver", "coyote", "ram_lamb"]
+	var s0 := float(race.riders[0]["s"]) + 4.0
+	for look in ["idle", "run", "roar"]:
+		race.animals.clear()
+		for i in kinds.size():
+			var side := 1.0 if i % 2 == 0 else -1.0
+			var p: Vector2 = race._pose(s0 + i * 0.9, side * (1.6 + (i % 3) * 0.9))["pos"]
+			race.animals.append({"kind": kinds[i], "pos": p, "home": p, "s": s0 + i, "side": side, "state": "roar" if look == "roar" else "idle", "t": 99.0,
+				"face": 1.0 if i % 4 < 2 else -1.0, "vel": Vector2.ZERO, "phase": float(i), "run": look == "run", "cross": false, "stag": true,
+				"dark": i % 3 == 1, "done": true})
+		race.riders[0]["s"] = s0 - 3.0
+		race.riders[0]["v"] = 0.0
 		for k in 3:
-			await RenderingServer.frame_post_draw
-		return vp.get_texture().get_image()
-	Sprites.baking = true
-	var p0: Image = await grab.call(Color.WHITE, Color.WHITE, false)
-	var p_shirt: Image = await grab.call(Color.WHITE, Color.BLACK, false)
-	var p_frame: Image = await grab.call(Color.BLACK, Color.WHITE, false)
-	var p_box: Image = await grab.call(Color.WHITE, Color.WHITE, true)
-	Sprites.baking = false
-	var differs := func(a: Color, b: Color) -> bool:
-		return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a) > 0.04
-	var layers := {}
-	for key in ["", "_jersey", "_frame", "_box"]:
-		layers[key] = Image.create(vp.size.x, vp.size.y, false, Image.FORMAT_RGBA8)
-	var lo := Vector2i(FW, FH)
-	var hi := Vector2i(0, 0)
-	for y in vp.size.y:
-		for x in vp.size.x:
-			var c0 := p0.get_pixel(x, y)
-			if differs.call(c0, p_box.get_pixel(x, y)):
-				layers["_box"].set_pixel(x, y, p_box.get_pixel(x, y))
-			if c0.a == 0.0:
-				continue
-			lo = lo.min(Vector2i(x % FW, y % FH))
-			hi = hi.max(Vector2i(x % FW, y % FH))
-			if differs.call(c0, p_shirt.get_pixel(x, y)):
-				layers["_jersey"].set_pixel(x, y, c0)
-			elif differs.call(c0, p_frame.get_pixel(x, y)):
-				layers["_frame"].set_pixel(x, y, c0)
-			else:
-				layers[""].set_pixel(x, y, c0)
-	for key in layers:
-		layers[key].save_png("%s/bike%s.png" % [out, key])
-	print("BAKE %s: %dx%d frames, art spans x %d..%d, y %d..%d -> %s" % [who, FW, FH, lo.x, hi.x, lo.y, hi.y, out])
+			await get_tree().process_frame
+		cam.position = race.cam_target()
+		await get_tree().create_timer(0.4).timeout
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/animals_%s.png" % [out, look])
 	get_tree().quit()
 
 
@@ -759,15 +1031,37 @@ func _debug_trainer() -> void:
 
 ## Dev helper: PIZZA_DEBUG=shot saves screenshots to PIZZA_OUT (default user://shots). With PIZZA_AT="x,y;x,y"
 ## the camera visits those world points; otherwise it follows the rider for PIZZA_SHOTS frames, one every second.
+## PIZZA_CARRY=1 rides with a pizza on board.
 func _debug_shot() -> void:
 	_start_game()
 	Input.action_press("pedal")
+	if OS.has_environment("PIZZA_CARRY"):
+		city._post_order()
+		city._take_order(city.orders[-1])
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	var spots: Array = []
 	if OS.get_environment("PIZZA_AT") == "junctions":
 		for j in city.junctions:
 			spots.append(j["pos"])
+	elif OS.get_environment("PIZZA_AT") == "er":
+		spots.append(city.zone_anchor("er")["pos"])
+	elif OS.get_environment("PIZZA_AT") == "townhall":
+		for b in city.buildings:
+			if b["kind"] == "townhall":
+				spots.append(b["door"])
+	elif OS.get_environment("PIZZA_AT") == "nineties":
+		for b in city.buildings:
+			if city.SHOP_90S.has(str(b.get("name", ""))):
+				spots.append(b["door"])
+		for p in city.props:
+			if p["kind"] == "tube" or str(p.get("art", "")) in ["basketball_hoop", "skate_ramp"]:
+				spots.append(p["pos"])
+	elif OS.get_environment("PIZZA_AT") == "edges":   # the buildings out by the edge of the map
+		for b in city.buildings:
+			var c: Vector2 = b["pos"] + b["size"] * 0.5
+			if minf(minf(c.x, c.y), minf(city.N - c.x, city.N - c.y)) < 22.0:
+				spots.append(c)
 	elif OS.get_environment("PIZZA_AT") == "shops":
 		for k in 3:
 			city._post_order()
@@ -791,6 +1085,7 @@ func _debug_shot() -> void:
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/shot_%02d.png" % [out, k])
+	print("cast: %d forced doubles" % Sprites.doubles)
 	get_tree().quit()
 
 
@@ -812,6 +1107,9 @@ func _debug_race_shot() -> void:
 		gmax = maxf(gmax, g)
 	print("COURSE %s: %.0f m, gain %.0f m, grade %+.1f%% to %+.1f%%, %d obstacles" % [race.course["name"], race.course["length"],
 		race.gain, gmin * 100.0, gmax * 100.0, race.obstacles.size()])
+	print("  %d hairpins, %d tunnels, %d steep/drop stretches" % [race.hairpins.size(), race.tunnels.size(), race.ramps.size()])
+	print("  %d skiers, chairlift %s, %d groomers, railway %s with %d crossings" % [race.life.skiers.size(), "yes" if not race.life.lift.is_empty() else "no",
+		race.life.groomers.size(), "yes" if race.life.rail_x >= 0.0 else "no", race.life.crossings.size()])
 	var spots: Array = race.debug_spots()
 	for k in spots.size():
 		race.debug_place(spots[k])
@@ -819,7 +1117,7 @@ func _debug_race_shot() -> void:
 		await get_tree().create_timer(0.9).timeout
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/race_%02d.png" % [out, k])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
 		f.store_string(backup)
 		f.close()
@@ -912,7 +1210,7 @@ func _debug_powerups() -> void:
 		print("RACE %s: used=%s riders_down=%d socks=%.1f bread=%.1f roller=%.1f draft=%d%%" % [kind, me["pu"] == "", downs,
 			me["socks"], me["bread"], me["roller"], roundi(float(me["draft"]) * 100.0)])
 		await save.call("pu_race_%s.png" % kind)
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
@@ -926,6 +1224,7 @@ func _debug_readme() -> void:
 	var save := func(file: String) -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	Game.money = maxi(Game.money, 420)   # (whatever's in your save, the pictures show a rider with some cash)
 	await get_tree().create_timer(2.0).timeout
 	await save.call("title.png")
 	_start_game()
@@ -937,7 +1236,7 @@ func _debug_readme() -> void:
 		await get_tree().process_frame
 	await get_tree().create_timer(5.0).timeout   # ride off with the box steaming on the bike, toasts faded
 	await save.call("delivery.png")
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 

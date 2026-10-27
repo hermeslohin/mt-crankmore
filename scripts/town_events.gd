@@ -33,6 +33,7 @@ var events: Array = []         # {kind, t (seconds left), actors: [...], ...}
 var next_t := 6.0
 var t_ := 0.0
 var critters: Array = []
+var leaving: Array = []       # actors still in sight when they were done: making their way out of it (see _leave)
 var crew: Array = []          # the construction site's workers (see _step_crew)
 const CREW_SIZE := 4
 const CREW_LINES := ["*clang* *clang*", "Measure twice!", "Lunch yet?", "Watch your head!", "Hand me that wrench!",
@@ -67,6 +68,7 @@ func _init(c) -> void:
 func clear() -> void:
 	events.clear()
 	critters.clear()
+	leaving.clear()
 	next_t = 6.0
 
 
@@ -94,9 +96,9 @@ func _step_critters(delta: float) -> void:
 	for a in critters:
 		a["phase"] = float(a["phase"]) + delta
 		if a.get("gone", false):
-			# a pigeon that flew off comes back to its spot after a while
+			# a pigeon that flew off comes back to its spot after a while (while you're not looking)
 			a["wait"] -= delta
-			if a["wait"] <= 0.0:
+			if a["wait"] <= 0.0 and not city._in_view(a["home"]):
 				a["gone"] = false
 				a["lift"] = 0.0
 				a["pos"] = a["home"]
@@ -134,7 +136,7 @@ func _step_critters(delta: float) -> void:
 				if a["name"] == "town_pigeon":
 					a["pos"] += a["vel"] * delta
 					a["lift"] = float(a["lift"]) + 60.0 * delta
-					if a["lift"] > 200.0:
+					if a["lift"] > 200.0 and not _seen(a):
 						a["gone"] = true
 						a["wait"] = randf_range(15.0, 30.0)
 				else:
@@ -156,7 +158,8 @@ func parade_spots() -> Array:
 	return []
 
 
-## Every actor of every happening, to be sorted and drawn with the rest of the town.
+## Every actor of every happening, to be sorted and drawn with the rest of the town (and those on their way out of
+## sight after it: see _leave).
 func actors() -> Array:
 	var out: Array = []
 	for a in critters:
@@ -165,8 +168,9 @@ func actors() -> Array:
 	out.append_array(crew)
 	for e in events:
 		for a in e["actors"]:
-			if not a.get("gone", false):
+			if not a.get("gone", false) and not a.get("unseen", false):
 				out.append(a)
+	out.append_array(leaving)
 	return out
 
 
@@ -181,7 +185,7 @@ func update(delta: float) -> void:
 	if parade_t <= 0.0 and city.active:
 		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1])
 		if not events.any(func(e): return e["kind"] == "parade"):
-			_start_parade()
+			_start_parade(city.p_pos)
 	next_t -= delta
 	if next_t <= 0.0 and events.filter(func(e): return e["kind"] != "parade" and e["kind"] != "fireworks" and not SPECIALS.has(e["kind"])).size() < MAX_LIVE and city.active:
 		next_t = randf_range(GAP_MIN, GAP_MAX)
@@ -195,9 +199,134 @@ func update(delta: float) -> void:
 			a["label_t"] = maxf(0.0, float(a.get("label_t", 0.0)) - delta)
 			if a.has("arrive_to"):
 				_arriving(a, delta)
+			if float(a.get("fade", 1.0)) < 1.0 and not a.has("exit"):
+				a["fade"] = minf(1.0, float(a["fade"]) + delta * city.DOOR_FADE)
+			if a.get("unseen", false) and not _seen(a):
+				a.erase("unseen")
+			if a.get("gone", false) and not a.has("exit"):
+				_leave(a, true)
 		if e["t"] <= 0.0:
 			_end(e)
 			events.remove_at(i)
+			for a in e["actors"]:
+				if not a.has("exit"):
+					_leave(a, false)
+	_step_leaving(delta)
+
+
+## A happening that's just started (City calls this after update): nothing of it appears out of thin air in front of
+## you. Anyone it put in sight walks in from off the screen instead (see _arrive), or steps out of a door or a vehicle
+## (fading in); scenery and vehicles in sight wait until you've looked away (`unseen`).
+func settle() -> void:
+	for e in events:
+		if e.get("settled", false):
+			continue
+		e["settled"] = true
+		if allow_in_view:
+			continue
+		for a in e["actors"]:
+			if a.get("gone", false) or a.has("arrive_to") or not _seen(a):
+				continue
+			if a["type"] == "person" and not a.get("moving", false) and not a.has("to") and not a.get("down", false) \
+				and float(a.get("lift", 0.0)) <= 0.0:
+				_arrive(a)
+			if not _seen(a):
+				continue
+			if a["type"] in ["person", "animal", "rider", "stretcher"]:
+				a["fade"] = 0.0
+			else:
+				a["unseen"] = true
+
+
+## Whether an actor might be seen: its spot on screen, or what's drawn up above it (a balloon, flames on a roof).
+func _seen(a: Dictionary) -> bool:
+	return city.on_screen(a["pos"], float(a.get("lift", 0.0)) + float(a.get("h", 0.0)), 140.0 if a["type"] == "fx" else 0.0)
+
+
+## `a` is done with (its happening's over, or it's finished its part: `done`) but may still be in sight. Rather than
+## vanishing it makes its own way out of the picture (see _step_leaving): people walk off (or, done where they stand,
+## go in: into a door, a van, the wedding car, fading out), animals run off, birds and balloons fly on, riders and cars
+## carry on the way they were going, and anything else stays put until you've looked away.
+func _leave(a: Dictionary, done: bool) -> void:
+	a["exit"] = ""
+	if a.get("unseen", false) or a.get("gift", false) or not _seen(a):
+		return
+	var lift := float(a.get("lift", 0.0))
+	var how := "stay"
+	match String(a["type"]):
+		"person":
+			if a.get("down", false) or a.get("seated", false) or lift > 0.0:
+				how = "stay"
+			elif done and not a.get("moving", false):
+				how = "fade"
+			else:
+				how = "walk"
+		"animal":
+			how = "fly" if lift > 0.0 else "walk"
+		"gull":
+			how = "fly"
+			a["vel"] = -(a["face"] as Vector2) * 3.0
+		"balloon":
+			how = "rise" if a.get("free", false) else "stay"
+		"image":
+			how = "rise" if a.get("hab", false) else "stay"
+		"rider", "cart":
+			how = "ride"
+		"vehicle":
+			how = "ride" if done or a.get("moving", false) else "stay"
+		"stretcher":
+			how = "fade" if done else "stay"
+	a["exit"] = how
+	a.erase("arrive_to")
+	if how == "ride":
+		a["exit_v"] = city.p_speed + (3.0 if a["type"] == "vehicle" else 1.5)
+	leaving.append(a)
+
+
+## Those on their way out of sight (see _leave): gone once you can't see them.
+func _step_leaving(delta: float) -> void:
+	for i in range(leaving.size() - 1, -1, -1):
+		var a: Dictionary = leaving[i]
+		a["phase"] = float(a.get("phase", 0.0)) + delta
+		a["label_t"] = maxf(0.0, float(a.get("label_t", 0.0)) - delta)
+		if a["exit"] != "fade" and float(a.get("fade", 1.0)) < 1.0:   # (done before it had quite faded in)
+			a["fade"] = minf(1.0, float(a["fade"]) + delta * city.DOOR_FADE)
+		match String(a["exit"]):
+			"fade":
+				a["fade"] = float(a.get("fade", 1.0)) - delta * city.DOOR_FADE
+			"walk":
+				_walk_off(a, delta)
+			"ride":
+				a["pos"] = (a["pos"] as Vector2) + (a["face"] as Vector2).normalized() * float(a["exit_v"]) * delta
+				a["pedal"] = float(a.get("pedal", 0.0)) + delta * 9.0
+				a["spin"] = float(a.get("spin", 0.0)) + delta * 6.0
+			"fly":
+				var v: Vector2 = a.get("vel", (a["face"] as Vector2) * 2.5)
+				a["pos"] = (a["pos"] as Vector2) + v * delta
+				a["lift"] = float(a.get("lift", 0.0)) + 40.0 * delta
+				a["anim"] = "fly"
+			"rise":
+				a["lift"] = float(a.get("lift", 0.0)) + 26.0 * delta
+		if float(a.get("fade", 1.0)) <= 0.0 or not _seen(a):
+			leaving.remove_at(i)
+
+
+## Walks (or, an animal, runs) away from you, round anything in the way, until out of sight.
+func _walk_off(a: Dictionary, delta: float) -> void:
+	var d: Vector2 = a.get("exit_dir", Vector2.ZERO)
+	if d == Vector2.ZERO:
+		d = (a["pos"] as Vector2) - city.p_pos
+		d = d.normalized() if d.length() > 0.1 else (a["face"] as Vector2).normalized()
+	var person: bool = a["type"] == "person"
+	for turn in [0.0, 0.6, -0.6, 1.2, -1.2, 2.0, -2.0, PI]:
+		if _free((a["pos"] as Vector2) + d.rotated(turn) * 0.4):
+			d = d.rotated(turn)
+			break
+	a["exit_dir"] = d
+	a["pos"] = (a["pos"] as Vector2) + d * (1.0 if person else 2.4) * delta
+	a["face"] = d
+	a["anim"] = "walk" if person else "run"
+	a["moving"] = true
 
 
 func _pick_kind() -> String:
@@ -558,7 +687,7 @@ func _start_parade(near_p := Vector2.INF) -> void:
 
 func _end(e: Dictionary) -> void:
 	if e.has("car") and not (e["car"] as Dictionary).is_empty():
-		city.cars.erase(e["car"])
+		city.retire_car(e["car"])
 
 
 func _step(e: Dictionary, delta: float) -> void:
@@ -694,6 +823,19 @@ func _step(e: Dictionary, delta: float) -> void:
 					b["gone"] = true
 
 
+## Puts `a` where its happening wants it now (`to`) without a jump: when that's suddenly somewhere else (a new stage,
+## another lane, the other end of the stretcher, off after you down the road) it slides over in a moment instead.
+func _place(a: Dictionary, to: Vector2) -> void:
+	var slip: Vector2 = a.get("slip", Vector2.ZERO)
+	if not a.has("aim") or (to - (a["aim"] as Vector2)).length() > 0.3:
+		slip = (a["pos"] as Vector2) - to
+	var dt: float = city.get_process_delta_time()
+	slip = slip.move_toward(Vector2.ZERO, minf(slip.length() * (1.0 - exp(-4.0 * dt)) + 0.5 * dt, 7.0 * dt))   # (at a run)
+	a["aim"] = to
+	a["slip"] = slip
+	a["pos"] = to + slip
+
+
 ## Moves an actor with a "to" and a "speed" towards it; it stops (idle) when it gets there.
 func _walk_to(a: Dictionary, delta: float) -> void:
 	if not a.has("to"):
@@ -720,7 +862,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 	var ph: float = a["phase"]
 	match a["type"]:
 		"person":
-			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2 * Sprites.fade))
 			# their look: anyone (from the cast), one of a list, or a role (a builder, a firefighter...) in whichever
 			# variant nobody else on screen is wearing
 			var d: String = a["design"]
@@ -787,7 +929,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			ci.draw_rect(Rect2(ground + Vector2(-7, -8), Vector2(14, 8)), Iso.OUTLINE, false, 1.0)
 			ci.draw_line(ground + Vector2(-6, -4), ground + Vector2(6, -4), Color(0.4, 0.25, 0.14), 1.0)
 		"rider":
-			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-7, 0), ground + Vector2(0, -3), ground + Vector2(7, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.2))
+			ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-7, 0), ground + Vector2(0, -3), ground + Vector2(7, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.2 * Sprites.fade))
 			if not Sprites.draw_rider(ci, ground, a["face"], a["pedal"], false, a["who"], false, float(a.get("fall_t", -1.0))) and a.has("design"):
 				# no bike art for them: they run for it instead
 				var look := Sprites.cast(a, Sprites.variants(a["design"]) if a["design"] != "" else a.get("looks", []), true)
@@ -814,7 +956,7 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 			var flip := Iso.to_screen(a["face"]).x < 0.0
 			var lift: float = a.get("lift", 0.0)
 			if lift <= 0.0:
-				ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-6, 0), ground + Vector2(0, -2.5), ground + Vector2(6, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+				ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-6, 0), ground + Vector2(0, -2.5), ground + Vector2(6, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2 * Sprites.fade))
 			var name := "animal_%s_%s" % [a["name"], a["anim"]]
 			if not Sprites.draw_strip(ci, name, ground + Vector2(0, -lift), ph, 12.0 if a["anim"] == "run" else 8.0, true, flip):
 				Sprites.draw_strip(ci, "animal_%s_idle" % a["name"], ground + Vector2(0, -lift), ph, 8.0, true, flip)
@@ -945,8 +1087,9 @@ func _update_specials(delta: float) -> void:
 
 
 ## An emergency vehicle (one of `kinds`) on its way to `park_s` on `road`, lights flashing; it stops there, pulled
-## over onto the kerb. {} when there's no art.
-func _responder(kinds: Array, road: int, park_s: float) -> Dictionary:
+## over onto the kerb. {} when there's no art. It sets off from out of sight; when all of that road is in sight it's
+## on its way (`e`["call"], see _step_special) and turns up once there's somewhere it can come from unseen.
+func _responder(kinds: Array, road: int, park_s: float, e: Dictionary = {}) -> Dictionary:
 	var have: Array = kinds.filter(func(k): return _has("vehicle_%s" % k))
 	if have.is_empty() or road < 0:
 		return {}
@@ -954,9 +1097,24 @@ func _responder(kinds: Array, road: int, park_s: float) -> Dictionary:
 	var d: Array = city.VEHICLE_DIMS[kind]
 	var r: Dictionary = city.roads[road]
 	var length: float = r["len"]
-	# come from whichever end has more room, ~14 m back
+	# come from whichever end has more room, ~14 m back, further if that's still in sight (or from the other end)
 	var dir := 1.0 if r["closed"] or park_s > length * 0.5 else -1.0
-	var s: float = city._wrap_s(r, park_s - dir * 20.0) if r["closed"] else clampf(park_s - dir * 20.0, 0.5, length - 0.5)   # from out of sight
+	var s := -1.0
+	for way in [dir, -dir]:
+		for back in range(20, 64, 4):
+			var q: float = city._wrap_s(r, park_s - way * back) if r["closed"] else park_s - way * back
+			if q < 0.5 or q > length - 0.5:
+				break
+			if allow_in_view or not city._in_view(city._road_at(r, q)[0]):
+				s = q
+				dir = way
+				break
+		if s >= 0.0:
+			break
+	if s < 0.0:
+		e["call"] = [kinds, road, park_s]
+		return {}
+	e.erase("call")
 	var c := {"road": road, "s": s, "dir": dir, "speed": 0.0, "max": float(d[3]) * 1.5 * city.PACE, "col": Color.WHITE, "kind": kind,
 		"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT, "siren": true, "park_s": park_s, "last_j": -1}
 	city._car_pose(c)
@@ -1080,7 +1238,7 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			witness["anim"] = "idle"
 			_say(witness, "FIRE! FIRE!", 3.0)
 			e["actors"].append(witness)
-			e["car"] = _responder(["truck_firetruck"], b["road"], float(b["s"]))
+			e["car"] = _responder(["truck_firetruck"], b["road"], float(b["s"]), e)
 			Game.toast.emit("Smoke over %s! The fire brigade is on its way." % str(b.get("name", "town")), Color(1.0, 0.55, 0.3))
 		"ambulance":
 			# someone hurt on the pavement and a bystander calling for help; the ambulance crew wheels them to the
@@ -1098,7 +1256,7 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			helper["helper"] = true
 			_say(helper, "Someone call an ambulance!", 3.0)
 			e["actors"].append(helper)
-			e["car"] = _responder(["van_ambulance"], sp[1], float(sp[2]))
+			e["car"] = _responder(["van_ambulance"], sp[1], float(sp[2]), e)
 		"crime":
 			# a robbery at the bank if it's close, else at a shop: the robber dashes out, a cop after him, and he's off on
 			# a bike. Catch him at 110% of your FTP (see City.CHALLENGES).
@@ -1171,7 +1329,8 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["t"] = 70.0
 			e["stage"] = "roll_up"
 			e["clock"] = 0.0
-			var rod := {"type": "vehicle", "name": cars[0], "pos": city.p_pos, "face": city.p_fwd, "phase": 0.0, "label_t": 0.0}
+			var behind: Array = city._rail_ahead(-16.0, city.CAR_LANE)   # (rolls up from out of sight behind you)
+			var rod := {"type": "vehicle", "name": cars[0], "pos": behind[0], "face": behind[1], "phase": 0.0, "label_t": 0.0}
 			e["actors"].append(rod)
 	return true
 
@@ -1179,6 +1338,9 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 func _step_special(e: Dictionary, delta: float) -> void:
 	var p: Vector2 = city.p_pos
 	var riding: bool = city.active and city.er_timer <= 0.0
+	if e.has("call"):   # the emergency vehicle still on its way (see _responder)
+		var call: Array = e["call"]
+		e["car"] = _responder(call[0], call[1], call[2], e)
 	match e["kind"]:
 		"fireworks":
 			_step_fireworks(e, delta)
@@ -1284,7 +1446,7 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 	var center: Vector2 = b["pos"] + b["size"] * 0.5
 	match e["stage"]:
 		"burning":
-			if truck.is_empty():
+			if truck.is_empty() and not e.has("call"):
 				fire["power"] = maxf(0.0, float(fire["power"]) - delta * 0.03)   # no truck art: it burns itself out
 				if fire["power"] <= 0.0:
 					e["stage"] = "out"
@@ -1298,6 +1460,7 @@ func _step_fire(e: Dictionary, delta: float) -> void:
 					ff["moving"] = true
 					ff["firefighter"] = true
 					ff["hose_from"] = truck["pos"]
+					ff["fade"] = 0.0   # (stepping out of the truck)
 					e["actors"].append(ff)
 				_say(e["actors"][1], "Over here!", 2.0)
 		"spray":
@@ -1348,7 +1511,7 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 	var hurt: Array = e["actors"].filter(func(a): return a.get("patient", false) and not a.get("gone", false) and a.get("down", false))
 	match e["stage"]:
 		"down":
-			if van.is_empty():
+			if van.is_empty() and not e.has("call"):
 				# no ambulance art: they pick themselves up and limp off
 				if e["clock"] > 6.0:
 					for a in hurt:
@@ -1363,9 +1526,11 @@ func _step_ambulance(e: Dictionary, delta: float) -> void:
 				for k in clampi(Sprites.variants("paramedic").size(), 1, 2):
 					var m := _person(van["pos"], "paramedic" if _has("ped_paramedic_walk") else "nurse", Vector2(1, 1))
 					m["medic"] = k
+					m["fade"] = 0.0   # (stepping out of the van)
 					e["actors"].append(m)
 					medics.append(m)
 				e["stretcher"] = {"type": "stretcher", "pos": van["pos"], "face": Vector2(1, 1), "phase": 0.0, "label_t": 0.0, "load": false}
+				e["stretcher"]["fade"] = 0.0
 				e["actors"].append(e["stretcher"])
 				_say(medics[0], "Paramedics! Coming through!", 2.5)
 				_next_patient(e)
@@ -1474,7 +1639,7 @@ func _carry(e: Dictionary, moving := true) -> void:
 	for a in e["actors"]:
 		if a.has("medic"):
 			var end := 0.55 if int(a["medic"]) == 0 else -0.55
-			a["pos"] = (st["pos"] as Vector2) + f * end
+			_place(a, (st["pos"] as Vector2) + f * end)
 			a["face"] = f
 			a["moving"] = moving
 			a["anim"] = "walk" if moving else "idle"
@@ -1498,6 +1663,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 				cop["to"] = (b["door"] as Vector2).lerp(robber["pos"], 0.6)
 				cop["speed"] = 1.8
 				_say(cop, "STOP THAT THIEF!", 3.0)
+				cop["fade"] = 0.0   # (stepping out of the door)
 				e["actors"].append(cop)
 			if e["actors"].size() > 1:
 				_walk_to(e["actors"][1], delta)
@@ -1517,7 +1683,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 				e["stage"] = "away"
 				return
 			var at: Array = city.challenge_pos()
-			robber["pos"] = at[0]
+			_place(robber, at[0])
 			robber["face"] = at[1]
 			robber["pedal"] = float(robber["pedal"]) + delta * 9.0
 			if robber["label_t"] <= 0.0 and randf() < delta * 0.4:
@@ -1537,7 +1703,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 					cop["moving"] = true
 					cop["fps"] = 14.0
 				var r: Dictionary = city.roads[city.rr]
-				e["car"] = _responder(["sedan_police"], city.rr, city._wrap_s(r, city.rs + city.rdir * float(c["catch"]) * city.TILES_PER_MS * city.PACE))
+				e["car"] = _responder(["sedan_police"], city.rr, city._wrap_s(r, city.rs + city.rdir * float(c["catch"]) * city.TILES_PER_MS * city.PACE), e)
 				e["clock"] = 0.0
 			elif c["state"] == "lost":
 				e["stage"] = "away"
@@ -1550,7 +1716,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 					e["leave_d"] = ((robber["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
 				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 3.0) * delta
 				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE)
-				robber["pos"] = at[0]
+				_place(robber, at[0])
 				robber["face"] = at[1]
 				robber["pedal"] = float(robber["pedal"]) + delta * 9.0
 			if e["clock"] > 4.0:
@@ -1563,7 +1729,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 				if not cop.get("moving", false):
 					cop["face"] = ((robber["pos"] as Vector2) - (cop["pos"] as Vector2)).normalized()
 			var car: Dictionary = e.get("car", {})
-			if (car.is_empty() and e["clock"] > 5.0) or _parked(car):
+			if (car.is_empty() and not e.has("call") and e["clock"] > 5.0) or _parked(car):
 				e["stage"] = "board"
 				for a in e["actors"]:
 					a["to"] = car["pos"] if not car.is_empty() else (a["pos"] as Vector2) + (a["face"] as Vector2) * 2.0
@@ -1612,6 +1778,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				o["speed"] = 1.5
 				o["fps"] = 14.0
 				_say(o, "STOP THIEF! That's a $3,000 bike!", 3.5)
+				o["fade"] = 0.0   # (stepping out of the door)
 				e["actors"].append(o)
 			if not thief.get("moving", false) and e["clock"] > 1.3:
 				e["stage"] = "mount"
@@ -1633,7 +1800,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				e["stage"] = "away"
 				return
 			var at: Array = city.challenge_pos()
-			thief["pos"] = at[0]
+			_place(thief, at[0])
 			thief["face"] = at[1]
 			thief["pedal"] = float(thief["pedal"]) + delta * 10.0
 			if thief["label_t"] <= 0.0 and randf() < delta * 0.35:
@@ -1646,13 +1813,18 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				thief["fall_t"] = 0.0
 				_say(thief, ["WHOA!", "Aaargh!", "Oof!"].pick_random(), 1.5)
 				if not owner.is_empty():
-					owner["pos"] = city.p_pos - city.p_fwd * 3.0
+					# running up after you (from out of sight behind, unless they're in sight already)
+					if not _seen(owner):
+						for d in range(3, 30, 2):
+							owner["pos"] = city._rail_ahead(-d, city.BIKE_LANE)[0]
+							if not city._in_view(owner["pos"]):
+								break
 					owner["to"] = (thief["pos"] as Vector2) - (thief["face"] as Vector2) * 0.7
 					owner["anim"] = "run"
 					owner["moving"] = true
-					owner["speed"] = 2.0
+					owner["speed"] = 3.0
 				var r: Dictionary = city.roads[city.rr]
-				e["car"] = _responder(["sedan_police"], city.rr, city._wrap_s(r, city.rs + city.rdir * float(c["catch"]) * city.TILES_PER_MS * city.PACE))
+				e["car"] = _responder(["sedan_police"], city.rr, city._wrap_s(r, city.rs + city.rdir * float(c["catch"]) * city.TILES_PER_MS * city.PACE), e)
 			elif c["state"] == "lost":
 				e["stage"] = "away"
 				e["clock"] = 0.0
@@ -1671,7 +1843,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				owner["anim"] = "cheer"
 				_say(owner, ["My bike! Thank you!", "You're a hero!", "Free tune-up for life!"].pick_random(), 3.0)
 			var car: Dictionary = e.get("car", {})
-			if (car.is_empty() and e["clock"] > 6.0) or _parked(car):
+			if (car.is_empty() and not e.has("call") and e["clock"] > 6.0) or _parked(car):
 				e["stage"] = "board"
 				thief["type"] = "person"
 				thief["anim"] = "walk"
@@ -1695,7 +1867,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 					e["leave_d"] = ((thief["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
 				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 3.5) * delta
 				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE)
-				thief["pos"] = at[0]
+				_place(thief, at[0])
 				thief["face"] = at[1]
 				thief["pedal"] = float(thief["pedal"]) + delta * 10.0
 			if e["clock"] > 5.0:
@@ -1713,7 +1885,7 @@ func _step_dog(e: Dictionary, delta: float) -> void:
 				e["stage"] = "gone"
 				return
 			var at: Array = city.challenge_pos()
-			dog["pos"] = at[0]
+			_place(dog, at[0])
 			dog["face"] = at[1]
 			dog["anim"] = "run"
 			if dog["label_t"] <= 0.0 and randf() < delta * 0.3:
@@ -1734,7 +1906,7 @@ func _step_dog(e: Dictionary, delta: float) -> void:
 				e["leave_d"] = ((dog["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
 			e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 2.5) * delta
 			var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE)
-			dog["pos"] = at[0]
+			_place(dog, at[0])
 			dog["face"] = at[1]
 			if not e.get("sad", false):
 				e["sad"] = true
@@ -1754,7 +1926,7 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 			# comes up from behind in the car lane and draws level
 			var u := clampf(float(e["clock"]) / 3.0, 0.0, 1.0)
 			var at: Array = city._rail_ahead(lerpf(-16.0, 0.4, u * (2.0 - u)), city.CAR_LANE)   # from out of sight behind
-			rod["pos"] = at[0]
+			_place(rod, at[0])
 			rod["face"] = at[1]
 			if u >= 1.0:
 				_say(rod, ["Race you to that line! Winner gets $300!", "Hey pizza kid! First to the line, $300!", "Think you can beat this? To the line!"].pick_random(), 3.0)
@@ -1769,7 +1941,7 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["clock"] = 0.0
 				return
 			var at: Array = city.challenge_pos()
-			rod["pos"] = at[0]
+			_place(rod, at[0])
 			rod["face"] = at[1]
 			if c["state"] == "count" and rod["label_t"] <= 0.0:
 				_say(rod, str(int(ceil(float(c["count"])))) + "...", 0.9)
@@ -1787,7 +1959,7 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["leave_d"] = ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
 			e["leave_d"] = float(e["leave_d"]) + (city.p_speed + minf(float(e["clock"]) * 4.0, 7.0)) * delta
 			var at: Array = city._rail_ahead(float(e["leave_d"]), city.CAR_LANE)
-			rod["pos"] = at[0]
+			_place(rod, at[0])
 			rod["face"] = at[1]
 			if float(e["clock"]) > 5.0:
 				rod["gone"] = true

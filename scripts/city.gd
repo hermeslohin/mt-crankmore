@@ -103,6 +103,7 @@ const ER_JOKES := [
 ]
 const CHEERS := ["Go {n}!", "Pizza hero!", "Woo-hoo!", "Pedal faster!", "Extra cheese!", "Allez allez!", "You got this!",
 	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
+const DOOR_FADE := 2.5     # 1/seconds: someone going in at a door (or coming out) fades out (in) over 0.4 s
 const SHOP_LINES := ["Bargain!", "Got snacks!", "Ooh, new socks!", "Best gelato ever.", "Back to work...", "Smells like pizza in there!",
 	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?"]
 const HONKS := ["Pizza coming through!", "Hot pizza, comin' atcha!", "On your left!", "Beep beep! Delivery!", "Move it or lose it!", "Ding ding!"]
@@ -130,6 +131,7 @@ var zones: Array = []     # interactive doors
 var cars: Array = []
 var peds: Array = []
 var road_doors: Dictionary = {}   # road index -> [[s, side, building index], ...]: the doors people can pop into
+var pops = load("res://tools/pop_watch.gd").new(self) if OS.has_environment("PIZZA_POPS") else null   # dev helper: see tools/pop_watch.gd
 var events: TownEvents          # random happenings around the player (see TownEvents)
 var boats: Array = []
 var astar := AStar2D.new()
@@ -1166,7 +1168,7 @@ func _along(pts: PackedVector2Array, d: float) -> Vector2:
 
 ## The lift cables and chairs (people riding up, empty chairs coming down), over everything like the gondola.
 func _draw_lifts(vr: Rect2) -> void:
-	var view := vr.grow(60.0)
+	var view := vr.grow_individual(80.0, 120.0, 80.0, 60.0)   # (the chairs hang well below the cable)
 	for l in lifts:
 		var pts := _lift_cable(l)
 		var down := PackedVector2Array()
@@ -1293,9 +1295,7 @@ func _place_season() -> void:
 func _sprop_pos(e: Dictionary) -> Vector2:
 	match e["kind"]:
 		"skier":
-			var u := fposmod(t_ * float(e["speed"]) + float(e["ph"]), 1.0)
-			var d: Vector2 = e["dir"]
-			return e["origin"] + d * float(e["run"]) * u + Vector2(-d.y, d.x) * sin(u * TAU * 3.0) * 0.7
+			return _skier_at(e, float(e.get("u", e["ph"])))
 		"skater", "ducks":
 			var a: float = e["a0"] + t_ * float(e["w"])
 			return LAKE + Vector2(cos(a), sin(a)) * _lake_r(a) * float(e["rf"])
@@ -1305,20 +1305,24 @@ func _sprop_pos(e: Dictionary) -> Vector2:
 	return e["pos"]
 
 
+## Where a skier is `u` of the way down their run (weaving from side to side).
+func _skier_at(e: Dictionary, u: float) -> Vector2:
+	var d: Vector2 = e["dir"]
+	return e["origin"] + d * float(e["run"]) * u + Vector2(-d.y, d.x) * sin(u * TAU * 3.0) * 0.7
+
+
 func _draw_sprop(e: Dictionary, at: Vector2) -> void:
 	var b := Iso.to_screen(at)
 	match e["kind"]:
 		"snowman":
 			Season.snowman(self, b, e["sd"])
 		"skier":
-			var u := fposmod(t_ * float(e["speed"]) + float(e["ph"]), 1.0)
-			if u > 0.96:
-				return   # off to the lift
+			var u: float = e.get("u", e["ph"])
 			var d: Vector2 = e["dir"]
 			var vel: Vector2 = d * float(e["run"]) + Vector2(-d.y, d.x) * cos(u * TAU * 3.0) * 0.7 * TAU * 3.0
 			var sk := Sprites.cast(e, Sprites.skiers())
-			if sk != "":
-				Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_, 8.0, Color.WHITE, e)
+			if sk != "":   # (stood still at the bottom of the run, waiting for the lift)
+				Sprites.draw_person(self, "ped_%s_ski" % sk, b, vel, t_ if u < 1.0 else 0.0, 8.0 if u < 1.0 else 0.0, Color.WHITE, e)
 		"skater":
 			var a: float = e["a0"] + t_ * float(e["w"])
 			var tan := Vector2(-sin(a), cos(a)) * signf(e["w"])
@@ -1668,6 +1672,7 @@ func _process(delta: float) -> void:
 	outage_t = maxf(0.0, outage_t - delta)
 	if events != null:
 		events.update(delta)
+		events.settle()
 	_update_mascots(delta)
 	_update_frisbees(delta)
 	_update_squash()
@@ -2148,7 +2153,18 @@ const CAR_BRAKE := 3.0       # m/s² when slowing for a corner or a junction
 var j_claim := {}            # junction -> {"cars": the cars crossing it, "from": [road, dir] they came in on}
 
 
+## A car that's done its part (an emergency vehicle back from a call, a hayride's tractor): it drives on with the
+## traffic, lights off, and is taken away once it's out of sight.
+func retire_car(c: Dictionary) -> void:
+	c["retire"] = true
+	c["siren"] = false
+	c.erase("park_s")
+
+
 func _update_cars(delta: float) -> void:
+	for k in range(cars.size() - 1, -1, -1):
+		if cars[k].get("retire", false) and (cars[k].get("hidden", false) or not on_screen(cars[k]["pos"])):
+			cars.remove_at(k)
 	for ji in j_claim.keys():
 		var jp: Vector2 = junctions[ji]["pos"]
 		j_claim[ji]["cars"] = j_claim[ji]["cars"].filter(func(h): return cars.has(h) and (int(h.get("claim", -1)) == ji or (h["pos"] as Vector2).distance_to(jp) < 1.4))
@@ -2399,6 +2415,15 @@ func _update_life(delta: float) -> void:
 		if p["giver"]:
 			_update_giver(p, delta, riding)
 			continue
+		if p.has("going_in"):
+			# stepping in at the door: fading out, then in the shop for a while
+			p["fade"] = float(p.get("fade", 1.0)) - delta * DOOR_FADE
+			if p["fade"] <= 0.0:
+				p["inside"] = p["going_in"]
+				p.erase("going_in")
+			continue
+		if float(p.get("inside", 0.0)) <= 0.0:
+			p["fade"] = minf(1.0, float(p.get("fade", 1.0)) + delta * DOOR_FADE)
 		# townsfolk cheer you on as you ride past: they stop, jump and shout
 		if p["cheer"] > 0.0:
 			p["cheer"] -= delta
@@ -2423,9 +2448,10 @@ func _update_life(delta: float) -> void:
 				continue
 		p["say_t"] = maxf(0.0, float(p.get("say_t", 0.0)) - delta)
 		if float(p.get("inside", 0.0)) > 0.0:
-			# in a shop: come back out a while later with something to say about it
+			# in a shop: come back out (fading in at the door) a while later with something to say about it
 			p["inside"] -= delta
 			if p["inside"] <= 0.0:
+				p["fade"] = 0.0
 				p["say"] = SHOP_LINES.pick_random()
 				p["say_t"] = 2.2
 				p["shop_cool"] = randf_range(25.0, 60.0)
@@ -2440,7 +2466,7 @@ func _update_life(delta: float) -> void:
 					if float(d[1]) == float(p["side"]) and (float(d[0]) - s_was) * (float(d[0]) - float(p["s"])) <= 0.0:
 						p["shop_cool"] = randf_range(15.0, 40.0)
 						if randf() < 0.45:
-							p["inside"] = randf_range(4.0, 12.0)
+							p["going_in"] = randf_range(4.0, 12.0)
 						break
 			if p["t"] <= 0.0 or (not r["closed"] and (p["s"] <= 0.5 or p["s"] >= float(r["len"]) - 0.5)):
 				p["dir"] = -p["dir"]
@@ -2461,6 +2487,15 @@ func _update_life(delta: float) -> void:
 			p["phase"] += delta * 8.0
 	for b in boats:
 		b["a"] += b["w"] * delta
+	# the skiers on the slopes: down the run, then off up the lift and back at the top for another, out of sight
+	for e in season_props:
+		if e["kind"] == "skier" and e["season"] == Season.current:
+			var u: float = e.get("u", e["ph"])
+			if u < 1.0:
+				u = minf(1.0, u + delta * float(e["speed"]))
+			elif not _in_view(_skier_at(e, 1.0)) and not _in_view(_skier_at(e, 0.0)):
+				u = 0.0
+			e["u"] = u
 
 
 ## The doors along a road that people walking past can go into (shops, hotels, cafes, ...).
@@ -3185,10 +3220,21 @@ func _giver_spot(p: Dictionary) -> void:
 		return
 
 
-## Roughly on screen (around the player, where the camera is).
+## Roughly on screen: around the player (where the camera is or is heading), up or down the hills, or in the camera's
+## view right now.
 func _in_view(q: Vector2) -> bool:
-	var d := Iso.to_screen(q) - Iso.to_screen(p_pos)
-	return absf(d.x) < 460.0 and absf(d.y) < 300.0
+	var d := Iso.to_screen(q, Iso.ground_z(q)) - Iso.to_screen(p_pos, Iso.ground_z(p_pos))
+	return (absf(d.x) < 460.0 and absf(d.y) < 300.0) or on_screen(q)
+
+
+## Whether something standing at `q` could be seen in the camera's view now (`up`: px it reaches above the ground,
+## past a person's height: a balloon, flames on a roof; `wide`: px it spreads out round its spot). Sprites stand up to
+## ~150 px tall from their spot, so the view reaches further below the bottom edge.
+func on_screen(q: Vector2, up := 0.0, wide := 0.0) -> bool:
+	if not is_inside_tree():
+		return false
+	var vr: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
+	return vr.grow_individual(80.0 + wide, 70.0 + wide, 80.0 + wide, 170.0 + up + wide).has_point(Iso.to_screen(q, 0.0 if Iso.terrain_on else Iso.ground_z(q)))
 
 
 func _draw_giver(p: Dictionary, ground: Vector2) -> void:
@@ -3270,7 +3316,13 @@ func _use_powerup(who: int) -> bool:
 			var v := _nearest_opponent(who, 1e9, who >= 0)
 			if v == -2:
 				return false
-			mascots.append({"victim": v, "t": PowerUps.MASCOT_TIME, "pos": _rider_pos(v) + _rider_fwd(v) * 3.0, "phase": randf() * TAU})
+			# the mascot comes dancing in from out of sight up the road
+			var from := _rider_pos(v) + _rider_fwd(v) * 3.0
+			for d in range(4, 30):
+				if not _in_view(from):
+					break
+				from = _rider_pos(v) + _rider_fwd(v) * d
+			mascots.append({"victim": v, "t": PowerUps.MASCOT_TIME, "pos": from, "phase": randf() * TAU})
 			if who < 0:
 				Game.toast.emit("WALKIE TALKIE! \"Mascot, go dance on %s!\"" % _rider_name(v), PowerUps.col(kind))
 			elif v < 0:
@@ -3351,11 +3403,16 @@ func _update_mascots(delta: float) -> void:
 		m["phase"] += delta
 		var v: int = m["victim"]
 		if m["t"] <= 0.0 or v >= rival_state.size():
-			mascots.remove_at(k)
+			# done: off it dances, out of sight
+			if not on_screen(m["pos"]):
+				mascots.remove_at(k)
+			else:
+				var away: Vector2 = (m["pos"] as Vector2) - (_rider_pos(v) if v < rival_state.size() else p_pos)
+				m["pos"] += (away.normalized() if away.length() > 0.01 else Vector2(1, 0)) * 4.0 * delta
 			continue
 		var f := _rider_fwd(v)
 		var goal := _rider_pos(v) + f * 0.9 + Vector2(-f.y, f.x) * sin(m["phase"] * 2.0) * 0.35
-		m["pos"] = m["pos"].move_toward(goal, 6.0 * delta)
+		m["pos"] = m["pos"].move_toward(goal, (9.0 if m["pos"].distance_to(goal) > 3.0 else 6.0) * delta)
 		if m["pos"].distance_to(goal) < 0.8:
 			if v < 0:
 				p_blocked = true
@@ -3417,7 +3474,9 @@ func _draw_world() -> void:
 	for b in buildings:
 		if big.has_point(Iso.to_screen(b["pos"] + b["size"] * 0.5)):
 			items.append([b["key"], 0, b])
-	var tv := vr.grow(60.0)
+	# what might be on screen: everything stands up from its spot on the ground (trees, the tube man and the big
+	# trucks reach 100-150 px up), so things just below the bottom edge still show their tops
+	var tv := vr.grow_individual(80.0, 70.0, 80.0, 170.0)
 	var lo := Vector2(1e9, 1e9)
 	var hi := Vector2(-1e9, -1e9)
 	for c in [tv.position, tv.position + Vector2(tv.size.x, 0), tv.end, tv.position + Vector2(0, tv.size.y)]:
@@ -3442,14 +3501,17 @@ func _draw_world() -> void:
 	for e in season_props:
 		if e["season"] == Season.current:
 			var sp := _sprop_pos(e)
-			if tv.has_point(Iso.to_screen(sp)):
+			if tv.grow(100.0).has_point(Iso.to_screen(sp)):   # (a volleyball game, a picnic, a kite: spread out round it)
 				items.append([sp.x + sp.y, 9, e, sp])
 	for p in peds:
 		if float(p.get("inside", 0.0)) <= 0.0 and tv.has_point(Iso.to_screen(p["pos"])):
 			items.append([p["pos"].x + p["pos"].y, 6, p])
 	if events != null:
 		for a in events.actors():
-			if tv.has_point(Iso.to_screen(a["pos"])):
+			# (balloons, flying birds and flames are drawn well above their spot, ropes and pumpkin patches spread out)
+			var at := Iso.to_screen(a["pos"])
+			if tv.has_point(at) or tv.has_point(at - Vector2(0, float(a.get("lift", 0.0)) + float(a.get("h", 0.0)) + 40.0)) \
+				or (a["type"] == "fx" and tv.grow(140.0).has_point(at)):
 				items.append([a["pos"].x + a["pos"].y, 10, a])
 	for si in shops.size():
 		var cp: Vector2 = shops[si]["chef"]
@@ -3461,6 +3523,8 @@ func _draw_world() -> void:
 	items.append([p_pos.x + p_pos.y, 4, null])
 	items.sort_custom(func(a, b): return a[0] < b[0])
 	for it in items:
+		if pops != null:
+			pops.begin(it)
 		match it[1]:
 			0:
 				# stand level on the lowest corner; the uphill side sinks into the slope
@@ -3477,7 +3541,14 @@ func _draw_world() -> void:
 			7: Iso.held(Iso.ground_z(shops[it[2]]["chef"]), _draw_chef.bind(it[2]))
 			8: PowerUps.draw_mascot(self, Iso.to_screen(it[2]["pos"]), it[2]["phase"])
 			9: Iso.held(Iso.ground_z(it[3]), _draw_sprop.bind(it[2], it[3]))
-			10: Iso.held(Iso.ground_z(it[2]["pos"]), events.draw_actor.bind(self, it[2]))
+			10:
+				Sprites.fade = float(it[2].get("fade", 1.0))   # (stepping out of a door or a van, or in)
+				Iso.held(Iso.ground_z(it[2]["pos"]), events.draw_actor.bind(self, it[2]))
+				Sprites.fade = 1.0
+		if pops != null:
+			pops.end()
+	if pops != null:
+		pops.finish(vr)
 	_draw_gondola_cable()
 	_draw_lifts(vr)
 	_draw_overlays()
@@ -4102,12 +4173,14 @@ func _draw_ped(p: Dictionary) -> void:
 	var design := Sprites.cast(p, p.get("looks", []))
 	if design == "":
 		return
-	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+	Sprites.fade = float(p.get("fade", 1.0))   # (going in at a door, or coming back out)
+	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2 * Sprites.fade))
 	if cheering:
 		Sprites.draw_cheer(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0)
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
 	else:
 		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0, Color.WHITE, p)
+	Sprites.fade = 1.0
 	if float(p.get("say_t", 0.0)) > 0.0:
 		_label(p["say"], ground + Vector2(0, -52), 8, Color(0.85, 0.95, 1.0))
 

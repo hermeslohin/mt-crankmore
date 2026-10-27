@@ -776,6 +776,7 @@ func _viewer_go(i: int) -> void:
 	for e in city.events.events:
 		city.events._end(e)
 	city.events.events.clear()
+	city.events.leaving.clear()
 	city.challenge = {}
 	city.outage_t = 0.0
 	city.events.next_t = 1e9

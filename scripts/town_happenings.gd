@@ -218,9 +218,10 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			var s := 0.0
 			var best := 1e9
 			var q := 0.0
-			while q < float(r["len"]):
-				var dd: float = (city._road_at(r, q)[0] as Vector2).distance_to(city.p_pos)
-				if dd < best:
+			while q < float(r["len"]):   # the nearest point of the loop out of sight: it floats into view
+				var at: Vector2 = city._road_at(r, q)[0]
+				var dd: float = at.distance_to(city.p_pos)
+				if dd < best and (allow_in_view or not city._in_view(at)):
 					best = dd
 					s = q
 				q += 0.5
@@ -228,6 +229,7 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["s"] = s
 			e["dir"] = 1.0 if randf() < 0.5 else -1.0
 			e["t"] = float(r["len"]) / 0.55
+			pos = city._road_at(r, s)[0]
 			for k in 4:
 				var h := _extra(e, pos, pos)
 				h["handler"] = k
@@ -512,12 +514,13 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 				return false
 			e["t"] = 60.0
 			var have: Array = ZOMBIES.filter(func(d): return _has("ped_%s_walk" % d))
+			var from: Vector2 = city.challenge_pos()[0]   # (out of sight behind you, closing in)
 			for k in 4:
 				var z: Dictionary
 				if k < have.size():
-					z = _person(city.p_pos, have[k], city.p_fwd)
+					z = _person(from, have[k], city.p_fwd)
 				else:   # no zombie art yet: trick-or-treaters gone a bit green
-					z = _person(city.p_pos, "", city.p_fwd)
+					z = _person(from, "", city.p_fwd)
 					z["looks"] = (["tot_ghost", "tot_witch", "tot_pumpkin", "tot_skeleton"] + KIDS).filter(func(d): return _has("ped_%s_walk" % d))
 					z["tint"] = Color(0.7, 1.0, 0.65)
 				z["zombie"] = k
@@ -601,7 +604,7 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			if not city.start_challenge("kid_race"):
 				return false
 			e["t"] = 80.0
-			var at: Array = city._rail_ahead(0.0, city.BIKE_LANE - 0.4)
+			var at: Array = city._rail_ahead(-16.0, city.BIKE_LANE - 0.4)   # (pedals up from behind you)
 			var kid := {"type": "rider", "who": "kid" if Sprites.sheet("bike_kid") != null else "", "design": "", "looks": KIDS,
 				"k": 0, "pos": at[0], "face": at[1], "phase": 0.0, "pedal": 0.0, "label_t": 0.0}
 			e["actors"].append(kid)
@@ -610,8 +613,9 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			if not city.start_challenge("gulls"):
 				return false
 			e["t"] = 100.0   # as long as the chase can last
+			var from: Array = city.challenge_pos()   # (out of sight behind you, closing in)
 			for k in 4:
-				e["actors"].append({"type": "gull", "k": k, "pos": city.p_pos, "face": city.p_fwd, "phase": randf() * 2.0, "label_t": 0.0})
+				e["actors"].append({"type": "gull", "k": k, "pos": from[0], "face": from[1], "phase": randf() * 2.0, "label_t": 0.0})
 			_say(e["actors"][0], "MINE! MINE!", 2.0)
 			Game.toast.emit("SEAGULLS! They want your pizza - get away (90% of your FTP)!", Color(1.0, 0.85, 0.4))
 	return true
@@ -702,6 +706,7 @@ func _step(e: Dictionary, delta: float) -> void:
 				"drive":
 					if not car.is_empty():
 						car["pos"] = (car["pos"] as Vector2) + (car["face"] as Vector2) * minf(float(e["clock"]) * 1.5, 3.0) * delta
+						car["moving"] = true
 					if e["clock"] > 6.0:
 						e["t"] = minf(float(e["t"]), 0.5)
 		"flash_mob":
@@ -823,9 +828,14 @@ func _step(e: Dictionary, delta: float) -> void:
 		"sledding":
 			for a in e["actors"]:
 				if a["type"] == "sled":
-					var u := fposmod(float(e["clock"]) * 0.25 + float(a["phase"]), 1.0)
+					# down the slope (4 s), then off the sled and back up the hill with it (6 s)
+					if not a.has("ph0"):
+						a["ph0"] = a["phase"]
+					var c := fposmod(float(e["clock"]) * 0.1 + float(a["ph0"]), 1.0)
+					var u := c / 0.4 if c < 0.4 else 1.0 - (c - 0.4) / 0.6
 					a["pos"] = (a["top"] as Vector2) + (a["face"] as Vector2) * u * 5.0
 					a["u"] = u
+					a["climb"] = c >= 0.4
 		"tree_lighting":
 			var tree: Dictionary = e["tree"]
 			if e["stage"] == "count":
@@ -980,20 +990,18 @@ func _step(e: Dictionary, delta: float) -> void:
 					e["leave_d"] = ((kid["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
 				e["leave_d"] = float(e["leave_d"]) + (city.p_speed + 1.5) * delta
 				var at: Array = city._rail_ahead(float(e["leave_d"]), city.BIKE_LANE - 0.4)
-				kid["pos"] = at[0]
+				_place(kid, at[0])
 				kid["face"] = at[1]
 				e["t"] = minf(float(e["t"]), 3.0)
 				return
 			var at: Array = city.challenge_pos()
-			kid["pos"] = at[0]
+			var u: float = clampf(1.0 - float(c.get("count", 0.0)) / 3.0, 0.0, 1.0)
+			if c["state"] == "count":   # pedals up from out of sight behind you while counting down
+				at = city._rail_ahead(lerpf(-16.0, 0.0, u * (2.0 - u)), city.BIKE_LANE - 0.4)
+			_place(kid, at[0])
 			kid["face"] = at[1]
 			kid["pedal"] = float(kid["pedal"]) + delta * 8.0
 			if c["state"] == "count":
-				# pedals up from out of sight behind you while counting down
-				var u: float = clampf(1.0 - float(c["count"]) / 3.0, 0.0, 1.0)
-				var back: Array = city._rail_ahead(lerpf(-16.0, 0.0, u * (2.0 - u)), city.BIKE_LANE - 0.4)
-				kid["pos"] = back[0]
-				kid["face"] = back[1]
 				if kid["label_t"] <= 0.0 and u > 0.6:
 					_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9)
 			elif c["state"] == "won" and not e.get("said", false):
@@ -1201,13 +1209,17 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 		"fx":
 			(a["fn"] as Callable).call(ci, a, ground)
 		"sled":
-			var u: float = a.get("u", 0.0)
-			var alpha := clampf(minf(u, 1.0 - u) * 10.0, 0.0, 1.0)
-			if not Sprites.draw_vehicle(ci, "obj_sled_kid", ground, a["face"], Color(1, 1, 1, alpha), 0, a):
-				var look := Sprites.cast(a["look"], KIDS)
+			var climb: bool = a.get("climb", false)
+			var look := Sprites.cast(a["look"], KIDS, true)   # (kept all the way down, for the walk back up)
+			if climb or not Sprites.draw_vehicle(ci, "obj_sled_kid", ground, a["face"], Color.WHITE, 0, a):
+				# (walking it back up the hill, or no sled art: a kid on a red sled)
 				if look != "":
-					ci.draw_rect(Rect2(ground + Vector2(-7, -3), Vector2(14, 4)), Color(0.8, 0.2, 0.15, alpha))
-					Sprites.draw_person(ci, "ped_%s_walk" % look, ground + Vector2(0, -3), a["face"], 0.0, 0.0, Color(1, 1, 1, alpha))
+					var back := Iso.to_screen(a["pos"] + (a["face"] as Vector2) * 0.35) if climb else ground
+					ci.draw_rect(Rect2(back + Vector2(-7, -3), Vector2(14, 4)), Color(0.8, 0.2, 0.15))
+					if climb:
+						Sprites.draw_person(ci, "ped_%s_walk" % look, ground, -(a["face"] as Vector2), ph, 6.0)
+					else:
+						Sprites.draw_person(ci, "ped_%s_walk" % look, ground + Vector2(0, -3), a["face"], 0.0, 0.0)
 		"cart":
 			if not Sprites.draw_vehicle(ci, "obj_shopping_cart", ground, Vector2.from_angle(float(a["spin"])), Color.WHITE, 0, a):
 				ci.draw_rect(Rect2(ground + Vector2(-6, -10), Vector2(12, 8)), Color(0.75, 0.78, 0.82), false, 1.0)

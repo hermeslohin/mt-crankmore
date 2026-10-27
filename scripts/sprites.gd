@@ -40,6 +40,8 @@ const CHARACTER_DESIGNS := ["jogger", "hiker", "surfer", "artist", "skater_kid",
 const PEDESTRIAN_DESIGNS := NORMAL_DESIGNS + CHARACTER_DESIGNS
 const NORMAL_WEIGHT := 4
 static var _peds: Array = []
+## How faded in everything drawn is (1 = fully there): someone stepping out of a door or into a van fades in or out.
+static var fade := 1.0
 
 
 ## The pedestrian designs that have art, ordinary people NORMAL_WEIGHT times over, so picking one at random (or by an
@@ -58,7 +60,9 @@ static func pedestrians() -> Array:
 ## The cast: nobody shows up twice on screen at once. Everyone drawn asks cast() for their look each frame; someone
 ## who was on screen last frame keeps theirs, and a newcomer gets the first look in their own (shuffled, everyday people
 ## first) order that nobody else on screen has. `options` limits the choice (the givers, firefighters, kid skiers...);
-## when every option is taken it returns "" (skip drawing them), or options[0] when `must` (someone a scene needs).
+## when every option is taken it returns "" (skip drawing them), or, when `must` (someone a scene needs), a double: a
+## look someone else on screen has too. A double keeps that look while on screen (and never takes it off whoever had
+## it first), so nobody ever changes look in front of you.
 ## Designs only ever worn by a role (police, builders...) are left out of the everyday choice.
 const ROLE_ONLY := ["police", "construction"]
 static var _uid := 0
@@ -69,6 +73,8 @@ static var _taken := {}         # look -> uid, this frame
 static var _held := {}          # look -> uid that had it last frame
 static var _hid_prev := {}      # uids left out last frame (nobody to be): they stay out until they've left the screen
 static var _hid_now := {}
+static var _dbl_prev := {}      # uids drawn as a double last frame
+static var _dbl_now := {}
 static var _everyone: Array = []
 static var doubles := 0         # times someone had to be drawn in a look already on screen (debugging)
 
@@ -81,16 +87,28 @@ static func cast(person: Dictionary, options: Array = [], must := false) -> Stri
 		_cast_now = {}
 		_hid_prev = _hid_now
 		_hid_now = {}
+		_dbl_prev = _dbl_now
+		_dbl_now = {}
 		_taken = {}
 		_held = {}
-		for u in _cast_prev:
-			_held[_cast_prev[u]] = u
+		for u in _cast_prev:   # (whoever had a look first holds it; a double only when nobody else has it any more)
+			if not _dbl_prev.has(u):
+				_held[_cast_prev[u]] = u
+		for u in _dbl_prev:
+			if not _held.has(_cast_prev[u]):
+				_held[_cast_prev[u]] = u
 	var u := uid(person)
 	if _cast_now.has(u):
 		return _cast_now[u]
 	var pool: Array = options if not options.is_empty() else _order(person)
 	var pick := ""
 	var had: String = _cast_prev.get(u, "")
+	if had != "" and had in pool and _dbl_prev.has(u) and _held.get(had, u) != u:
+		# still a double: they keep their look
+		doubles += 1
+		_dbl_now[u] = true
+		_cast_now[u] = had
+		return had
 	if had != "" and had in pool and not _taken.has(had):
 		pick = had
 	else:
@@ -104,8 +122,16 @@ static func cast(person: Dictionary, options: Array = [], must := false) -> Stri
 			_hid_now[u] = true
 			return ""
 		if pick == "":
+			# nobody free to be: a double, in a look nobody's been given yet this frame if there is one
 			pick = pool[0]
+			for d in pool:
+				if not _taken.has(d):
+					pick = d
+					break
 			doubles += 1
+			_dbl_now[u] = true
+			_cast_now[u] = pick
+			return pick
 	_taken[pick] = u
 	_cast_now[u] = pick
 	return pick
@@ -338,6 +364,8 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	var frames := maxi(1, tex.get_width() / fh)
 	var src := Rect2(posmod(int(t * fps), frames) * fh, 0, fh, fh)
 	var tl := (at - Vector2(fh * 0.5, fh - STRIP_FEET_MARGIN if feet else fh * 0.5)).round()
+	tint.a *= fade
+	_mark(Rect2(tl, Vector2(fh, fh)), tint.a)
 	if flip:
 		_mirrored(ci, tl.x + fh * 0.5, func(): ci.draw_texture_rect_region(tex, Rect2(tl, Vector2(fh, fh)), src, tint))
 	else:
@@ -461,6 +489,8 @@ static func turn_rows(st: Dictionary, w: Vector2) -> Array:
 ## One frame (column `x`) of an 8-row sheet in the view `rows` gives (see turn_rows): mid-turn, the new view over the
 ## old one, fading in.
 static func _draw_turning(ci: CanvasItem, tex: Texture2D, dst: Rect2, x: float, fw: float, fh: float, rows: Array, tint: Color) -> void:
+	tint.a *= fade
+	_mark(dst, tint.a)
 	var from := int(rows[1])
 	var to := int(rows[0])
 	if float(rows[2]) < 1.0 and from != to:
@@ -492,11 +522,23 @@ static func draw_image(ci: CanvasItem, name: String, at: Vector2, flip := false,
 	var w := float(tex.get_width()) * scale
 	var h := float(tex.get_height()) * scale
 	var top_left := (at - Vector2(w * 0.5, h)).round()
+	alpha *= fade
+	_mark(Rect2(top_left, Vector2(w, h)), alpha)
 	if flip:
 		_mirrored(ci, top_left.x + w * 0.5, func(): ci.draw_texture_rect(tex, Rect2(top_left, Vector2(w, h)), false, Color(1, 1, 1, alpha)))
 	else:
 		ci.draw_texture_rect(tex, Rect2(top_left, Vector2(w, h)), false, Color(1, 1, 1, alpha))
 	return true
+
+
+## Dev helper (PIZZA_POPS, see tools/pop_watch.gd): while `marking`, the screen rect and strongest alpha of what's drawn.
+static var marking := false
+static var marked := Rect2()
+static var marked_a := 0.0
+static func _mark(r: Rect2, a: float) -> void:
+	if marking:
+		marked = r if marked_a <= 0.0 else marked.merge(r)
+		marked_a = maxf(marked_a, maxf(a, 0.001))
 
 
 ## Runs `fn` (some drawing) mirrored left to right about the vertical line x = `mid`. (A negative-width rect doesn't

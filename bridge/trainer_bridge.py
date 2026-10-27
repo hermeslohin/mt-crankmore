@@ -6,6 +6,8 @@ Godot has no Bluetooth LE support, so this small program talks BLE and relays ov
 
   trainer  (FTMS, standard)  -> power / cadence / speed        -> game  (UDP 9871)
   game  -> road grade (town hills, Mt. Crankmore) + virtual gear -> trainer resistance (FTMS simulation)
+  or a power meter (Cycling Power, 0x1818: pedals, cranks, spiders) -> power / cadence -> game
+     (no resistance to control: hills and virtual gears don't change how hard it feels, shift the real bike)
   handlebar controllers (proprietary, service 0xFC82) -> button presses -> game
 
 Normally the game starts this for you ("Connect Trainer" on the title screen) in --managed mode,
@@ -43,6 +45,9 @@ LISTEN_PORT = 9872
 FTMS_SERVICE = "00001826-0000-1000-8000-00805f9b34fb"
 INDOOR_BIKE_DATA = "00002ad2-0000-1000-8000-00805f9b34fb"
 FTMS_CONTROL_POINT = "00002ad9-0000-1000-8000-00805f9b34fb"
+
+CPS_SERVICE = "00001818-0000-1000-8000-00805f9b34fb"       # Cycling Power: power meters (and many trainers too)
+CP_MEASUREMENT = "00002a63-0000-1000-8000-00805f9b34fb"
 
 CTRL_SERVICE = "0000fc82-0000-1000-8000-00805f9b34fb"
 CTRL_ASYNC = "00000002-19ca-4651-86e5-fa29dcdd09d1"      # notifications: buttons
@@ -128,7 +133,15 @@ def name_of(dev, adv):
 
 
 def is_trainer(dev, adv):
-    return FTMS_SERVICE in uuids(adv)
+    """Anything that can supply the power: a smart trainer (FTMS) or a power meter (Cycling Power)."""
+    u = uuids(adv)
+    return FTMS_SERVICE in u or CPS_SERVICE in u
+
+
+def is_power_meter(dev, adv):
+    """Power only, no trainer to control. A trainer offering both is used as a trainer."""
+    u = uuids(adv)
+    return CPS_SERVICE in u and FTMS_SERVICE not in u
 
 
 def is_controller(dev, adv):
@@ -190,7 +203,7 @@ class Discovery:
             if not (trainer or controller):
                 continue
             out.append({"address": addr, "name": name_of(dev, adv) or "(unnamed)", "rssi": adv.rssi or -99,
-                        "kind": "trainer" if trainer else "controller"})
+                        "kind": "trainer" if trainer else "controller", "power_meter": is_power_meter(dev, adv)})
         out.sort(key=lambda d: (d["kind"] != "trainer", -d["rssi"]))
         return out
 
@@ -244,7 +257,80 @@ def sim_packet(grade_pct: float) -> bytes:
     return struct.pack("<BhhBB", 0x11, 0, int(round(grade * 100)), int(SIM_CRR * 10000), int(SIM_CW * 100))
 
 
+# ---------------------------------------------------------------- power meter (Cycling Power)
+
+def parse_cycling_power(data: bytes) -> dict:
+    """Cycling Power Measurement: flags, instantaneous power, then optional fields in a fixed order.
+    Returns power, and the crank revolution data (count, event time in 1/1024 s) when it's there."""
+    flags = struct.unpack_from("<H", data, 0)[0]
+    out = {"power": struct.unpack_from("<h", data, 2)[0]}
+    off = 4
+    if flags & 0x0001:
+        off += 1                                 # pedal power balance
+    if flags & 0x0004:
+        off += 2                                 # accumulated torque
+    if flags & 0x0010:
+        off += 6                                 # wheel revolutions (u32) + last wheel event time (u16)
+    if flags & 0x0020 and len(data) >= off + 4:
+        out["crank_revs"], out["crank_time"] = struct.unpack_from("<HH", data, off)
+    return out
+
+
+class Cadence:
+    """Cadence from a power meter's crank revolution counter and event clock (both wrap at 65536)."""
+
+    def __init__(self):
+        self.last = None
+        self.rpm = 0.0
+        self.moved_at = 0.0
+
+    def update(self, revs: int, t1024: int, now: float) -> float:
+        if self.last is not None:
+            dr = (revs - self.last[0]) & 0xFFFF
+            dt = ((t1024 - self.last[1]) & 0xFFFF) / 1024.0
+            if dr > 0 and dt > 0:
+                rpm = dr / dt * 60.0
+                if rpm < 250:
+                    self.rpm = rpm
+                self.moved_at = now
+        self.last = (revs, t1024)
+        if now - self.moved_at > 3.0:   # no new pedal stroke for a while: stopped
+            self.rpm = 0.0
+        return self.rpm
+
+
+async def power_meter_session(client, state: State, addr: str):
+    cad = Cadence()
+
+    def on_data(_, data: bytearray):
+        try:
+            d = parse_cycling_power(bytes(data))
+        except Exception:
+            return
+        now = time.time()
+        state.power = float(max(0, d["power"]))
+        if "crank_revs" in d:
+            state.cadence = cad.update(d["crank_revs"], d["crank_time"], now)
+        state.speed = 0.0                        # a power meter doesn't know; the game works it out from the watts
+        state.trainer = True
+        state.trainer_seen = now
+
+    await client.start_notify(CP_MEASUREMENT, on_data)
+    state.control_ready = False
+    log("trainer: power meter (Cycling Power) - power and cadence only, no resistance control")
+    while client.is_connected and state.want["trainer"] == addr and not state.quit:
+        await asyncio.sleep(0.25)
+    state.trainer = False
+
+
 async def trainer_session(client, state: State, addr: str):
+    if client.services.get_service(FTMS_SERVICE) is None:
+        if client.services.get_service(CPS_SERVICE) is not None:
+            await power_meter_session(client, state, addr)
+            return
+        log("trainer: neither a trainer (FTMS) nor a power meter (Cycling Power) service on this device")
+        return
+
     def on_data(_, data: bytearray):
         try:
             d = parse_indoor_bike_data(bytes(data))
@@ -684,7 +770,9 @@ async def scan_once():
     found = await BleakScanner.discover(timeout=8.0, return_adv=True)
     for addr, (dev, adv) in sorted(found.items(), key=lambda kv: -(kv[1][1].rssi or -999)):
         tags = []
-        if is_trainer(dev, adv):
+        if is_power_meter(dev, adv):
+            tags.append("POWER METER")
+        elif is_trainer(dev, adv):
             tags.append("TRAINER(FTMS)")
         if is_controller(dev, adv):
             tags.append("CONTROLLER")

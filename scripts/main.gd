@@ -318,21 +318,22 @@ func _trainer_menu() -> Dictionary:
 			shown[addr] = true
 			var info := Trainer.role_info(role)
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
-			var tag := "TRAINER " if role == "trainer" else "CONTROLS"
+			var pm: bool = d.get("power_meter", false)   # power and cadence only: no resistance for hills or gears
+			var tag := ("POWER   " if pm else "TRAINER ") if role == "trainer" else "CONTROLS"
 			var signal_bars := "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
 			if connected:
 				items.append({"label": "%s  %s  [connected - disconnect]" % [tag, d["name"]], "fn": Trainer.disconnect_device.bind(role),
 					"detail": "Select to disconnect this device."})
 			else:
 				items.append({"label": "%s  %s  %s" % [tag, d["name"], signal_bars], "fn": Trainer.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % ("trainer (power, cadence, climbs)" if role == "trainer" else "handlebar controllers (buttons)")})
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")})
 		for role in ["trainer", "controller"]:
 			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
 				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", info.get("name", "device")],
 					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
 		if Trainer.devices().is_empty():
-			lines.append("No trainers or handlebar controllers found yet.")
+			lines.append("No trainers, power meters or handlebar controllers found yet.")
 	items.append({"label": "Back", "fn": func():
 		Trainer.scan(false)
 		_show_title(), "detail": ""})

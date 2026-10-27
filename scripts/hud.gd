@@ -21,6 +21,7 @@ var menu_age := 0.0
 var menu_cache: Dictionary = {}
 var title_mode := false
 var capture := {}           # while a remap screen waits for a key or button: {"device", "action", "slot", "t"}
+var menu_note := {}         # a remap result shown inside the menu (a toast would be hidden under it): {"text", "color", "t"}
 var _adjust_hold := 0.0     # how long LEFT / RIGHT has been held on an adjustable item (for auto-repeat)
 var _adjust_next := 0.0
 
@@ -89,6 +90,7 @@ func open_menu(builder: Callable, is_title: bool = false) -> void:
 	menu_open = true
 	title_mode = is_title
 	menu_age = 0.0
+	menu_note = {}
 	_rebuild_menu()
 	menu_panel.visible = true
 
@@ -131,6 +133,11 @@ func _rebuild_menu() -> void:
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size = Vector2(330, 0)
 		menu_box.add_child(d)
+	if not menu_note.is_empty():
+		var n := _mk_label(menu_note["text"], 9, menu_note["color"])
+		n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		n.custom_minimum_size = Vector2(330, 0)
+		menu_box.add_child(n)
 	var adjustable: bool = not items.is_empty() and items[menu_index].has("adjust")
 	var hint := "UP/DOWN choose   E/A select   ESC/B back"
 	if not capture.is_empty():
@@ -177,6 +184,12 @@ func _process(delta: float) -> void:
 	for f in feed:
 		f["t"] -= delta
 	feed = feed.filter(func(f): return f["t"] > 0.0)
+	if not menu_note.is_empty():
+		menu_note["t"] -= delta
+		if menu_note["t"] <= 0.0:
+			menu_note = {}
+			if menu_open:
+				_rebuild_menu()
 	if not capture.is_empty():   # remapping: nothing else may react to the key being pressed
 		capture["t"] -= delta
 		if capture["t"] <= 0.0:
@@ -213,6 +226,7 @@ func _process(delta: float) -> void:
 func begin_capture(device: String, action: String, slot: int) -> void:
 	capture = {"device": device, "action": action, "slot": slot, "t": 8.0}
 	menu_age = 0.0
+	menu_note = {}
 	if device == "pad":
 		Trainer.capture = _pad_captured
 	_rebuild_menu()
@@ -224,7 +238,7 @@ func _pad_captured(button: String) -> void:
 	_end_capture(Controls.bind("pad", capture["action"], capture["slot"], button))
 
 
-## Ends a capture; `msg` (a refusal, or a note that a key was taken from another action) is shown as a toast.
+## Ends a capture; `msg` (a refusal, or a note that a key was taken from another action) is shown in the menu.
 func _end_capture(msg: String) -> void:
 	if capture.is_empty():
 		return
@@ -232,7 +246,11 @@ func _end_capture(msg: String) -> void:
 	Trainer.capture = Callable()
 	menu_age = 0.0   # the press that ended it must not also drive the menu
 	if msg != "":
-		Game.toast.emit(msg, Color(1.0, 0.85, 0.4) if msg.begins_with("Took") else Color(1.0, 0.6, 0.4))
+		var col := Color(1.0, 0.85, 0.4) if msg.begins_with("Took") else Color(1.0, 0.6, 0.4)
+		if menu_open:
+			menu_note = {"text": msg, "color": col, "t": 6.0}
+		else:
+			Game.toast.emit(msg, col)
 	if menu_open and menu_builder.is_valid():
 		_rebuild_menu()
 

@@ -1224,6 +1224,7 @@ func _debug_readme() -> void:
 	var save := func(file: String) -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
+	Game.money = maxi(Game.money, 420)   # (whatever's in your save, the pictures show a rider with some cash)
 	await get_tree().create_timer(2.0).timeout
 	await save.call("title.png")
 	_start_game()

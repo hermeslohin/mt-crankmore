@@ -4,15 +4,33 @@
 
 A colorful 16-bit-style isometric pizza-delivery racing game set in Crankmore Village, an isolated mountain resort town, through all four seasons, built in **Godot 4**.
 The game renders at 640x360 and scales up with crisp integer pixels (2x in the default 1280x720 window).
-Pedal a **bicycle trainer** (optionally with handlebar controllers) to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
+Pedal a **bicycle trainer** (Bluetooth or Wi-Fi, optionally with handlebar controllers) or just a **Bluetooth power meter** to ride; rival pizza bikers (3 by default, up to 7) trash-talk you the whole way.
 
 ![Title screen](docs/title.png)
 
 ![Out on a delivery, pizza steaming on the bike](docs/delivery.png)
 
+## What's new in 0.8
+
+* **A whole 90s town that lives.** Day turns to night over an hour, street lamps come on, it rains through spring to fall and snows in winter. Dozens of happenings: a marching band, parades, fireworks, soapbox speakers, group rides, building fires, ambulances, robberies, a runaway dog, a construction site that orders pizza, chairlifts full of skiers, Santa's sleigh on winter nights, seagulls and (in the fall) zombie kids. Nothing pops into or out of sight any more: people walk on and off, cars drive away.
+* **Challenges that pay.** Catch a thief or a bike thief, catch a runaway dog, race the hot rod or a kid on a BMX (to a chequered line along the roads, with big red arrows at the turns), pizza rushes, hill sprints, and a mountain rescue up Mt. Crankmore. Each asks for a share of your FTP.
+* **Smooth turns.** Every car, truck, rider and townsperson turns through four in-between frames (made with PixelLab) instead of snapping between views, summer and winter outfits alike.
+* **Mt. Crankmore climbs like Alpe d'Huez.** 17 stacked hairpins, rock walls and drop-offs; Flour Run sweeps through long bends instead.
+* **The bear.** If it catches you, you wipe out, the ski patrol wheels your bike away and brings a new one: 15 seconds gone.
+* **Ride anywhere across the road**, oncoming lane included (oncoming cars wait for you).
+* **More ways to ride:** Bluetooth power meters, Wi-Fi trainers (Wahoo Direct Connect), and a trainer that goes quiet now reconnects by itself.
+* **A sprite viewer** (`tools/sprite_viewer/index.html`): browse every sprite, watch it turn, swap colours and seasons.
+
+| | |
+|---|---|
+| ![Switchback climb with cliffs on Mt. Crankmore](docs/switchbacks.png) | ![Racing the hot rod: a red arrow painted on the road for the turn](docs/race_arrow.png) |
+| ![Caught by the bear: the ski patrol wheels your bike away](docs/bear.png) | ![Night in the village, street lamps on](docs/night.png) |
+
+![The sprite viewer](docs/sprite_viewer.png)
+
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.5**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.8**):
 
 | Platform | File | How to run |
 |---|---|---|

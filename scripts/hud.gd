@@ -21,6 +21,7 @@ var menu_age := 0.0
 var menu_cache: Dictionary = {}
 var title_mode := false
 var capture := {}           # while a remap screen waits for a key or button: {"device", "action", "slot", "t"}
+var menu_note := {}         # a remap result shown inside the menu (a toast would be hidden under it): {"text", "color", "t"}
 var _adjust_hold := 0.0     # how long LEFT / RIGHT has been held on an adjustable item (for auto-repeat)
 var _adjust_next := 0.0
 
@@ -89,6 +90,7 @@ func open_menu(builder: Callable, is_title: bool = false) -> void:
 	menu_open = true
 	title_mode = is_title
 	menu_age = 0.0
+	menu_note = {}
 	_rebuild_menu()
 	menu_panel.visible = true
 
@@ -131,6 +133,11 @@ func _rebuild_menu() -> void:
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size = Vector2(330, 0)
 		menu_box.add_child(d)
+	if not menu_note.is_empty():
+		var n := _mk_label(menu_note["text"], 9, menu_note["color"])
+		n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		n.custom_minimum_size = Vector2(330, 0)
+		menu_box.add_child(n)
 	var adjustable: bool = not items.is_empty() and items[menu_index].has("adjust")
 	var hint := "UP/DOWN choose   E/A select   ESC/B back"
 	if not capture.is_empty():
@@ -177,6 +184,12 @@ func _process(delta: float) -> void:
 	for f in feed:
 		f["t"] -= delta
 	feed = feed.filter(func(f): return f["t"] > 0.0)
+	if not menu_note.is_empty():
+		menu_note["t"] -= delta
+		if menu_note["t"] <= 0.0:
+			menu_note = {}
+			if menu_open:
+				_rebuild_menu()
 	if not capture.is_empty():   # remapping: nothing else may react to the key being pressed
 		capture["t"] -= delta
 		if capture["t"] <= 0.0:
@@ -213,6 +226,7 @@ func _process(delta: float) -> void:
 func begin_capture(device: String, action: String, slot: int) -> void:
 	capture = {"device": device, "action": action, "slot": slot, "t": 8.0}
 	menu_age = 0.0
+	menu_note = {}
 	if device == "pad":
 		Trainer.capture = _pad_captured
 	_rebuild_menu()
@@ -224,7 +238,7 @@ func _pad_captured(button: String) -> void:
 	_end_capture(Controls.bind("pad", capture["action"], capture["slot"], button))
 
 
-## Ends a capture; `msg` (a refusal, or a note that a key was taken from another action) is shown as a toast.
+## Ends a capture; `msg` (a refusal, or a note that a key was taken from another action) is shown in the menu.
 func _end_capture(msg: String) -> void:
 	if capture.is_empty():
 		return
@@ -232,7 +246,11 @@ func _end_capture(msg: String) -> void:
 	Trainer.capture = Callable()
 	menu_age = 0.0   # the press that ended it must not also drive the menu
 	if msg != "":
-		Game.toast.emit(msg, Color(1.0, 0.85, 0.4) if msg.begins_with("Took") else Color(1.0, 0.6, 0.4))
+		var col := Color(1.0, 0.85, 0.4) if msg.begins_with("Took") else Color(1.0, 0.6, 0.4)
+		if menu_open:
+			menu_note = {"text": msg, "color": col, "t": 6.0}
+		else:
+			Game.toast.emit(msg, col)
 	if menu_open and menu_builder.is_valid():
 		_rebuild_menu()
 
@@ -241,9 +259,19 @@ func _input(event: InputEvent) -> void:
 	if capture.is_empty():
 		return
 	var k := event as InputEventKey
-	if k == null or not k.pressed or k.echo or k.physical_keycode == KEY_NONE or k.physical_keycode == KEY_F11:
+	if k == null or k.echo or k.physical_keycode == KEY_NONE or k.physical_keycode == KEY_F11:
 		return
 	get_viewport().set_input_as_handled()
+	# Shift / Ctrl / Alt / Cmd wait for their release: typing "<" (Shift + comma) binds the comma key, and only a
+	# modifier pressed and let go on its own binds the modifier.
+	var modifier := k.physical_keycode in [KEY_SHIFT, KEY_CTRL, KEY_ALT, KEY_META]
+	if not k.pressed:
+		if modifier and capture.get("mod", KEY_NONE) == k.physical_keycode and capture["device"] == "key":
+			_end_capture(Controls.bind("key", capture["action"], capture["slot"], int(k.physical_keycode)))
+		return
+	if modifier:
+		capture["mod"] = k.physical_keycode
+		return
 	match k.physical_keycode:
 		KEY_ESCAPE:
 			_end_capture("")
@@ -252,6 +280,9 @@ func _input(event: InputEvent) -> void:
 		_:
 			if capture["device"] == "key":
 				_end_capture(Controls.bind("key", capture["action"], capture["slot"], int(k.physical_keycode)))
+			else:   # a controller screen ignores keys: say so, or it looks like nothing happened
+				menu_note = {"text": "This screen sets controller buttons: press one on the controller (ESC cancels). Keyboard keys are under \"Keyboard: ...\" in Controls.", "color": Color(1.0, 0.6, 0.4), "t": 6.0}
+				_rebuild_menu()
 
 
 ## LEFT / RIGHT on a setting: one step per press, then auto-repeat while held (getting faster).

@@ -949,10 +949,10 @@ func _place_nature() -> void:
 				var tv: Vector2 = at[1]
 				var n := Vector2(-tv.y, tv.x)
 				for side in ([1.0, -1.0] if village else [1.0 if k % 6 == 0 else -1.0]):
-					var lp: Vector2 = p + n * side * (ROAD_HW + 0.55)
+					var lp: Vector2 = p + n * side * (ROAD_HW + 0.24)   # on the kerb, clear of the pavement people walk along
 					var ix := int(lp.x)
 					var iy := int(lp.y)
-					if ix >= 0 and iy >= 0 and ix < N and iy < N and reserved[iy * N + ix] != 2 and _road_dist(lp) > ROAD_HW + 0.45:
+					if ix >= 0 and iy >= 0 and ix < N and iy < N and reserved[iy * N + ix] != 2 and _road_dist(lp) > ROAD_HW + 0.18:
 						props.append({"kind": "lamp", "pos": lp})
 			s += 3.5
 	# beach umbrellas on the west shore

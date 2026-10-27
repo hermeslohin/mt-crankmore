@@ -1,5 +1,5 @@
 extends Node
-## Global game state: money, garage, rider settings (FTP, weight, difficulty, rivals), physics helpers, input map, save/load.
+## Global game state: money, garage, rider settings (FTP, weight, difficulty, rivals), physics helpers, save/load (the input map lives in controls.gd).
 
 signal toast(text: String, color: Color)
 signal feed(text: String, color: Color)
@@ -68,35 +68,7 @@ var setup_done := false       # the rider has seen the setup screen at least onc
 
 
 func _ready() -> void:
-	_setup_input()
 	load_game()
-
-
-func _setup_input() -> void:
-	var map := {
-		"steer_left": [KEY_A, KEY_LEFT],
-		"steer_right": [KEY_D, KEY_RIGHT],
-		"pedal": [KEY_W],
-		"brake": [KEY_S],
-		"sprint": [KEY_SHIFT],
-		"powerup": [KEY_Y, KEY_SPACE],
-		"honk": [KEY_H],
-		"lane_left": [],      # the handlebar paddles: move across the road (never pick a turn)
-		"lane_right": [],
-		"shift_up": [KEY_R, KEY_BRACKETRIGHT],
-		"shift_down": [KEY_Q, KEY_BRACKETLEFT],
-		"act_up": [KEY_UP],
-		"act_down": [KEY_DOWN],
-		"act_select": [KEY_E, KEY_ENTER],
-		"act_back": [KEY_ESCAPE],
-	}
-	for action in map:
-		if not InputMap.has_action(action):
-			InputMap.add_action(action)
-		for k in map[action]:
-			var ev := InputEventKey.new()
-			ev.physical_keycode = k
-			InputMap.action_add_event(action, ev)
 
 
 # ---- bikes -------------------------------------------------------------

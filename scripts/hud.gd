@@ -20,6 +20,7 @@ var menu_open := false
 var menu_age := 0.0
 var menu_cache: Dictionary = {}
 var title_mode := false
+var capture := {}           # while a remap screen waits for a key or button: {"device", "action", "slot", "t"}
 var _adjust_hold := 0.0     # how long LEFT / RIGHT has been held on an adjustable item (for auto-repeat)
 var _adjust_next := 0.0
 
@@ -93,6 +94,7 @@ func open_menu(builder: Callable, is_title: bool = false) -> void:
 
 
 func close_menu() -> void:
+	_end_capture("")
 	menu_open = false
 	menu_panel.visible = false
 
@@ -130,7 +132,18 @@ func _rebuild_menu() -> void:
 		d.custom_minimum_size = Vector2(330, 0)
 		menu_box.add_child(d)
 	var adjustable: bool = not items.is_empty() and items[menu_index].has("adjust")
-	menu_box.add_child(_mk_label("UP/DOWN choose   LEFT/RIGHT change   E/A select   ESC/B back" if adjustable else "UP/DOWN choose   E/A select   ESC/B back", 8, Color(0.6, 0.65, 0.85)))
+	var hint := "UP/DOWN choose   E/A select   ESC/B back"
+	if not capture.is_empty():
+		hint = "Press the new %s    ESC cancel    DEL clear" % ("key" if capture["device"] == "key" else "controller button")
+	else:
+		var up: String = Controls.key("act_up").to_upper()
+		var dn: String = Controls.key("act_down").to_upper()
+		var lf: String = Controls.key("steer_left").to_upper()
+		var rt: String = Controls.key("steer_right").to_upper()
+		hint = "%s/%s choose   %s/A select   %s/B back" % [up, dn, Controls.key("act_select").to_upper(), Controls.key("act_back").to_upper()]
+		if adjustable:
+			hint = "%s/%s choose   %s/%s change   %s/A select   %s/B back" % [up, dn, lf, rt, Controls.key("act_select").to_upper(), Controls.key("act_back").to_upper()]
+	menu_box.add_child(_mk_label(hint, 8, Color(0.6, 0.65, 0.85)))
 	menu_panel.reset_size()
 
 
@@ -164,6 +177,12 @@ func _process(delta: float) -> void:
 	for f in feed:
 		f["t"] -= delta
 	feed = feed.filter(func(f): return f["t"] > 0.0)
+	if not capture.is_empty():   # remapping: nothing else may react to the key being pressed
+		capture["t"] -= delta
+		if capture["t"] <= 0.0:
+			_end_capture("")
+		queue_redraw()
+		return
 	if menu_open and menu_cache.get("live", false) and int(menu_age * 4.0) != int((menu_age - delta) * 4.0):
 		_rebuild_menu()  # live screens (device lists, connection status) refresh 4x a second
 	if menu_open and menu_age > 0.25:
@@ -187,6 +206,52 @@ func _process(delta: float) -> void:
 			close_menu()
 			main.on_menu_closed()
 	queue_redraw()
+
+
+## Waits for the player's next key ("key") or handlebar-controller button ("pad") and binds it to slot `slot` of `action`.
+## ESC cancels, DEL clears the slot, and it gives up on its own after 8 s.
+func begin_capture(device: String, action: String, slot: int) -> void:
+	capture = {"device": device, "action": action, "slot": slot, "t": 8.0}
+	menu_age = 0.0
+	if device == "pad":
+		Trainer.capture = _pad_captured
+	_rebuild_menu()
+
+
+func _pad_captured(button: String) -> void:
+	if capture.is_empty() or capture["device"] != "pad":
+		return
+	_end_capture(Controls.bind("pad", capture["action"], capture["slot"], button))
+
+
+## Ends a capture; `msg` (a refusal, or a note that a key was taken from another action) is shown as a toast.
+func _end_capture(msg: String) -> void:
+	if capture.is_empty():
+		return
+	capture = {}
+	Trainer.capture = Callable()
+	menu_age = 0.0   # the press that ended it must not also drive the menu
+	if msg != "":
+		Game.toast.emit(msg, Color(1.0, 0.85, 0.4) if msg.begins_with("Took") else Color(1.0, 0.6, 0.4))
+	if menu_open and menu_builder.is_valid():
+		_rebuild_menu()
+
+
+func _input(event: InputEvent) -> void:
+	if capture.is_empty():
+		return
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo or k.physical_keycode == KEY_NONE or k.physical_keycode == KEY_F11:
+		return
+	get_viewport().set_input_as_handled()
+	match k.physical_keycode:
+		KEY_ESCAPE:
+			_end_capture("")
+		KEY_DELETE, KEY_BACKSPACE:
+			_end_capture(Controls.clear_slot(capture["device"], capture["action"], capture["slot"]))
+		_:
+			if capture["device"] == "key":
+				_end_capture(Controls.bind("key", capture["action"], capture["slot"], int(k.physical_keycode)))
 
 
 ## LEFT / RIGHT on a setting: one step per press, then auto-repeat while held (getting faster).

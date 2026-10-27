@@ -30,7 +30,7 @@ Pedal a **bicycle trainer** (Bluetooth or Wi-Fi, optionally with handlebar contr
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.8**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.8.1**):
 
 | Platform | File | How to run |
 |---|---|---|
@@ -93,6 +93,8 @@ Pickups and deliveries happen automatically: the bike coasts up to the window an
 | LS2 or left power-up | S | brake |
 | Z | H | shout at the rivals |
 | | F11 or Alt+Enter | toggle fullscreen (the game starts fullscreen) |
+
+The table shows the defaults. Every key and controller button can be remapped from **Controls** (on the title screen, the pause menu and the race pause menu): pick Keyboard or Controller, choose an action, press select, then press the new key or button. LEFT / RIGHT on an action picks which of its (up to three) keys or buttons you are changing, DEL clears one and ESC cancels. A key or button already used by another action is taken from it; the menu actions (turn left / right, straight, U-turn, select, back) always keep at least one key. Controller buttons need the Bluetooth bridge to be running. Your choices are saved in `controls.json` in the game's user folder (apart from the game save, so New game keeps them), and "Reset everything to default" restores the table above.
 
 ### Virtual shifting
 The bike has 21 gears: 1 is the easiest, 21 the hardest, and you start in 11. The range is wide: gear 1 pushes back about a quarter as hard as gear 11, and gear 21 about three times as hard. There is no front/rear shifter juggling, just up and down; hold a shifter (or the shift key) and after a second it keeps shifting, a gear every half second. The current gear shows at the top of the WEEHOO bike computer. The WEEHOO sits in the top-left corner: a pixel-art handlebar computer (art/ui_weehoo_shell.png) with the town map (or the race's elevation profile) taking most of its screen, then speed, watts, money or position, grade, HP or legs, your power-up and cadence. The deliveries table (or the race standings) is in the bottom-right corner.
@@ -219,6 +221,7 @@ project.godot
 export_presets.cfg        Windows / Linux / macOS export presets
 scenes/main.tscn          entry scene (everything else is built in code)
 scripts/game.gd           autoload: money, bikes, physics, save/load, input map
+scripts/controls.gd         autoload: key and controller-button bindings (remappable, saved)
 scripts/trainer_link.gd     autoload: UDP link to the bridge + keyboard fallback
 scripts/trash_talk.gd     autoload: rivals and their trash talk
 scripts/season.gd         autoload: the current season, its colours and seasonal drawing helpers

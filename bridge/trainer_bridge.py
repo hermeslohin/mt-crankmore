@@ -10,13 +10,18 @@ Godot has no Bluetooth LE support, so this small program talks BLE and relays ov
      (no resistance to control: hills and virtual gears don't change how hard it feels, shift the real bike)
   handlebar controllers (proprietary, service 0xFC82) -> button presses -> game
 
+Wi-Fi / Ethernet trainers (Wahoo KICKR and others with "Direct Connect", a.k.a. DIRCON) work too: they are found over
+mDNS (needs the zeroconf package; without it only Bluetooth is used) and carry the same FTMS / Cycling Power services
+over TCP, so they are listed, connected, remembered and controlled just like Bluetooth trainers. Their address is
+"wifi:<name>" (the name they announce, which stays put when their IP changes).
+
 Normally the game starts this for you ("Connect Trainer" on the title screen) in --managed mode,
 where the game tells it what to scan for and which devices to connect, and the chosen devices are
 remembered in devices.json.
 
 Manual usage:
   python trainer_bridge.py              # scan, auto-connect the first trainer + controllers, relay
-  python trainer_bridge.py --scan       # list nearby BLE devices and exit
+  python trainer_bridge.py --scan       # list nearby BLE devices and Wi-Fi trainers and exit
   python trainer_bridge.py --dump       # also print raw controller messages (for debugging)
   python trainer_bridge.py --learn      # teach the bridge your controller's buttons (writes buttons.json)
   python trainer_bridge.py --inspect --no-trainer   # record what every button / paddle sends (writes inspect.log)
@@ -32,12 +37,19 @@ import socket
 import struct
 import sys
 import time
+import uuid
 from pathlib import Path
 
 try:
     from bleak import BleakClient, BleakScanner
 except ImportError:  # --fake works without bleak
     BleakClient = BleakScanner = None
+
+try:
+    from zeroconf import IPVersion, ServiceStateChange
+    from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZeroconf
+except ImportError:  # only needed for Wi-Fi trainers: Bluetooth works without it
+    AsyncZeroconf = None
 
 GAME_ADDR = ("127.0.0.1", 9871)
 LISTEN_PORT = 9872
@@ -55,6 +67,9 @@ CTRL_SYNC_RX = "00000003-19ca-4651-86e5-fa29dcdd09d1"     # write: handshake
 CTRL_SYNC_TX = "00000004-19ca-4651-86e5-fa29dcdd09d1"     # indications: handshake replies
 CTRL_COMPANY_ID = 0x094A
 HANDSHAKE = b"RideOn"
+
+WIFI_SERVICE = "_wahoo-fitness-tnp._tcp.local."   # what Wi-Fi trainers (Direct Connect / DIRCON) announce over mDNS
+WIFI_PREFIX = "wifi:"                             # a Wi-Fi trainer's address: this + its announced name
 
 # Handlebar controller button bits (reported active-low). Reverse-engineered by the community and not
 # officially documented: if a button does nothing, run --learn to record your own mapping.
@@ -157,10 +172,39 @@ def is_power_meter(dev, adv):
 
 
 def is_controller(dev, adv):
-    if is_trainer(dev, adv):
+    if is_trainer(dev, adv) or getattr(dev, "wifi", False):
         return False
     return (CTRL_SERVICE in uuids(adv) or CTRL_COMPANY_ID in (adv.manufacturer_data or {})
             or "zwift" in name_of(dev, adv).lower())
+
+
+class WifiDevice:
+    """A Wi-Fi trainer found over mDNS. It stands in for both the BLE device and its advertisement in Discovery.seen,
+    so is_trainer, name_of, find and device_list work on it unchanged."""
+    wifi = True
+    rssi = -50                  # no signal strength over Wi-Fi: rank it like a nearby Bluetooth device
+    manufacturer_data = {}
+
+    def __init__(self, name: str, host: str, port: int, service_uuids: list):
+        self.name = self.local_name = name
+        self.address = WIFI_PREFIX + name
+        self.host = host
+        self.port = port
+        self.service_uuids = service_uuids
+
+
+def wifi_uuids(txt: str) -> list:
+    """The "ble-service-uuids" TXT entry: 16-bit ("1826" or "0x1826") or full UUIDs, comma-separated."""
+    out = []
+    for u in txt.split(","):
+        u = u.strip().lower()
+        if u.startswith("0x"):
+            u = u[2:]
+        if len(u) == 4:
+            u = f"0000{u}-0000-1000-8000-00805f9b34fb"
+        if u:
+            out.append(u)
+    return out or [FTMS_SERVICE]   # no hint: it's still a trainer (trainer_session checks what it really offers)
 
 
 class Discovery:
@@ -195,6 +239,50 @@ class Discovery:
                 await asyncio.sleep(2.0)
             await asyncio.sleep(0.3)
 
+    async def run_wifi(self):
+        """Wi-Fi trainers: browse mDNS all along, and while scanning re-resolve each one (its IP / port can change)."""
+        if AsyncZeroconf is None:
+            log("Wi-Fi trainers: off - the zeroconf package is missing (reinstall the helper); Bluetooth still works")
+            return
+        names = set()
+
+        def changed(zeroconf, service_type, name, state_change):
+            if state_change == ServiceStateChange.Removed:
+                names.discard(name)
+                self.seen.pop(WIFI_PREFIX + name.removesuffix("." + WIFI_SERVICE), None)
+            else:
+                names.add(name)
+
+        try:
+            azc = AsyncZeroconf()
+            browser = AsyncServiceBrowser(azc.zeroconf, WIFI_SERVICE, handlers=[changed])
+        except Exception as e:   # no network, mDNS port unavailable...
+            log("Wi-Fi trainers: mDNS discovery could not start:", e)
+            return
+        try:
+            while not self.state.quit:
+                if self._needed() and names:
+                    await asyncio.gather(*(self._resolve(azc, n) for n in list(names)))
+                await asyncio.sleep(2.0)
+        finally:
+            await browser.async_cancel()
+            await azc.async_close()
+
+    async def _resolve(self, azc, name: str):
+        info = AsyncServiceInfo(WIFI_SERVICE, name)
+        try:
+            if not await info.async_request(azc.zeroconf, 3000):
+                return
+        except Exception:
+            return
+        hosts = info.parsed_addresses(IPVersion.V4Only) or info.parsed_scoped_addresses()
+        if not hosts or not info.port:
+            return
+        txt = (info.properties or {}).get(b"ble-service-uuids") or b""
+        dev = WifiDevice(name.removesuffix("." + WIFI_SERVICE), hosts[0], info.port,
+                         wifi_uuids(txt.decode("utf-8", "replace")))
+        self.seen[dev.address] = (dev, dev, time.time())
+
     def find(self, pred):
         best = None
         for addr, (dev, adv, ts) in self.seen.items():
@@ -215,7 +303,8 @@ class Discovery:
             if not (trainer or controller):
                 continue
             out.append({"address": addr, "name": name_of(dev, adv) or "(unnamed)", "rssi": adv.rssi or -99,
-                        "kind": "trainer" if trainer else "controller", "power_meter": is_power_meter(dev, adv)})
+                        "kind": "trainer" if trainer else "controller", "power_meter": is_power_meter(dev, adv),
+                        "wifi": getattr(dev, "wifi", False)})
         out.sort(key=lambda d: (d["kind"] != "trainer", -d["rssi"]))
         return out
 
@@ -518,6 +607,145 @@ async def controller_session(client, state: State, addr: str, dump: bool):
     state.pressed = set()
 
 
+# ---------------------------------------------------------------- Wi-Fi trainers (Direct Connect / DIRCON)
+#
+# "BLE over TCP": the trainer serves its usual Bluetooth services on a TCP port (usually 36866) it announces over mDNS.
+# Every message is a 6-byte header - version (1), message id, sequence number, response code (0 = ok), payload length
+# (u16, big-endian) - then the payload, which starts with a full 16-byte UUID written in its usual reading order (not
+# BLE's reversed bytes). A request is answered with the same id and sequence number; id 6 is a notification. There is
+# no official spec: see github.com/elfrances/wahoo-fitness-tnp and qdomyos-zwift (src/devices/dircon).
+
+DC_DISCOVER_SERVICES = 0x01
+DC_DISCOVER_CHARS = 0x02
+DC_WRITE = 0x04
+DC_ENABLE_NOTIFY = 0x05
+DC_NOTIFICATION = 0x06
+DC_ERRORS = {1: "unknown message", 2: "error", 3: "service not found", 4: "characteristic not found",
+             5: "operation not supported", 6: "write failed"}
+
+
+class DirconServices:
+    def __init__(self, service_uuids):
+        self.uuids = set(service_uuids)
+
+    def get_service(self, u: str):
+        return u if u.lower() in self.uuids else None
+
+
+class DirconClient:
+    """A Wi-Fi trainer with the parts of BleakClient the sessions use (start_notify, write_gatt_char, is_connected,
+    services.get_service), so trainer_session and its watchdog drive it exactly like a Bluetooth one."""
+
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+        self.services = DirconServices([])
+        self._reader = self._writer = self._task = None
+        self._closed = False
+        self._lock = asyncio.Lock()
+        self._seq = 0
+        self._pending = None        # (message id, sequence number, future) of the request waiting for its reply
+        self._notify = {}           # characteristic UUID -> callback(sender, data)
+
+    @property
+    def is_connected(self) -> bool:
+        return self._writer is not None and not self._closed
+
+    async def __aenter__(self):
+        self._reader, self._writer = await asyncio.wait_for(asyncio.open_connection(self.host, self.port), 10.0)
+        sock = self._writer.get_extra_info("socket")
+        if sock is not None:
+            try:
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)   # tiny messages: send them right away
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            except OSError:
+                pass
+        self._task = asyncio.ensure_future(self._read_loop())
+        try:
+            reply = await self._request(DC_DISCOVER_SERVICES, b"")
+            found = [str(uuid.UUID(bytes=reply[i:i + 16])) for i in range(0, len(reply) - 15, 16)]
+            for s in found:   # discover characteristics too, as a BLE app would: some trainers expect it
+                try:
+                    await self._request(DC_DISCOVER_CHARS, uuid.UUID(s).bytes)
+                except Exception:
+                    pass
+            self.services = DirconServices(found)
+        except BaseException:
+            await self.close()
+            raise
+        return self
+
+    async def __aexit__(self, *exc):
+        await self.close()
+
+    async def close(self):
+        self._closed = True
+        if self._task is not None:
+            self._task.cancel()
+        if self._writer is not None:
+            self._writer.close()
+            try:
+                await asyncio.wait_for(self._writer.wait_closed(), 2.0)
+            except Exception:
+                pass
+
+    async def start_notify(self, char: str, callback):
+        key = str(uuid.UUID(char))
+        self._notify[key] = callback
+        try:
+            await self._request(DC_ENABLE_NOTIFY, uuid.UUID(char).bytes + b"\x01")
+        except Exception:
+            self._notify.pop(key, None)
+            raise
+
+    async def write_gatt_char(self, char: str, data: bytes, response: bool = True):
+        await self._request(DC_WRITE, uuid.UUID(char).bytes + bytes(data))   # always acknowledged over TCP
+
+    async def _request(self, msg: int, payload: bytes) -> bytes:
+        async with self._lock:   # one request at a time, like GATT
+            if not self.is_connected:
+                raise ConnectionError("Wi-Fi trainer connection closed")
+            self._seq = (self._seq + 1) & 0xFF
+            fut = asyncio.get_running_loop().create_future()
+            self._pending = (msg, self._seq, fut)
+            try:
+                self._writer.write(struct.pack(">BBBBH", 1, msg, self._seq, 0, len(payload)) + payload)
+                await self._writer.drain()
+                code, data = await asyncio.wait_for(fut, 5.0)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"no reply from the Wi-Fi trainer (message {msg})") from None
+            finally:
+                self._pending = None
+        if code:
+            raise RuntimeError(f"Wi-Fi trainer refused message {msg}: {DC_ERRORS.get(code, code)}")
+        return data
+
+    async def _read_loop(self):
+        try:
+            while True:
+                _, msg, seq, code, n = struct.unpack(">BBBBH", await self._reader.readexactly(6))
+                data = await self._reader.readexactly(n) if n else b""
+                if msg == DC_NOTIFICATION:
+                    cb = self._notify.get(str(uuid.UUID(bytes=data[:16]))) if len(data) >= 16 else None
+                    if cb is not None:
+                        try:
+                            cb(str(uuid.UUID(bytes=data[:16])), bytearray(data[16:]))
+                        except Exception as e:
+                            log("Wi-Fi trainer: notification handler failed:", e)
+                    continue
+                p = self._pending
+                if p is not None and p[0] == msg and p[1] == seq and not p[2].done():
+                    p[2].set_result((code, data))
+                # anything else (a late reply, a message id we don't know) is ignored
+        except (asyncio.IncompleteReadError, OSError):
+            pass
+        finally:
+            self._closed = True
+            p = self._pending
+            if p is not None and not p[2].done():
+                p[2].set_exception(ConnectionError("Wi-Fi trainer connection closed"))
+
+
 # ---------------------------------------------------------------- connection manager
 
 async def role_task(role: str, state: State, disc: Discovery, args):
@@ -541,11 +769,12 @@ async def role_task(role: str, state: State, disc: Discovery, args):
             continue
         dev, adv, _ = entry
         nm = name_of(dev, adv) or addr
+        wifi = getattr(dev, "wifi", False)
         state.conn[role] = {"state": "connecting", "name": nm, "address": addr}
-        log(f"{role}: connecting to {nm}")
+        log(f"{role}: connecting to {nm}" + (f" over Wi-Fi ({dev.host}:{dev.port})" if wifi else ""))
         disc.busy.add(addr)
         try:
-            async with BleakClient(dev) as client:
+            async with (DirconClient(dev.host, dev.port) if wifi else BleakClient(dev)) as client:
                 state.conn[role] = {"state": "connected", "name": nm, "address": addr}
                 log(f"{role}: connected")
                 if args.managed:
@@ -789,7 +1018,12 @@ async def error_only(state: State, args, message: str):
 
 async def scan_once():
     log("scanning for 8 s...")
+    disc = Discovery(State(), always=True)   # Wi-Fi trainers: browse mDNS meanwhile
+    wifi = asyncio.ensure_future(disc.run_wifi())
     found = await BleakScanner.discover(timeout=8.0, return_adv=True)
+    disc.state.quit = True
+    await wifi
+    found.update({addr: (dev, adv) for addr, (dev, adv, _) in disc.seen.items()})
     for addr, (dev, adv) in sorted(found.items(), key=lambda kv: -(kv[1][1].rssi or -999)):
         tags = []
         if is_power_meter(dev, adv):
@@ -798,7 +1032,10 @@ async def scan_once():
             tags.append("TRAINER(FTMS)")
         if is_controller(dev, adv):
             tags.append("CONTROLLER")
-        print(f"  {adv.rssi:>4} dB  {name_of(dev, adv) or '?':<28} {addr}  {' '.join(tags)}")
+        if getattr(dev, "wifi", False):
+            print(f"  Wi-Fi    {name_of(dev, adv):<28} {addr} ({dev.host}:{dev.port})  {' '.join(tags)}")
+        else:
+            print(f"  {adv.rssi:>4} dB  {name_of(dev, adv) or '?':<28} {addr}  {' '.join(tags)}")
 
 
 async def amain(args):
@@ -821,6 +1058,7 @@ async def amain(args):
     disc = Discovery(state, always=not args.managed)
     tasks = [sender_task(state, disc, args), disc.run()]
     if not args.no_trainer:
+        tasks.append(disc.run_wifi())
         tasks.append(role_task("trainer", state, disc, args))
     if not args.no_controller:
         tasks.append(role_task("controller", state, disc, args))
@@ -842,7 +1080,7 @@ async def amain(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--managed", action="store_true", help="controlled by the game (scan/connect on request)")
-    ap.add_argument("--scan", action="store_true", help="list nearby BLE devices and exit")
+    ap.add_argument("--scan", action="store_true", help="list nearby BLE devices and Wi-Fi trainers and exit")
     ap.add_argument("--dump", action="store_true", help="print raw controller messages")
     ap.add_argument("--learn", action="store_true", help="record your controller's button bits")
     ap.add_argument("--record", action="store_true", help="log every controller message with a timestamp to inspect.log until stopped")

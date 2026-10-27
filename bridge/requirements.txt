@@ -1,1 +1,2 @@
 bleak>=0.22
+zeroconf>=0.132   # Wi-Fi trainers (found over mDNS)

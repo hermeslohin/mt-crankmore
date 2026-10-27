@@ -1,7 +1,8 @@
 extends Node
 ## Talks to bridge/trainer_bridge.py over localhost UDP, and runs that bridge ("the Bluetooth helper")
 ## for the player: it installs it into bridge/.venv, launches it in --managed mode, and sends it
-## scan / connect / disconnect commands from the Connect Trainer screen.
+## scan / connect / disconnect commands from the Connect Trainer screen. The helper also finds and
+## connects Wi-Fi trainers (Direct Connect); to the game they are just devices with "wifi": true.
 ## Bridge -> game (port 9871): {"type":"data", "power","cadence","speed","buttons":[...],"trainer","controller"}
 ##                             {"type":"status", "scanning", "devices":[...], "trainer":{...}, "controller":{...}, "error"}
 ## Game -> bridge (port 9872): {"grade": percent, "gear": ratio, "mass": kg} or {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}
@@ -67,6 +68,7 @@ var helper_state := "stopped"     # stopped | installing | starting | running | 
 var helper_msg := ""
 var _install_thread: Thread
 var _install_log := ""
+var _update_tried := false        # this session already tried to bring an installed helper up to date
 var _ping_clock := 0.0
 var _autostart_clock := 1.5
 
@@ -132,8 +134,28 @@ func helper_installed() -> bool:
 	return venv_python() != ""
 
 
+## The requirements.txt the helper was installed from. When the game's differs (an update needs another library,
+## like zeroconf for Wi-Fi trainers) the helper is updated once before it starts.
+func _stamp_path() -> String:
+	return bridge_dir() + "/.venv/installed-requirements.txt"
+
+
+func helper_outdated() -> bool:
+	return helper_installed() and FileAccess.get_file_as_string(_stamp_path()) != FileAccess.get_file_as_string(bridge_dir() + "/requirements.txt")
+
+
+func _write_stamp() -> void:
+	var f := FileAccess.open(_stamp_path(), FileAccess.WRITE)
+	if f != null:
+		f.store_string(FileAccess.get_file_as_string(bridge_dir() + "/requirements.txt"))
+
+
 func start_helper() -> void:
 	if bridge_live or helper_state == "installing":
+		return
+	if helper_outdated() and not _update_tried:
+		_update_tried = true
+		install_helper()   # starts the helper when it's done, even if the update fails
 		return
 	var py := venv_python()
 	if py == "":
@@ -156,17 +178,21 @@ func stop_helper() -> void:
 		helper_pid = -1
 
 
-## One-time setup: a private Python environment in bridge/.venv with the Bluetooth library.
+## One-time setup: a private Python environment in bridge/.venv with the Bluetooth (and Wi-Fi discovery) libraries.
+## Also updates an installed helper in place (see helper_outdated).
 func install_helper() -> void:
 	if helper_state == "installing":
 		return
 	var py := system_python()
-	if py == "":
+	if py == "" and not helper_installed():   # an update only needs the helper's own Python
 		helper_state = "error"
 		helper_msg = "Python 3 was not found. Install it from python.org, then try again."
 		return
 	helper_state = "installing"
-	helper_msg = "Installing the Bluetooth helper (about a minute, needs internet)..."
+	if helper_installed():
+		helper_msg = "Updating the Bluetooth helper (about a minute, needs internet)..."
+	else:
+		helper_msg = "Installing the Bluetooth helper (about a minute, needs internet)..."
 	_install_thread = Thread.new()
 	_install_thread.start(_install.bind(py))
 
@@ -174,9 +200,11 @@ func install_helper() -> void:
 func _install(py: String) -> int:
 	var out: Array = []
 	var venv := bridge_dir() + "/.venv"
-	var code := OS.execute(py, ["-m", "venv", venv], out, true)
+	var vpy := venv + ("/Scripts/python.exe" if OS.get_name() == "Windows" else "/bin/python")
+	var code := 0
+	if not FileAccess.file_exists(vpy):   # an update reuses the venv as it is
+		code = OS.execute(py, ["-m", "venv", venv], out, true)
 	if code == 0:
-		var vpy := venv + ("/Scripts/python.exe" if OS.get_name() == "Windows" else "/bin/python")
 		code = OS.execute(vpy, ["-m", "pip", "install", "--disable-pip-version-check", "-q", "-r", bridge_dir() + "/requirements.txt"], out, true)
 	_install_log = "\n".join(out)
 	return code
@@ -239,6 +267,11 @@ func _process(delta: float) -> void:
 		var code: int = _install_thread.wait_to_finish()
 		_install_thread = null
 		if code == 0:
+			_write_stamp()
+			helper_state = "stopped"
+			start_helper()
+		elif _update_tried and helper_installed():
+			# the update failed (offline?): run the helper as it was; Bluetooth works, Wi-Fi trainers wait for the update
 			helper_state = "stopped"
 			start_helper()
 		else:

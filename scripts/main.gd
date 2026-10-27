@@ -268,18 +268,36 @@ func _open_trainer_menu() -> void:
 	hud.open_menu(_trainer_menu)
 
 
+## A device's name as the player sees it: Wi-Fi trainers (Direct Connect) say so, Bluetooth ones don't.
+func _device_name(dev_name: String, address: String) -> String:
+	return dev_name + " (Wi-Fi)" if address.begins_with("wifi:") else dev_name
+
+
+## Disconnecting a connected device takes two presses within 4 s, so a stray press doesn't drop your trainer.
+var _disconnect_armed := ""
+var _disconnect_at := 0
+func _confirm_disconnect(role: String) -> void:
+	if _disconnect_armed == role and Time.get_ticks_msec() - _disconnect_at < 4000:
+		_disconnect_armed = ""
+		Trainer.disconnect_device(role)
+	else:
+		_disconnect_armed = role
+		_disconnect_at = Time.get_ticks_msec()
+
+
 func _role_line(label: String, role: String, live_text: String) -> String:
 	var info := Trainer.role_info(role)
 	var st: String = info.get("state", "idle")
+	var nm := _device_name(info.get("name", ""), info.get("address", ""))
 	match st:
 		"connected":
-			return "%s: %s - CONNECTED %s" % [label, info.get("name", ""), live_text]
+			return "%s: %s - CONNECTED %s" % [label, nm, live_text]
 		"connecting":
-			return "%s: connecting to %s..." % [label, info.get("name", "")]
+			return "%s: connecting to %s..." % [label, nm]
 		"searching":
-			return "%s: looking for %s... (wake it up)" % [label, info.get("name", "your device")]
+			return "%s: looking for %s... (wake it up)" % [label, nm if nm != "" else "your device"]
 		"failed":
-			return "%s: couldn't connect to %s - retrying" % [label, info.get("name", "")]
+			return "%s: couldn't connect to %s - retrying" % [label, nm]
 	return "%s: not connected" % label
 
 
@@ -287,7 +305,7 @@ func _trainer_menu() -> Dictionary:
 	var items: Array = []
 	var lines: Array = []
 	if not Trainer.bridge_live:
-		lines.append("Your game talks to your bicycle trainer through a small Bluetooth helper.")
+		lines.append("Your game talks to your bicycle trainer through a small Bluetooth helper (it finds Wi-Fi trainers too).")
 		if Trainer.helper_state == "installing" or Trainer.helper_state == "starting":
 			items.append({"label": "Please wait...", "fn": func(): pass, "enabled": false})
 		elif not Trainer.helper_installed():
@@ -310,7 +328,7 @@ func _trainer_menu() -> Dictionary:
 			lines.append("! " + err)
 		var scanning: bool = Trainer.status.get("scanning", false)
 		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Trainer.scan(true),
-			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: Bluetooth devices only accept one connection."})
+			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer."})
 		var shown := {}
 		for d in Trainer.devices():
 			var role: String = d["kind"]
@@ -319,18 +337,26 @@ func _trainer_menu() -> Dictionary:
 			var info := Trainer.role_info(role)
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
 			var pm: bool = d.get("power_meter", false)   # power and cadence only: no resistance for hills or gears
+			var wifi: bool = d.get("wifi", false)         # Direct Connect over the network: no signal strength to show
 			var tag := ("POWER   " if pm else "TRAINER ") if role == "trainer" else "CONTROLS"
-			var signal_bars := "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
-			if connected:
-				items.append({"label": "%s  %s  [connected - disconnect]" % [tag, d["name"]], "fn": Trainer.disconnect_device.bind(role),
-					"detail": "Select to disconnect this device."})
+			var nm := _device_name(d["name"], addr)
+			var signal_bars := "" if wifi else "  " + "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
+			if connected and info.get("state", "") != "connected":
+				# still connecting (it can take 10 s): selecting it again must not cancel it
+				items.append({"label": "%s  %s  [connecting...]" % [tag, nm], "fn": func(): pass,
+					"detail": "Connecting - give it a few seconds. (Pedal or press a button if it's asleep.)"})
+			elif connected:
+				var armed: bool = _disconnect_armed == role and Time.get_ticks_msec() - _disconnect_at < 4000
+				items.append({"label": "%s  %s  [connected%s]" % [tag, nm, " - select again to disconnect" if armed else ""],
+					"fn": _confirm_disconnect.bind(role), "detail": "Select twice to disconnect this device."})
 			else:
-				items.append({"label": "%s  %s  %s" % [tag, d["name"], signal_bars], "fn": Trainer.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")})
+				items.append({"label": "%s  %s%s" % [tag, nm, signal_bars], "fn": Trainer.connect_device.bind(role, addr),
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")
+						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")})
 		for role in ["trainer", "controller"]:
 			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
-				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", info.get("name", "device")],
+				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", _device_name(info.get("name", "device"), info.get("address", ""))],
 					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
 		if Trainer.devices().is_empty():
 			lines.append("No trainers, power meters or handlebar controllers found yet.")

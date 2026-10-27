@@ -85,17 +85,20 @@ Resistance needs a trainer that accepts FTMS simulation control.
 On the title screen choose **Connect Trainer**:
 
 1. **Install Bluetooth helper (one time)**: the game sets up a private Python environment in `bridge/.venv` (in a packaged build, in a `bridge` folder in the game's user data folder) with the Bluetooth library. Needs Python 3 (`brew install python` or python.org) and internet, about a minute.
-2. The helper starts and scans. Pedal / press a button so your devices wake up; they appear as `TRAINER ...` and `CONTROLS ...`.
+2. The helper starts and scans. Pedal / press a button so your devices wake up; they appear as `TRAINER ...` and `CONTROLS ...` (a Wi-Fi trainer as `TRAINER  KICKR ... (Wi-Fi)`, see below).
 3. Select your trainer and your handlebar controllers. The status lines show live power/cadence and the buttons you press, so you can check everything works.
 4. Done. Your choices are remembered (`bridge/devices.json`) and reconnect automatically every time you start the game; select a connected device to disconnect it.
 
-Quit any other trainer app first: BLE devices only accept one connection. On macOS, allow Bluetooth for Godot (or your terminal) when asked
+Quit any other trainer app first: trainers only accept one connection. On macOS, allow Bluetooth for Godot (or your terminal) when asked
 (System Settings > Privacy & Security > Bluetooth).
+
+When a game update needs another library (`bridge/requirements.txt` changed, as it did for Wi-Fi trainers), the game updates the helper by itself the next time it starts it ("Updating the Bluetooth helper..."; needs internet once). If that fails, for instance offline, the helper runs as before: Bluetooth works, Wi-Fi trainers wait for the next try.
 
 Godot itself can't use Bluetooth, which is why the helper (`bridge/trainer_bridge.py`) exists. You can also run it by hand:
 `bridge/.venv/bin/python bridge/trainer_bridge.py` (auto-connects the first trainer/controls it finds), `--scan`, `--dump`, `--fake`.
 
 * **Trainer**: standard FTMS. Your real power and cadence drive your speed. The game puts the trainer in simulation mode and sends the road grade (town hills and Mt. Crankmore, -7% to +12%) so climbs get harder and descents easier, with an extra kick when you hop a fallen tree or wade a creek; it repeats the grade every 2 s so the trainer doesn't fall back to a fixed resistance, and goes flat in menus, the bike shop and the ER. The helper log (`grade -> +6.3%`, `trainer: resistance control ready`) shows what is being sent.
+* **Wi-Fi trainers**: trainers with Wahoo's Direct Connect (DIRCON), over Wi-Fi or an Ethernet adapter, show up next to the Bluetooth ones as `TRAINER  <name> (Wi-Fi)`: Wahoo KICKR (V5 with the Direct Connect adapter, V6, CORE 2, MOVE, KICKR BIKE), and some Elite (Justo, Avanti) and Tacx (NEO 3M) models. The trainer and the computer must be on the same network (mDNS has to get through, which some guest or mesh networks block). Power, cadence, speed, hills and virtual gears all work as over Bluetooth, and the choice is remembered by the trainer's name, so a new IP address doesn't matter. If your trainer needs Wi-Fi switched on or set up first, do that once in the maker's app (Wahoo's app, for example).
 * **Power meter instead of a trainer**: any Bluetooth power meter (Cycling Power: pedals, cranks, spiders) shows up as `POWER ...`. Your power and cadence drive your speed just the same, but there's nothing to push back, so hills and the game's gears don't change how hard it feels: shift your real bike. A trainer that offers both is used as a trainer.
 * **Controllers**: see the controls table above.
 

@@ -668,7 +668,7 @@ func _debug_ride() -> void:
 		print("RIDE shot: ", s["kind"], " ", s["file"])
 	Game.deliveries -= 2
 	Ride.reset()
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(path, FileAccess.WRITE).store_string(backup)
 		Ride._load()
 	get_tree().quit()
@@ -699,7 +699,7 @@ func _debug_seasons() -> void:
 			get_viewport().get_texture().get_image().save_png("%s/%s_%s.png" % [out, se, e["kind"]])
 		shot_at = Vector2.INF
 		print("SEASON %s: %s" % [se, seen.keys()])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
@@ -738,7 +738,7 @@ func _debug_events() -> void:
 				await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/event_%s.png" % [out, kind])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
 		f.store_string(backup)
 		f.close()
@@ -892,7 +892,7 @@ func _debug_wipeout() -> void:
 		at = t
 		await shot.call("wipe_car_%.2f.png" % t)
 	print("WIPEOUT: p_fall=%.2f er_timer=%.2f" % [city.p_fall, city.er_timer])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
@@ -1089,7 +1089,7 @@ func _debug_race_shot() -> void:
 		await get_tree().create_timer(0.9).timeout
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/race_%02d.png" % [out, k])
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		var f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
 		f.store_string(backup)
 		f.close()
@@ -1182,7 +1182,7 @@ func _debug_powerups() -> void:
 		print("RACE %s: used=%s riders_down=%d socks=%.1f bread=%.1f roller=%.1f draft=%d%%" % [kind, me["pu"] == "", downs,
 			me["socks"], me["bread"], me["roller"], roundi(float(me["draft"]) * 100.0)])
 		await save.call("pu_race_%s.png" % kind)
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 
@@ -1207,7 +1207,7 @@ func _debug_readme() -> void:
 		await get_tree().process_frame
 	await get_tree().create_timer(5.0).timeout   # ride off with the box steaming on the bike, toasts faded
 	await save.call("delivery.png")
-	if backup != "":
+	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
 		FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE).store_string(backup)
 	get_tree().quit()
 

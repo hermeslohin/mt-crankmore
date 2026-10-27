@@ -7,13 +7,19 @@ extends Node2D
 signal finished(result: Dictionary)
 
 const COURSES := [
+	# "hairpins": turnarounds stacked up the mountainside (a few may fall in the run-out); "stagger": how far (a fraction
+	# of the leg) each one may sit in from the edge, so the stack is ragged like the Alpe d'Huez's 21 virages
 	{"name": "Foothill Gravel Grind", "length": 6000.0, "grade": 0.04, "roll": 1.3, "entry": 40, "prize": 500, "seed": 7, "tunnels": 1,
+		"hairpins": 15, "stagger": 0.22,
 		"blurb": "6 km of rolling gravel switchbacks with jumps, creek crossings and fallen trees, about 20 minutes for the front of the pack. Full of squirrels. And deer. And a bear or two."},
 	{"name": "Summit Gravel Showdown", "length": 4400.0, "grade": 0.065, "roll": 1.2, "entry": 100, "prize": 1200, "seed": 21, "tunnels": 2,
-		"blurb": "4.4 km of steep gravel to the top of Mt. Crankmore with ramps up to 12%, short plunges, logs and bears, about 20 minutes. Legends are made here. So are blisters."},
+		"hairpins": 18, "stagger": 0.22,
+		"blurb": "4.4 km of steep gravel to the top of Mt. Crankmore, hairpin after hairpin stacked up the face like the Alpe d'Huez, with ramps up to 12%, short plunges, logs and bears, about 20 minutes. Legends are made here. So are blisters."},
 	# "bump": gentle rollers on top of the base grade; "flowers": a valley of flower meadows instead of a mountain;
-	# "profile": [metres, grade] stretches replacing the base grade, levelled so the finish is as high as the start
+	# "profile": [metres, grade] stretches replacing the base grade, levelled so the finish is as high as the start;
+	# "bends": wide sweeping U-bends ("gap" tiles across) and long meanders instead of hairpins
 	{"name": "Flour Run", "length": 3000.0, "grade": 0.0, "roll": 0.0, "bump": 0.006, "flowers": true, "entry": 20, "prize": 250, "seed": 33,
+		"hairpins": 3, "bends": true, "gap": 44.0, "stagger": 0.12,
 		"profile": [[150, 0.0], [400, 0.03], [150, -0.02], [250, 0.0], [200, -0.025], [350, 0.035], [200, 0.0],
 			[300, -0.03], [150, 0.02], [250, 0.0], [450, -0.023], [150, 0.0]],
 		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: gentle climbs, easy dips and flat stretches, finishing back where you started, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
@@ -22,8 +28,8 @@ const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
 const M_PER_TILE := 3.3       # metres of road per tile (the town is about 3.2), so speeds look the same
 const PX_PER_M := 12.0        # screen lift per metre of height
-const LEG_GAP := 16.0         # tiles between switchback legs
-const HAIRPIN_R := 8.0
+const LEG_GAP := 16.0         # tiles between switchback legs (a course's "gap" can widen it)
+const HAIRPIN_R := 8.0        # radius of a hairpin (LEG_GAP / 2)
 const STEP := 0.5             # road sample spacing (tiles)
 const VIEW_R := 17            # terrain cells drawn around the player
 const MAX_SPEED := 16.0       # m/s cap on the descents
@@ -49,7 +55,11 @@ var vz := PX_PER_M
 var gain := 100.0                     # highest road elevation (m)
 var legs_n := 3
 var leg_len := 100.0
+var leg_gap := LEG_GAP                # tiles between legs on this course
+var turn_r := HAIRPIN_R               # radius of the turns joining the legs (leg_gap / 2)
 var leg_wob: Array = []
+var leg_span: Array = []              # per leg: Vector2(lowest x, highest x) it runs between
+var wob_w := 16.0                     # tiles at each end of a leg over which its meander eases in
 var leg_elev: Array = []              # per leg: road elevation (m) per grid column
 var gw := 1
 var gh := 1
@@ -98,9 +108,11 @@ var idle_t := 0.0                     # seconds the finished player has been sto
 var last_swap := {}
 var lead_clock := 0.0
 var t_ := 0.0
-var road_leg := PackedInt32Array()    # which switchback leg each road sample is on (-1 = in a hairpin)
+var road_leg := PackedInt32Array()    # which switchback leg each road sample is on (-1 = in a hairpin, -2 = in a wide bend)
 var hairpins: Array = []              # {s, i0, i1, left, n, c, called}
 var tunnels: Array = []               # {s0, s1, i0, i1, a (roof opacity), called}
+var cliffs: Array = []                # rock faces beside the road {i0, i1, side (which side of the road), h (m, + wall, - drop)}
+var cell_cliff := PackedByteArray()   # per cell: 0 none, 1 rock on top of / below a cliff, 2 the cliff face
 var ramps: Array = []                 # steep climbs and fast descents {s0, s1, g, called}
 var snow_called := false
 var life: RaceLife                    # the race-day crowds, motos, helicopter and the railway (see RaceLife)
@@ -130,6 +142,7 @@ func setup(course_id: int) -> void:
 	_build_road(rng)
 	_build_streams(rng)
 	_build_tunnels(rng)
+	_build_cliffs(rng)
 	_build_terrain()
 	_build_features(rng)
 	life = RaceLife.new(self)
@@ -174,33 +187,77 @@ func setup(course_id: int) -> void:
 		get_tree().create_timer(1.0 + k * 1.2).timeout.connect(Talk.say.bind(ids[k], "race_start", true))
 
 
-## Switchbacks: legs run along +x / -x, each one LEG_GAP tiles further up the mountain (towards -y, away from the
+## Switchbacks: legs run along +x / -x, each one leg_gap tiles further up the mountain (towards -y, away from the
 ## camera, so the slope never hides you), joined by hairpins. Leg 0 is at the bottom.
 func _build_road(rng: RandomNumberGenerator) -> void:
 	var length: float = course["length"]
 	road_len = length + RUNOUT
 	var target := road_len / M_PER_TILE
-	legs_n = maxi(3, roundi(target / 185.0))
-	leg_len = (target - (legs_n - 1) * PI * HAIRPIN_R) / (legs_n * 1.04)
+	var bends: bool = course.get("bends", false)
+	leg_gap = float(course.get("gap", LEG_GAP))
+	turn_r = leg_gap * 0.5
+	legs_n = int(course.get("hairpins", maxi(2, roundi(target / 185.0) - 1))) + 1
+	var stagger: float = course.get("stagger", 0.0)
+	wob_w = 34.0 if bends else 16.0
+	# the shape has its own random numbers; the course's rng skips what the old layout used, so the grade profile
+	# (and with it the climb) is exactly what it was before the hairpins were stacked up
+	var geo := RandomNumberGenerator.new()
+	geo.seed = int(course["seed"]) * 7919 + 17
+	for _q in maxi(3, roundi(target / 185.0)) * 6:
+		rng.randf()
 	leg_wob.clear()
 	for k in legs_n:
-		leg_wob.append([rng.randf_range(1.6, 2.8), rng.randf_range(0.045, 0.08), rng.randf() * TAU,
-			rng.randf_range(0.5, 1.2), rng.randf_range(0.13, 0.2), rng.randf() * TAU])
+		if bends:   # long lazy meanders through the meadows
+			leg_wob.append([geo.randf_range(6.0, 8.5), geo.randf_range(0.05, 0.075), geo.randf() * TAU,
+				geo.randf_range(1.5, 2.5), geo.randf_range(0.1, 0.14), geo.randf() * TAU])
+		else:       # short ramps that kink and bow between the hairpins
+			leg_wob.append([geo.randf_range(1.6, 2.8), geo.randf_range(0.06, 0.1), geo.randf() * TAU,
+				geo.randf_range(0.5, 1.2), geo.randf_range(0.13, 0.2), geo.randf() * TAU])
+	# how far in from the edge each turn sits (a fraction of the leg), so the stack is ragged
+	var inset: Array = []
+	for k in legs_n - 1:
+		inset.append(geo.randf() * stagger)
+	# size the legs so the whole road (turns included) comes out at about road_len
+	var turns := (legs_n - 1) * PI * turn_r
+	leg_len = maxf(40.0, (target - turns) / (legs_n * (1.0 - stagger * 0.5) * 1.04))
 	var poly := PackedVector2Array()
 	var poly_leg := PackedInt32Array()
-	for k in legs_n:
-		var fwd := k % 2 == 0
-		var n := int(leg_len * 2.0)
-		for q in n + 1:
-			var x := leg_len * (q / float(n) if fwd else 1.0 - q / float(n))
-			poly.append(Vector2(x, leg_y(k, x)))
-			poly_leg.append(k)
-		if k < legs_n - 1:
-			var c := Vector2(leg_len if fwd else 0.0, _leg_base(k) - HAIRPIN_R)
-			for q in range(1, 48):
-				var a := PI * q / 48.0
-				poly.append(c + Vector2(sin(a) * HAIRPIN_R * (1.0 if fwd else -1.0), cos(a) * HAIRPIN_R))
-				poly_leg.append(-1)
+	for _pass in 6:
+		leg_span.clear()
+		for k in legs_n:
+			var a := 0.0
+			var b := leg_len
+			if k % 2 == 0:
+				a = leg_len * float(inset[k - 1]) if k > 0 else 0.0
+				b = leg_len * (1.0 - float(inset[k])) if k < legs_n - 1 else leg_len
+			else:
+				b = leg_len * (1.0 - float(inset[k - 1]))
+				a = leg_len * float(inset[k]) if k < legs_n - 1 else 0.0
+			leg_span.append(Vector2(a, b))
+		poly = PackedVector2Array()
+		poly_leg = PackedInt32Array()
+		for k in legs_n:
+			var fwd := k % 2 == 0
+			var lo: float = leg_span[k].x
+			var hi: float = leg_span[k].y
+			var n := maxi(8, int((hi - lo) * 2.0))
+			for q in n + 1:
+				var x := lerpf(lo, hi, q / float(n)) if fwd else lerpf(hi, lo, q / float(n))
+				poly.append(Vector2(x, leg_y(k, x)))
+				poly_leg.append(k)
+			if k < legs_n - 1:
+				var c := Vector2(hi if fwd else lo, _leg_base(k) - turn_r)
+				var na := maxi(48, int(PI * turn_r * 2.0))
+				for q in range(1, na):
+					var a := PI * q / float(na)
+					poly.append(c + Vector2(sin(a) * turn_r * (1.0 if fwd else -1.0), cos(a) * turn_r))
+					poly_leg.append(-2 if bends else -1)
+		var got := 0.0
+		for i in range(1, poly.size()):
+			got += poly[i].distance_to(poly[i - 1])
+		if absf(got - target) < 1.0:
+			break
+		leg_len *= (target - turns) / maxf(got - turns, 1.0)
 	var cum := PackedFloat32Array()
 	cum.resize(poly.size())
 	for i in range(1, poly.size()):
@@ -220,7 +277,7 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 		while j < poly.size() - 2 and cum[j + 1] < d:
 			j += 1
 		pts[i] = poly[j].lerp(poly[j + 1], clampf(inverse_lerp(cum[j], cum[j + 1], d), 0.0, 1.0))
-		sample_leg[i] = poly_leg[j] if poly_leg[j] == poly_leg[j + 1] else -1
+		sample_leg[i] = poly_leg[j] if poly_leg[j] == poly_leg[j + 1] else mini(mini(poly_leg[j], poly_leg[j + 1]), -1)
 	for i in M:
 		var tng := (pts[mini(i + 1, M - 1)] - pts[maxi(i - 1, 0)]).normalized()
 		nrm[i] = Vector2(-tng.y, tng.x)
@@ -263,22 +320,27 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 	for i in M:
 		elev[i] -= lo
 		gain = maxf(gain, elev[i])
-	# the hairpins (runs of samples that are on no leg), to warn about
+	# the hairpins (runs of samples that are on no leg) before the finish, to warn about; wide bends are not hairpins
 	hairpins.clear()
 	var run := -1
 	for i in M:
-		if road_leg[i] < 0 and run < 0:
+		if road_leg[i] == -1 and run < 0:
 			run = i
-		elif road_leg[i] >= 0 and run >= 0:
+		elif road_leg[i] != -1 and run >= 0:
+			if s_m[(run + i) / 2] > length - 20.0:
+				break
 			hairpins.append({"s": s_m[(run + i) / 2], "i0": run, "i1": i - 1, "left": road_leg[run - 1] % 2 == 0 if run > 0 else true,
 				"n": hairpins.size() + 1, "c": (pts[run] + pts[i - 1]) * 0.5, "dx": 1.0 if road_leg[run - 1] % 2 == 0 else -1.0, "called": false})
 			run = -1
 	vz = PX_PER_M
-	# terrain grid around the switchbacks
-	ox = -int(HAIRPIN_R) - 14
-	oy = -18
-	gw = int(leg_len) + 2 * (int(HAIRPIN_R) + 14) + 1
-	gh = int((legs_n - 1) * LEG_GAP) + 34
+	# terrain grid around the switchbacks (with room for the legs' meanders)
+	var mw := 0
+	for w in leg_wob:
+		mw = maxi(mw, ceili(float(w[0]) + float(w[3])))
+	ox = -int(turn_r) - 14
+	oy = -18 - mw
+	gw = int(leg_len) + 2 * (int(turn_r) + 14) + 1
+	gh = int((legs_n - 1) * leg_gap) + 34 + 2 * mw
 	# road elevation of each leg per grid column, for the hillside between legs
 	leg_elev.clear()
 	for k in legs_n:
@@ -369,12 +431,14 @@ func _profile_grade(profile: Array, s: float) -> float:
 
 
 func _leg_base(k: int) -> float:
-	return (legs_n - 1 - k) * LEG_GAP
+	return (legs_n - 1 - k) * leg_gap
 
 
+## A leg's centre line: its base row plus a meander that eases off to nothing at the turns at either end.
 func leg_y(k: int, x: float) -> float:
 	var w: Array = leg_wob[k]
-	var win := smoothstep(0.0, 16.0, x) * smoothstep(0.0, 16.0, leg_len - x)
+	var sp: Vector2 = leg_span[k]
+	var win := smoothstep(sp.x, sp.x + wob_w, x) * smoothstep(sp.y, sp.y - wob_w, x)
 	return _leg_base(k) + win * (float(w[0]) * sin(x * float(w[1]) + float(w[2])) + float(w[3]) * sin(x * float(w[4]) + float(w[5])))
 
 
@@ -397,7 +461,7 @@ func _base_m(x: float, y: float) -> float:
 	var yt := leg_y(top, xc)
 	if y <= yt:
 		return _leg_e(top, ci, cf) + (yt - y) * 1.4
-	var k := clampi(int(((legs_n - 1) * LEG_GAP - y) / LEG_GAP), 0, legs_n - 2)
+	var k := clampi(int(((legs_n - 1) * leg_gap - y) / leg_gap), 0, legs_n - 2)
 	while k > 0 and y > leg_y(k, xc):
 		k -= 1
 	while k < legs_n - 2 and y < leg_y(k + 1, xc):
@@ -425,7 +489,7 @@ func _build_streams(rng: RandomNumberGenerator) -> void:
 		var ks := rng.randi_range(mini(3, legs_n - 1), mini(6, legs_n - 1))
 		streams.append({"x0": leg_len * (rng.randf_range(0.14, 0.42) if q == 0 else rng.randf_range(0.58, 0.86)),
 			"a": rng.randf_range(1.5, 2.6), "f": rng.randf_range(0.18, 0.28), "p": rng.randf() * TAU,
-			"y0": _leg_base(ks) - LEG_GAP * 0.5, "y1": float(oy + gh)})
+			"y0": _leg_base(ks) - leg_gap * 0.5, "y1": float(oy + gh)})
 
 
 func _stream_x(st: Dictionary, y: float) -> float:
@@ -467,6 +531,9 @@ func _build_terrain() -> void:
 				if d < rdist[idx]:
 					rdist[idx] = d
 					re[idx] = lerpf(elev[i], elev[i2], a.distance_to(q) / ab)
+	var cliff_off := _cliff_offsets(n1, count)
+	var cliff_m := PackedFloat32Array()   # how much of its cliff each corner has (0..1)
+	cliff_m.resize(count)
 	peak = 1.0
 	for cy in gh + 1:
 		for cx in n1:
@@ -478,6 +545,11 @@ func _build_terrain() -> void:
 			e -= 0.45 * (1.0 - smoothstep(0.2, 1.6, _stream_d(x, y))) * smoothstep(0.9, 2.5, d)
 			if d < 3.5:
 				e = lerpf(re[idx], e, smoothstep(0.75, 3.2, d))
+			if cliff_off.has(idx):   # a rock wall up from the shoulder, or a drop away from it (never on a road)
+				var co: Vector2 = cliff_off[idx]
+				var k := smoothstep(2.0, 3.5, d)
+				e += co.x * k
+				cliff_m[idx] = co.y * k
 			zgrid[idx] = e * vz
 			peak = maxf(peak, zgrid[idx])
 	cell_col.resize(gw * gh)
@@ -485,6 +557,8 @@ func _build_terrain() -> void:
 	cell_tex.resize(gw * gh)
 	cell_light.resize(gw * gh)
 	cell_tint.resize(gw * gh)
+	cell_cliff.resize(gw * gh)
+	cell_cliff.fill(0)
 	for j in gh:
 		for i in gw:
 			var z00 := zgrid[j * n1 + i]
@@ -520,6 +594,19 @@ func _build_terrain() -> void:
 				if _stream_d(x, y) < 1.8:
 					col = col.lerp(Color(0.24, 0.56, 0.36), 0.5)
 			var sh := 1.0 + clampf(((z10 - z00) + (z11 - z01) + (z01 - z00) + (z11 - z10)) * 0.004, -0.35, 0.35)
+			# cliffs: bare grey rock on the face, broken scree on the ledge above or below it
+			var m00 := cliff_m[j * n1 + i]
+			var m10 := cliff_m[j * n1 + i + 1]
+			var m11 := cliff_m[(j + 1) * n1 + i + 1]
+			var m01 := cliff_m[(j + 1) * n1 + i]
+			var mlo := minf(minf(m00, m10), minf(m11, m01))
+			var mhi := maxf(maxf(m00, m10), maxf(m11, m01))
+			if mhi - mlo > 0.4:
+				cell_cliff[j * gw + i] = 2   # the face itself (drawn as bare rock, see _draw_cliff_face)
+				col = Color(0.55, 0.51, 0.48)
+				kind = 3
+			elif mhi > 0.35:
+				cell_cliff[j * gw + i] = 1   # the ledge above or the foot below: loose rocks (see _build_flora)
 			if kind == 3:
 				col = col.lerp(Season.SNOW, 0.65) if Season.bare() else col
 			elif kind != 4:
@@ -592,6 +679,126 @@ func _in_tunnel(s: float, gap: float = 0.0) -> bool:
 		if s > float(t["s0"]) - gap and s < float(t["s1"]) + gap:
 			return true
 	return false
+
+
+## True on a cliff face (or its ledge, with `ledge`): nothing should stand there.
+func _on_cliff(p: Vector2, ledge := false) -> bool:
+	var i := int(floorf(p.x)) - ox
+	var j := int(floorf(p.y)) - oy
+	if i < 0 or j < 0 or i >= gw or j >= gh or cell_cliff.is_empty():
+		return false
+	return cell_cliff[j * gw + i] >= (1 if ledge else 2)
+
+
+func _in_cliff(s: float, gap: float = 0.0) -> bool:
+	for cl in cliffs:
+		if s > s_m[int(cl["i0"])] - gap and s < s_m[int(cl["i1"])] + gap:
+			return true
+	return false
+
+
+## Cliffs on the mountain, like the Alpe d'Huez's: rock walls rising on the uphill side of some of the ramps, and
+## drops falling away off the outside of some of the hairpins that face the camera (and a few ramps). Kept off the
+## start and finish, tunnels, creeks and the fans' campsites.
+func _build_cliffs(rng: RandomNumberGenerator) -> void:
+	cliffs.clear()
+	if course.get("flowers", false):
+		return
+	var length: float = course["length"]
+	var ok := func(i0: int, i1: int) -> bool:
+		if i0 < 0 or i1 >= M or s_m[i0] < 160.0 or s_m[i1] > length - 160.0:
+			return false
+		for k in 4:   # the camper vans (see RaceLife._build_camps)
+			var cs := length * (0.15 + 0.2 * k)
+			if s_m[i1] > cs - 75.0 and s_m[i0] < cs + 75.0:
+				return false
+		for q in range(i0, i1 + 1, 4):
+			if _in_tunnel(s_m[q], 30.0) or _stream_d(pts[q].x, pts[q].y) < 5.0:
+				return false
+		for cl in cliffs:
+			if i1 > int(cl["i0"]) - 40 and i0 < int(cl["i1"]) + 40:
+				return false
+		return true
+	# drops off the outside of the right-hand hairpins (their outside faces the camera)
+	for h in hairpins:
+		if float(h["dx"]) < 0.0 or rng.randf() > 0.7:
+			continue
+		var i0: int = int(h["i0"]) - 12
+		var i1: int = int(h["i1"]) + 12
+		var mid := (int(h["i0"]) + int(h["i1"])) / 2
+		if ok.call(i0, i1):
+			var side := signf(nrm[mid].dot(pts[mid] - (h["c"] as Vector2)))
+			cliffs.append({"i0": i0, "i1": i1, "side": side, "h": -rng.randf_range(5.0, 8.0)})
+	# rock walls up the uphill side (away from the camera) of some ramps, and the odd drop on the downhill side
+	for k in range(1, legs_n - 1):
+		if rng.randf() > 0.65:
+			continue
+		var ia := -1
+		var ib := -1
+		for i in M:
+			if road_leg[i] == k:
+				if ia < 0:
+					ia = i
+				ib = i
+		var n := int(rng.randf_range(45.0, 85.0) / ds_m)
+		var pad := int(22.0 / ds_m)
+		if ia < 0 or ib - ia < n + 2 * pad:
+			continue
+		var i0 := ia + pad + int((ib - ia - n - 2 * pad) * rng.randf())
+		var i1 := i0 + n
+		if not ok.call(i0, i1):
+			continue
+		var mid := (i0 + i1) / 2
+		var up := -signf(nrm[mid].y)   # the side of the road towards -y, up the mountain
+		if rng.randf() < 0.7:
+			cliffs.append({"i0": i0, "i1": i1, "side": up, "h": rng.randf_range(4.0, 7.0)})
+		else:
+			cliffs.append({"i0": i0, "i1": i1, "side": -up, "h": -rng.randf_range(4.5, 7.0)})
+	cliffs.sort_custom(func(a, b): return int(a["i0"]) < int(b["i0"]))
+
+
+## Terrain corner -> Vector2(height offset (m), how much of the cliff it has (0..1)) for the corners by a cliff.
+func _cliff_offsets(n1: int, count: int) -> Dictionary:
+	var out := {}
+	for cl in cliffs:
+		var i0: int = cl["i0"]
+		var i1: int = cl["i1"]
+		var side: float = cl["side"]
+		var h: float = cl["h"]
+		var ramp := maxf(6.0, (i1 - i0) * 0.18)
+		var best := {}   # corner -> [distance, taper]
+		for i in range(i0, i1, 2):
+			var a := pts[i]
+			var b := pts[mini(i + 2, M - 1)]
+			var taper := smoothstep(float(i0), i0 + ramp, float(i)) * smoothstep(float(i1), i1 - ramp, float(i))
+			var x0 := clampi(floori(minf(a.x, b.x) - 11.5) - ox, 0, gw)
+			var x1 := clampi(ceili(maxf(a.x, b.x) + 11.5) - ox, 0, gw)
+			var y0 := clampi(floori(minf(a.y, b.y) - 11.5) - oy, 0, gh)
+			var y1 := clampi(ceili(maxf(a.y, b.y) + 11.5) - oy, 0, gh)
+			for cy in range(y0, y1 + 1):
+				for cx in range(x0, x1 + 1):
+					var p := Vector2(ox + cx, oy + cy)
+					if (p - a).dot(nrm[i]) * side <= 0.0:
+						continue
+					var d := p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b))
+					var idx := cy * n1 + cx
+					if not best.has(idx) or d < float(best[idx][0]):
+						best[idx] = [d, taper]
+		for idx in best:
+			var d: float = best[idx][0]
+			var t: float = best[idx][1]
+			var f := 0.0
+			if h > 0.0:   # a wall: straight up off the shoulder, a ledge, then back down into the hillside
+				f = smoothstep(2.9, 3.7, d) * (1.0 - smoothstep(6.0, 11.0, d))
+			else:         # a drop: straight down off the shoulder, then the slope below eases back into the hillside
+				f = smoothstep(2.3, 3.1, d) * (1.0 - smoothstep(6.5, 11.0, d))
+			f *= t
+			if f <= 0.0:
+				continue
+			var o: Vector2 = out.get(idx, Vector2.ZERO)
+			if absf(h * f) > absf(o.x):
+				out[idx] = Vector2(h * f, f)
+	return out
 
 
 func _clear_of(s: float, gap: float, kind: String = "") -> bool:
@@ -693,7 +900,7 @@ func _build_tunnels(rng: RandomNumberGenerator) -> void:
 					ia = i
 				ib = i
 		var n := int(rng.randf_range(80.0, 110.0) / ds_m)
-		if ia < 0 or ib - ia < n + 120:
+		if ia < 0 or ib - ia < n + 50:   # room for the tunnel and a run-in either side
 			continue
 		var i0 := ia + int((ib - ia - n) * rng.randf_range(0.3, 0.6))
 		var s0 := s_m[i0]
@@ -933,7 +1140,16 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
 			var sd := _stream_d(x, y)
-			if _rd(p) < 2.0 or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1):
+			if _rd(p) < 2.0 or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1 and y > life.rail_y0 - 1.0 and y < life.rail_y1 + 1.0):
+				continue
+			var cc := cell_cliff[j * gw + i]
+			if cc == 2:
+				continue
+			if cc == 1:   # loose rock and the odd stunted pine on the ledges
+				if roll < 0.12:
+					_put_static(3, {"pos": p, "z": z, "size": rng.randf_range(0.5, 1.2), "h": rng.randi(), "snow": snow}, [])
+				elif roll < 0.16:
+					_put_static(1, {"pos": p, "z": z, "s": rng.randf_range(0.6, 0.9), "sp": "snag" if roll < 0.13 else "pine", "snow": snow, "h": rng.randi()}, [])
 				continue
 			var rock_chance := 0.09 if f > 0.85 else 0.04 if snow else 0.015
 			if roll < chance:
@@ -1134,7 +1350,7 @@ func _build_season() -> void:
 		s += rng.randf_range(35.0, 80.0)
 		var side := 1.0 if rng.randf() < 0.5 else -1.0
 		var p: Vector2 = _pose(s, side * rng.randf_range(2.2, 4.0))["pos"]
-		if _rd(p) < 1.8 or _stream_d(p.x, p.y) < 1.2 or not _clear_of(s, 6.0):
+		if _rd(p) < 1.8 or _stream_d(p.x, p.y) < 1.2 or not _clear_of(s, 6.0) or _in_cliff(s, 8.0):
 			continue
 		var kind: String = kinds[rng.randi() % kinds.size()]
 		if kind == "skier":
@@ -1941,7 +2157,9 @@ func _draw() -> void:
 			var gname: String = GROUND_KINDS[cell_tex[ci_]]
 			var quad := PackedVector2Array([Iso.to_screen(Vector2(wx, wy), z00), Iso.to_screen(Vector2(wx + 1, wy), z10),
 				Iso.to_screen(Vector2(wx + 1, wy + 1), z11), Iso.to_screen(Vector2(wx, wy + 1), z01)])
-			if Ground.tex(gname) == null:
+			if cell_cliff[ci_] == 2:
+				_draw_cliff_face(quad, PackedFloat32Array([z00, z10, z11, z01]), wx, wy)
+			elif Ground.tex(gname) == null:
 				draw_primitive(quad, PackedColorArray([col]), PackedVector2Array())
 				_cell_detail(i, j, center, cell_kind[ci_], col)
 			else:
@@ -2058,6 +2276,43 @@ func _draw() -> void:
 
 
 ## Snowflakes drifting across the screen once you are up in the snow.
+## A cell of cliff face: bare rock (too steep to hold snow) lit at the top and in shadow at the foot, with bedding
+## lines and the odd crack so it reads as layered rock.
+func _draw_cliff_face(q: PackedVector2Array, z: PackedFloat32Array, wx: int, wy: int) -> void:
+	var h := absi(wx * 73856093 ^ wy * 19349663)
+	var zlo := minf(minf(z[0], z[1]), minf(z[2], z[3]))
+	var zhi := maxf(maxf(z[0], z[1]), maxf(z[2], z[3]))
+	var base := Color(0.56, 0.52, 0.49).lerp(Color(0.6, 0.55, 0.47), float(h % 5) / 4.0)
+	var cols := PackedColorArray()
+	for k in 4:
+		var u := (z[k] - zlo) / maxf(zhi - zlo, 1.0)
+		cols.append(Iso.shade(base, lerpf(0.62, 1.12, u)))
+	draw_primitive(q, cols, PackedVector2Array())
+	var dark := Color(0.16, 0.13, 0.13, 0.4)
+	var lite := Color(1.0, 0.97, 0.9, 0.14)
+	# lines run across the face between its two tall edges
+	var top_l := q[0]
+	var top_r := q[1]
+	var bot_l := q[3]
+	var bot_r := q[2]
+	if q[0].distance_to(q[1]) + q[3].distance_to(q[2]) > q[0].distance_to(q[3]) + q[1].distance_to(q[2]):
+		top_r = q[3]   # a face running along y (round a hairpin): its tall edges are the other pair
+		bot_l = q[1]
+	for k in 2:
+		var u := (0.3 + 0.4 * k) + 0.08 * float((h >> (k * 3)) % 3 - 1)
+		var a := top_l.lerp(bot_l, u)
+		var b := top_r.lerp(bot_r, u + 0.06 * float((h >> (k * 2 + 7)) % 3 - 1))
+		if a.distance_to(b) < 2.0:
+			continue
+		draw_line(a.round(), b.round(), dark, 1.0)
+		draw_line(a.round() + Vector2(0, 1), b.round() + Vector2(0, 1), lite, 1.0)
+	if h % 4 == 0:   # a crack down the face
+		var c0 := top_l.lerp(top_r, 0.3 + 0.4 * float(h % 7) / 7.0)
+		var c1 := bot_l.lerp(bot_r, 0.4 + 0.3 * float(h % 5) / 5.0)
+		draw_line(c0.round(), c0.lerp(c1, 0.5).round() + Vector2(1, 0), dark, 1.0)
+		draw_line(c0.lerp(c1, 0.5).round() + Vector2(1, 0), c1.round(), dark, 1.0)
+
+
 func _draw_flurries(vr: Rect2, cover: float) -> void:
 	if cover < 0.25:
 		return

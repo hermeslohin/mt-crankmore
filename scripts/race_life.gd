@@ -177,24 +177,47 @@ func _build_railway(rng: RandomNumberGenerator, length: float) -> void:
 		return
 	rail_y0 = float(race.oy) + 3.0
 	rail_y1 = float(race.oy + race.gh) - 3.0
-	for f in [0.62, 0.38, 0.74, 0.26, 0.5]:
+	var tries: Array = [0.62, 0.38, 0.74, 0.26, 0.5]
+	for q in 26:   # with the hairpins stacked high there are many more legs to cross clear of creeks and cliffs
+		tries.append(0.25 + 0.02 * q)
+	# the line runs down the hillside over as many legs in a row as it can cross cleanly; if a creek, tunnel or cliff
+	# is in the way it stops short at a halt between two legs instead
+	var best: Array = []
+	var best_x := -1.0
+	var best_cut := [false, false]   # [stops short at the top, stops short at the bottom]
+	for f in tries:
 		var x: float = race.leg_len * float(f)
-		var found: Array = []
-		var ok := true
+		var all: Array = []   # [crossing, clear?] bottom to top
 		for i in race.M - 1:
 			var a: Vector2 = race.pts[i]
 			var b: Vector2 = race.pts[i + 1]
 			if race.road_leg[i] < 0 or (a.x - x) * (b.x - x) > 0.0:
 				continue
 			var s: float = race.s_m[i]
-			if race._in_tunnel(s, 25.0) or race._near_ford(s, 25.0) or race._stream_d(x, a.y) < 3.0:
-				ok = false
-				break
-			found.append({"s": s, "y": a.y, "lat": 0.0})
-		if ok and not found.is_empty():
-			rail_x = x
-			crossings = found
+			var clear: bool = not (race._in_tunnel(s, 25.0) or race._near_ford(s, 25.0) or race._stream_d(x, a.y) < 3.0 or race._in_cliff(s, 15.0))
+			all.append([{"s": s, "y": a.y, "lat": 0.0}, clear])
+		var q0 := 0
+		while q0 < all.size():
+			if not all[q0][1]:
+				q0 += 1
+				continue
+			var q1 := q0
+			while q1 + 1 < all.size() and all[q1 + 1][1]:
+				q1 += 1
+			if q1 - q0 + 1 > best.size():
+				best = all.slice(q0, q1 + 1).map(func(e): return e[0])
+				best_x = x
+				best_cut = [q1 < all.size() - 1, q0 > 0]
+			q0 = q1 + 1
+		if best.size() == all.size() and not all.is_empty():
 			break
+	if best.size() >= 3:
+		rail_x = best_x
+		crossings = best
+		if best_cut[0]:
+			rail_y0 = float(crossings[-1]["y"]) - race.leg_gap * 0.5
+		if best_cut[1]:
+			rail_y1 = float(crossings[0]["y"]) + race.leg_gap * 0.5
 	if rail_x < 0.0:
 		return
 	for c in crossings:
@@ -203,7 +226,9 @@ func _build_railway(rng: RandomNumberGenerator, length: float) -> void:
 			for side in [-1.0, 1.0]:
 				var p: Vector2 = Vector2(rail_x + side * 1.0, float(c["y"]) + side * 1.25)
 				race._put_static(2, {"kind": "crossing", "pos": p, "z": race._tz(p), "c": c}, [])
-			race._put_static(2, {"kind": "board", "s": s - 80.0, "icon": "train", "l1": "RAILWAY", "l2": "CROSSING", "side": 1.0}, [])
+			# a warning board, unless a hairpin's board already stands there (the hairpins come thick and fast)
+			if not race.hairpins.any(func(h): return absf(float(h["s"]) - 105.0 - (s - 80.0)) < 45.0):
+				race._put_static(2, {"kind": "board", "s": s - 80.0, "icon": "train", "l1": "RAILWAY", "l2": "CROSSING", "side": 1.0}, [])
 	# a little halt half way up
 	var sy: float = lerpf(rail_y0, rail_y1, 0.45)
 	var sp := Vector2(rail_x + 2.2, sy)
@@ -331,7 +356,7 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 		var towers: Array = []
 		var ty: float = float(rn[2]) - 2.0
 		while ty > float(rn[3]) + 2.0:
-			if race._rd(Vector2(bx, ty)) > 1.4:
+			if race._rd(Vector2(bx, ty)) > 1.4 and not race._on_cliff(Vector2(bx, ty), true):   # the cable spans the cliffs
 				towers.append(ty)
 			ty -= 7.0
 		lifts.append({"x": bx, "y0": rn[2], "y1": rn[3], "towers": towers, "ph": rng.randf() * 10.0})

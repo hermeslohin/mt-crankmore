@@ -20,28 +20,12 @@ const EASIEST := 0.27    # gear 1, ratio to gear 11 (the range, hardest over eas
 const HARDEST := 3.12    # gear 21
 const FIXED_GEAR := 9     # the fixie's one and only gear
 
-## Shifter buttons: LS1 = easier, RS1 = harder.
-const SHIFT_BUTTONS := {"LS1": -1, "RS1": 1}
 const SHIFT_HOLD := 1.0       # seconds a shifter (or key) is held before it starts shifting again by itself
 const SHIFT_REPEAT := 0.5     # then one more gear every this many seconds
 
-## Controller button name -> game action.
-const BUTTON_ACTIONS := {
-	"LEFT": "steer_left",
-	"RIGHT": "steer_right",
-	"UP": "act_up",
-	"DOWN": "act_down",
-	"A": "act_select",
-	"B": "act_back",
-	"Y": "powerup",
-	"Z": "honk",
-	"RS2": "powerup",
-	"LS2": "brake",
-	"POWERUP_R": "powerup",
-	"POWERUP_L": "brake",
-	"PADDLE_L": "lane_left",
-	"PADDLE_R": "lane_right",
-}
+## While set (the controller remap screen), the next controller button pressed goes to this Callable(name) instead of
+## driving the game.
+var capture := Callable()
 
 var rx := PacketPeerUDP.new()
 var tx := PacketPeerUDP.new()
@@ -293,7 +277,7 @@ func _process(delta: float) -> void:
 	# say so when the trainer drops out mid-ride (you'd otherwise just grind to a halt), and when it's back
 	if had_trainer and not trainer_live:
 		_lost_trainer = true
-		Game.toast.emit("Trainer signal lost - reconnecting... (W pedals meanwhile)", Color(1.0, 0.6, 0.4))
+		Game.toast.emit("Trainer signal lost - reconnecting... (%s pedals meanwhile)" % Controls.key("pedal"), Color(1.0, 0.6, 0.4))
 	elif _lost_trainer and trainer_live:
 		_lost_trainer = false
 		Game.toast.emit("Trainer back!", Color(0.5, 1.0, 0.6))
@@ -333,13 +317,15 @@ func _on_message(d: Dictionary) -> void:
 		trainer_cadence = float(d.get("cadence", 0.0))
 		trainer_speed_kmh = float(d.get("speed", 0.0))
 	var pressed: Array = d.get("buttons", [])
-	for b in pressed:
-		if SHIFT_BUTTONS.has(str(b)) and not pressed_names.has(b):
-			shift(SHIFT_BUTTONS[str(b)])
+	var fresh: Array = pressed.filter(func(b): return not pressed_names.has(b))
 	pressed_names = pressed
+	if capture.is_valid():   # remapping: a button press is an answer, not a command
+		if not fresh.is_empty():
+			capture.call(str(fresh[0]))
+		pressed = []
 	var now_actions := {}
 	for b in pressed:
-		var action: String = BUTTON_ACTIONS.get(str(b), "")
+		var action: String = Controls.pad_lookup.get(str(b), "")
 		if action != "":
 			now_actions[action] = true
 	var frame := Engine.get_process_frames()
@@ -392,14 +378,13 @@ func gear_ratio(g: int = gear) -> float:
 	return pow(HARDEST, float(g - START_GEAR) / (GEARS - START_GEAR))
 
 
-## Holding a shifter (the controller's LS1 / RS1 or the shift keys) keeps shifting: once more after SHIFT_HOLD, then
+## Holding a shifter (the controller's shifters or the shift keys) keeps shifting: once more after SHIFT_HOLD, then
 ## every SHIFT_REPEAT until it's let go. (The first shift happens on the press itself.)
 func _shift_repeat(delta: float) -> void:
-	var live := Time.get_ticks_msec() - last_msg_ms < 600   # the controller's buttons only count while it's talking
 	var dir := 0
-	if Input.is_action_pressed("shift_up") or (live and pressed_names.has("RS1")):
+	if Input.is_action_pressed("shift_up"):
 		dir += 1
-	if Input.is_action_pressed("shift_down") or (live and pressed_names.has("LS1")):
+	if Input.is_action_pressed("shift_down"):
 		dir -= 1
 	if dir == 0 or dir != _rep_dir:
 		_rep_dir = dir

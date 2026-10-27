@@ -242,7 +242,8 @@ func _show_title() -> void:
 	city.visible = true
 	race.visible = false
 	hud.open_menu(func():
-		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\n%s in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: W pedal, Shift sprint, Q / R shift gear, arrows choose, S brake, Y use power-up, H shout, E select." % [Game.SLOGAN, Season.NAMES[Season.current], _cap(_rivals_text())],
+		return {"title": "Welcome to Mt. Crankmore", "sub": "%s.\n%s in Crankmore Village. %s. One mountain. Just pedal: your bike follows the road. At junctions pick LEFT / RIGHT or UP for straight (DOWN = U-turn). Shifters change gear (1-21). Keyboard: %s pedal, %s sprint, %s / %s shift gear, arrows choose, %s brake, %s use power-up, %s shout, %s select (change them in Controls)." % [Game.SLOGAN, Season.NAMES[Season.current], _cap(_rivals_text()),
+			Controls.key("pedal"), Controls.key("sprint"), Controls.key("shift_down"), Controls.key("shift_up"), Controls.key("brake"), Controls.key("powerup"), Controls.key("honk"), Controls.key("act_select")],
 			"items": [
 				{"label": "Continue game", "fn": _start_or_setup, "enabled": Game.has_save(),
 					"detail": "$%d  |  %d deliveries" % [Game.money, Game.deliveries] if Game.has_save() else "No saved game yet"},
@@ -251,6 +252,7 @@ func _show_title() -> void:
 					"detail": "FTP %d W  |  %s  |  %.1f W/kg  |  %s  |  %d rival%s" % [int(Game.ftp), Game.weight_text(), Game.wkg(),
 						Game.DIFFICULTIES[Game.difficulty]["label"], Game.rival_count, "" if Game.rival_count == 1 else "s"]},
 				_season_item(),
+				{"label": "Controls", "fn": _open_controls.bind(_show_title), "detail": "Change the keyboard keys and the handlebar controller buttons."},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
 				{"label": "Quit", "fn": _quit},
@@ -498,6 +500,7 @@ func _open_pause() -> void:
 				{"label": "My bikes", "fn": _open_garage, "detail": "Riding the %s. Pick any bike you own." % Game.bike()["name"]},
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
 				_season_item(),
+				{"label": "Controls", "fn": _open_controls.bind(_open_pause), "detail": "Change the keyboard keys and the handlebar controller buttons."},
 				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
 				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
 			]})
@@ -539,8 +542,58 @@ func _open_race_pause() -> void:
 		return {"title": "Race paused", "sub": "Forfeiting loses your entry fee.",
 			"items": [
 				{"label": "Back to the climb", "fn": func(): hud.close_menu(); on_menu_closed()},
+				{"label": "Controls", "fn": _open_controls.bind(_open_race_pause), "detail": "Change the keyboard keys and the handlebar controller buttons."},
 				{"label": "Forfeit and return to town", "fn": _leave_race},
 			]})
+
+
+# ---- controls (remapping) ------------------------------------------------
+
+## The remap screens: a hub, then a page per device and group of actions. LEFT / RIGHT on an action picks which of its
+## slots to change (a key or button each, up to Controls.MAX_SLOTS); select then waits for the new key / button.
+var _remap_slot := {}   # "device:action" -> the slot LEFT / RIGHT has picked
+
+func _open_controls(back: Callable) -> void:
+	hud.open_menu(func():
+		var items: Array = []
+		for device in ["key", "pad"]:
+			for g in Controls.GROUPS.size():
+				var group: Dictionary = Controls.GROUPS[g]
+				items.append({"label": "%s: %s" % ["Keyboard" if device == "key" else "Controller", group["name"]],
+					"fn": _open_remap.bind(device, g, back),
+					"detail": "Press select, pick an action, then press the new %s." % ("key" if device == "key" else "controller button")})
+		items.append({"label": "Reset everything to default", "enabled": not Controls.is_default(),
+			"fn": func():
+				Controls.reset_all()
+				Game.toast.emit("Controls reset", Color(0.5, 1.0, 0.6)),
+			"detail": "Puts every key and button back the way the game shipped."})
+		items.append({"label": "Back", "fn": back, "detail": ""})
+		return {"title": "Controls", "sub": "Changes are saved straight away. F11 (fullscreen) can't be changed.", "items": items})
+
+
+func _open_remap(device: String, g: int, back: Callable) -> void:
+	var group: Dictionary = Controls.GROUPS[g]
+	hud.open_menu(func():
+		var items: Array = []
+		for action in group["actions"]:
+			var slot_key: String = device + ":" + action
+			var list: Array = Controls.table(device)[action]
+			var slot: int = clampi(int(_remap_slot.get(slot_key, 0)), 0, mini(list.size(), Controls.MAX_SLOTS - 1))
+			var parts: Array = []
+			for i in Controls.MAX_SLOTS:
+				if i > list.size():
+					break   # one empty slot to add to, no more
+				var t: String = Controls.name_of(device, list[i]) if i < list.size() else "-"
+				if not hud.capture.is_empty() and hud.capture["device"] == device and hud.capture["action"] == action and hud.capture["slot"] == i:
+					t = "?"
+				parts.append("[%s]" % t if i == slot else t)
+			items.append({"label": "%s:  %s" % [Controls.LABELS[action], "  /  ".join(parts)],
+				"fn": func(): hud.begin_capture(device, action, slot),
+				"adjust": func(d: int): _remap_slot[slot_key] = clampi(slot + d, 0, mini(list.size(), Controls.MAX_SLOTS - 1)),
+				"detail": ("Select to set the [bracketed] %s; LEFT / RIGHT picks another slot (an action can have up to %d). DEL clears a slot, ESC cancels." % ["key" if device == "key" else "button", Controls.MAX_SLOTS])})
+		items.append({"label": "Back", "fn": _open_controls.bind(back), "detail": ""})
+		var sub := "Pick an action, then press the new %s." % ("key" if device == "key" else "controller button (needs the bridge: see Connect Trainer)")
+		return {"title": "%s: %s" % ["Keyboard" if device == "key" else "Controller", group["name"]], "sub": sub, "items": items})
 
 
 # ---- interactions -------------------------------------------------------

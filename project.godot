@@ -11,6 +11,7 @@ config/features=PackedStringArray("4.3")
 
 [autoload]
 
+Controls="*res://scripts/controls.gd"
 Season="*res://scripts/season.gd"
 Game="*res://scripts/game.gd"
 Trainer="*res://scripts/trainer_link.gd"

@@ -501,7 +501,7 @@ func _add_vehicle(out: Array, name: String, s: float, lat: float) -> void:
 
 func _draw_vehicle(name: String, pz: Dictionary) -> void:
 	var n: Vector2 = pz["n"]
-	var along := Vector2(-n.y, n.x)
+	var along := Vector2(n.y, -n.x)   # along the road, the way the race goes
 	var at := Iso.to_screen(pz["pos"], pz["z"] + 1.5)
 	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-12, 0), at + Vector2(0, -5), at + Vector2(12, 0), at + Vector2(0, 5)]), Color(0, 0, 0, 0.2))
 	Sprites.draw_vehicle(race, name, at + Vector2(0, -1 if int(t_ * 8.0) % 2 == 0 else 0), along, Color.WHITE, int(t_ * 8.0), Sprites.turn_state("race/" + name))
@@ -538,7 +538,7 @@ func _draw_devil(pz: Dictionary, running: bool) -> void:
 	var n: Vector2 = pz["n"]
 	Sprites.cast(devil, ["fan_devil"], true)   # the one and only devil: no fan in the same costume next to him
 	if running:
-		Sprites.draw_person(race, "ped_fan_devil_walk", at, Vector2(-n.y, n.x), t_, 12.0)
+		Sprites.draw_person(race, "ped_fan_devil_walk", at, Vector2(n.y, -n.x), t_, 12.0)
 		if int(t_ * 1.5) % 3 == 0:
 			_shout(at + Vector2(0, -58), ["ALLEZ ALLEZ!", "GO GO GO!", "DIG DEEP!", "FASTER!"][int(t_ / 2.0) % 4], Color(1.0, 0.35, 0.3))
 	else:

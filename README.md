@@ -30,7 +30,7 @@ Pedal a **bicycle trainer** (Bluetooth or Wi-Fi, optionally with handlebar contr
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.8.1**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.8.2**):
 
 | Platform | File | How to run |
 |---|---|---|

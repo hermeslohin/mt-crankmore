@@ -1462,6 +1462,30 @@ func _build_road_geometry() -> void:
 			road_draw.append([Iso.to_screen((a + b) * 0.5), _ribbon(a, b, na, nb, ROAD_HW + 0.3), _ribbon(a, b, na, nb, ROAD_HW), dash,
 				empty if cut_l else _ribbon(a + na * kerb_in, b + nb * kerb_in, na, nb, 0.05), empty if cut_r else _ribbon(a - na * kerb_in, b - nb * kerb_in, na, nb, 0.05), specks,
 				empty if cut_l else _ribbon(a + na * kerb_out, b + nb * kerb_out, na, nb, 0.12)])
+	# Each road end is cut square to its own heading, so where arms meet at an angle a wedge of grass
+	# shows between the cuts. Pave every junction with the hull of its arms' ends (pavement, then asphalt).
+	for j in junctions:
+		var walk := PackedVector2Array()
+		var tar := PackedVector2Array()
+		for l in j["links"]:
+			var r: Dictionary = roads[l[0]]
+			for hw in [ROAD_HW + 0.3, ROAD_HW]:
+				for d in [-hw, 0.0, hw]:
+					var s: float = l[1] + d
+					if not r["closed"] and (s < -0.01 or s > float(r["len"]) + 0.01):
+						continue
+					var at := _road_at(r, s)
+					var n := Vector2(-at[1].y, at[1].x)
+					var into := walk if hw > ROAD_HW else tar
+					into.append_array([at[0] + n * hw, at[0] - n * hw])
+		var empty := PackedVector2Array()
+		var hulls: Array = []
+		for pts in [walk, tar]:
+			var h := Geometry2D.convex_hull(pts)
+			if h.size() > 1 and h[0] == h[h.size() - 1]:
+				h.remove_at(h.size() - 1)
+			hulls.append(_to_screen_poly(h))
+		road_draw.append([Iso.to_screen(j["pos"]), hulls[0], hulls[1], empty, empty, empty, empty, empty])
 	zebra.clear()
 	for j in junctions:
 		for l in j["links"]:

@@ -9,7 +9,7 @@ extends RefCounted
 ## Bigger happenings come round on their own clocks (see SPECIALS): a soapbox speaker with hecklers, a club group ride,
 ## a fire with the fire brigade, someone hurt and an ambulance, a robber chased by the police (ride into him to stop
 ## him), and fireworks once a night.
-## Every few minutes the whole Crankmore Marching Band parades round the Plaza Loop (see PARADE): the drum major
+## Every twenty minutes or so the whole Crankmore Marching Band parades round the Plaza Loop (see PARADE): the drum major
 ## out in front, flags and batons, then the brass, woodwinds and drums, sousaphones at the back, in their own lane,
 ## with the traffic queueing behind and the townsfolk cheering them on.
 ## The crew at the Crankmore Heights construction site is always about: walking the site, stopping to work, calling
@@ -17,7 +17,11 @@ extends RefCounted
 ## Each happening is a handful of actors (people, animals, a parked vehicle, a ball or a balloon) that City sorts into
 ## its drawing like everything else (see actors()). Anything without art is skipped.
 
-const GAP_MIN := 20.0         # seconds between happenings
+## Every event clock (the small happenings, the parade, SPECIALS and TownHappenings) runs this many times slower than
+## the intervals written below, so each happening stays a rare treat. Fireworks (nightly) and the already-rare chaos
+## and Santa keep their own timing.
+const RARITY := 4.0
+const GAP_MIN := 20.0         # seconds between happenings (times RARITY)
 const GAP_MAX := 40.0
 const MAX_LIVE := 2           # happenings going on at once
 var near := 7.0               # tiles from the player a happening starts
@@ -30,7 +34,7 @@ const CROWD_SHOUTS := ["Go {n}!", "PIZZA!", "Woooo!", "Faster!", "Legend!", "We 
 
 var city                       # the City node (untyped: City has no class_name)
 var events: Array = []         # {kind, t (seconds left), actors: [...], ...}
-var next_t := 6.0
+var next_t := 6.0 * RARITY
 var t_ := 0.0
 var critters: Array = []
 var leaving: Array = []       # actors still in sight when they were done: making their way out of it (see _leave)
@@ -38,7 +42,7 @@ var crew: Array = []          # the construction site's workers (see _step_crew)
 const CREW_SIZE := 4
 const CREW_LINES := ["*clang* *clang*", "Measure twice!", "Lunch yet?", "Watch your head!", "Hand me that wrench!",
 	"Pizza later?", "Easy... easy...", "Who ordered the anchovies?", "Hard hats on!", "BEEP BEEP BEEP"]
-var parade_t := randf_range(60.0, 150.0)   # seconds until the band next marches
+var parade_t := randf_range(60.0, 150.0) * RARITY   # seconds until the band next marches
 const PARADE_EVERY := [300.0, 540.0]
 const PARADE_SPEED := 0.75     # m/s, a brisk march
 const PARADE_LAPS := 2.0
@@ -69,7 +73,7 @@ func clear() -> void:
 	events.clear()
 	critters.clear()
 	leaving.clear()
-	next_t = 6.0
+	next_t = 6.0 * RARITY
 
 
 func _spawn_critters() -> void:
@@ -183,12 +187,12 @@ func update(delta: float) -> void:
 	_update_specials(delta)
 	parade_t -= delta
 	if parade_t <= 0.0 and city.active:
-		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1])
+		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1]) * RARITY
 		if not events.any(func(e): return e["kind"] == "parade"):
 			_start_parade(city.p_pos)
 	next_t -= delta
 	if next_t <= 0.0 and events.filter(func(e): return e["kind"] != "parade" and e["kind"] != "fireworks" and not SPECIALS.has(e["kind"])).size() < MAX_LIVE and city.active:
-		next_t = randf_range(GAP_MIN, GAP_MAX)
+		next_t = randf_range(GAP_MIN, GAP_MAX) * RARITY
 		_start(_pick_kind())
 	for i in range(events.size() - 1, -1, -1):
 		var e: Dictionary = events[i]
@@ -1066,10 +1070,10 @@ func _update_specials(delta: float) -> void:
 		return
 	for k in SPECIALS:
 		if not special_t.has(k):
-			special_t[k] = randf_range(30.0, float(SPECIALS[k][0]))
+			special_t[k] = randf_range(30.0, float(SPECIALS[k][0])) * RARITY
 		special_t[k] -= delta
 		if special_t[k] <= 0.0:
-			special_t[k] = randf_range(SPECIALS[k][0], SPECIALS[k][1])
+			special_t[k] = randf_range(SPECIALS[k][0], SPECIALS[k][1]) * RARITY
 			if not events.any(func(e): return e["kind"] == k):
 				_start(k)
 	# fireworks: once a night, a while after it gets properly dark

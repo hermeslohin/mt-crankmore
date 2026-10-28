@@ -4,8 +4,9 @@ extends Node
 ## strava.com/settings/api and pastes its Client ID and Client Secret into the game. Linking opens the Strava
 ## approval page in your browser, which sends you back to a tiny web server the game runs on localhost.
 ## Tokens are kept in user://strava.json and refreshed when they expire.
-## Strava's API can't attach photos, so a posted ride's screenshots are kept in user://rides/<activity> and
-## "Add screenshots" opens the activity and that folder, ready to drag them in.
+## Strava's API can't attach photos, so a posted ride's screenshots are written to user://rides/<activity> and
+## "Add screenshots" opens the activity and that folder, ready to drag them in. Only the last posted ride's folder is
+## kept: "Add screenshots" can't reach older ones.
 
 const SAVE := "user://strava.json"
 const PORT := 9873
@@ -259,12 +260,24 @@ func post_ride() -> void:
 		await get_tree().create_timer(2.0).timeout
 	var dir := "user://rides/" + activity_id
 	var had_shots := not Ride.shots.is_empty()
+	_clear_old_shots()
 	Ride.reset(dir if had_shots else "")
 	last_activity = {"id": activity_id, "shots_dir": dir if had_shots else ""}
 	_save()
 	state = "done"
 	msg = "Posted to Strava!" + ("" if typed else " (as a Ride: Strava wouldn't make it a Virtual Ride: %s)" % _err_text(r)) + \
 		(" Pick \"Add screenshots\" to put them on the activity." if had_shots else "")
+
+
+## Deletes the screenshot folders of rides posted before this one.
+func _clear_old_shots() -> void:
+	if Game.no_save or not DirAccess.dir_exists_absolute("user://rides"):
+		return
+	for d in DirAccess.get_directories_at("user://rides"):
+		var path := "user://rides".path_join(d)
+		for f in DirAccess.get_files_at(path):
+			DirAccess.remove_absolute(path.path_join(f))
+		DirAccess.remove_absolute(path)
 
 
 func _fail(text: String) -> void:

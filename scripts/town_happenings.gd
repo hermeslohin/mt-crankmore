@@ -25,6 +25,10 @@ const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual
 const RUN_LEN := 18.0                  # tiles of road closed for a fun run
 const SEASONAL := {"winter": ["snowball_fight", "sledding", "tree_lighting"], "spring": ["egg_hunt", "duck_crossing"],
 	"summer": ["volleyball", "fishing", "lemonade"], "fall": ["trick_or_treat", "hayride", "harvest_festival", "zombie_kids"]}
+## Happenings that belong on open ground (a park, the plaza, the beach) rather than at the kerb, and how much room
+## they need: [either side along the road, behind, in front towards the road] in tiles (see TownEvents._ground_spot).
+const OFF_ROAD := {"market": [2.7, 1.3, 0.5], "harvest_festival": [3.0, 2.9, 0.5], "movie_night": [2.0, 2.6, 2.6],
+	"volleyball": [1.8, 1.8, 1.8]}
 const ZOMBIES := ["zombie_kid_1", "zombie_kid_2", "zombie_kid_3", "zombie_kid_4"]
 const KIDS := ["kid", "bucket_hat_kid", "skater_kid", "norm_boy_kid", "scout", "norm_teen_girl", "norm_teen_boy"]
 const EGG_COLS := [Color(1.0, 0.55, 0.75), Color(0.55, 0.8, 1.0), Color(1.0, 0.9, 0.4), Color(0.6, 1.0, 0.6), Color(0.85, 0.6, 1.0)]
@@ -58,12 +62,15 @@ func update(delta: float) -> void:
 		happen_t = randf_range(EVERY[0], EVERY[1]) * RARITY
 		var kinds: Array = TOWN + SEASONAL.get(Season.current, [])
 		kinds = kinds.filter(func(k): return not k in recent and not events.any(func(e): return e["kind"] == k) and _fits(k))
-		if not kinds.is_empty():
-			var k: String = kinds.pick_random()
+		kinds.shuffle()
+		for k in kinds:   # one with nowhere to go now (a market needs open ground) makes way for the next
+			var n := events.size()
 			_start(k)
-			recent.append(k)
-			if recent.size() > 6:
-				recent.pop_front()
+			if events.size() > n:
+				recent.append(k)
+				if recent.size() > 6:
+					recent.pop_front()
+				break
 	for k in CHAOS:
 		if not chaos_t.has(k):
 			chaos_t[k] = randf_range(CHAOS[k][0] * 0.3, CHAOS[k][1])
@@ -173,7 +180,7 @@ func _start(kind: String) -> void:
 	if not kind in all_kinds():
 		super._start(kind)
 		return
-	var sp := _spot()
+	var sp := _ground_spot(OFF_ROAD[kind][0], OFF_ROAD[kind][1], OFF_ROAD[kind][2]) if OFF_ROAD.has(kind) else _spot()
 	var e := {"kind": kind, "t": 60.0, "actors": [], "clock": 0.0, "stage": ""}
 	if not sp.is_empty():
 		e.merge({"pos": sp[0], "road": sp[1], "s": sp[2], "side": sp[3], "along": sp[4], "across": ((sp[5] as Vector2) - (sp[0] as Vector2)).normalized()})

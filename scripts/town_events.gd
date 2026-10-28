@@ -362,6 +362,64 @@ func _has(sheet: String) -> bool:
 
 ## A spot on a pavement near the player: [pos, road index, s, side, road direction] or [] if none.
 func _spot() -> Array:
+	var cands := _spot_cands()
+	for _try in 12:
+		if cands.is_empty():
+			return []
+		var c: Array = cands.pick_random()
+		var at: Array = c[2]
+		var side := 1.0 if randf() < 0.5 else -1.0
+		var n := Vector2(-at[1].y, at[1].x)
+		var pos: Vector2 = at[0] + n * side * (city.ROAD_HW + 0.6)
+		if _free(pos):
+			return [pos, c[0], c[1], side, at[1], at[0]]
+	return []
+
+
+## Like _spot, but back from the kerb on open ground (grass, the plaza, the beach) for a happening that doesn't belong
+## in the street: a busker, a market, movie night. Everything from `back` behind the spot to `front` in front of it
+## (towards the road) and `half_along` either side must be clear of the road and the pavement, of buildings and of
+## trees. "across" still points towards the road, so people face the passing traffic. [] when there's nowhere.
+func _ground_spot(half_along: float, back: float, front: float) -> Array:
+	var cands := _spot_cands()
+	for _try in 24:
+		if cands.is_empty():
+			return []
+		var c: Array = cands.pick_random()
+		var at: Array = c[2]
+		var side := 1.0 if randf() < 0.5 else -1.0
+		var n: Vector2 = Vector2(-at[1].y, at[1].x) * side
+		for d in [front + 0.5, front + 1.5, front + 3.0, front + 5.0, front + 7.0]:
+			var pos: Vector2 = at[0] + n * (city.ROAD_HW + 0.6 + d)
+			if (allow_in_view or not city._in_view(pos)) and _ground_clear(pos, at[1], n, half_along, back, front):
+				return [pos, c[0], c[1], side, at[1], at[0]]
+	return []
+
+
+func _ground_clear(pos: Vector2, along: Vector2, to_road: Vector2, half_along: float, back: float, front: float) -> bool:
+	var u := -half_along
+	while u <= half_along + 0.01:
+		var v := -back
+		while v <= front + 0.01:
+			var q: Vector2 = pos + along * u + to_road * v
+			var ix := floori(q.x)
+			var iy := floori(q.y)
+			if ix < 0 or iy < 0 or ix >= city.N or iy >= city.N:
+				return false
+			var i: int = iy * city.N + ix
+			if not city.tiles[i] in [city.T.GRASS, city.T.PLAZA, city.T.SAND] or city.solid[i] != 0 or city.reserved[i] == 2 \
+					or city.road_d[i] < city.ROAD_HW + 1.2:
+				return false
+			for t in city.tree_chunks.get(Vector2i(floori(q.x / city.CHUNK), floori(q.y / city.CHUNK)), []):
+				if (t["pos"] as Vector2).distance_squared_to(q) < 0.5:
+					return false
+			v += 0.7
+		u += 0.7
+	return city.road_dist(pos) >= city.ROAD_HW + 1.2 + front   # exact, unlike road_d (per tile), but slow: last
+
+
+## Road points near the player where a happening could start: ahead of you and just out of sight.
+func _spot_cands() -> Array:
 	var p: Vector2 = city.p_pos
 	var cands: Array = []
 	for ri in city.roads.size():
@@ -376,17 +434,7 @@ func _spot() -> Array:
 			if d > near and d < far and ahead and (allow_in_view or not city._in_view(at[0])):
 				cands.append([ri, s, at])
 			s += 2.0
-	for _try in 12:
-		if cands.is_empty():
-			return []
-		var c: Array = cands.pick_random()
-		var at: Array = c[2]
-		var side := 1.0 if randf() < 0.5 else -1.0
-		var n := Vector2(-at[1].y, at[1].x)
-		var pos: Vector2 = at[0] + n * side * (city.ROAD_HW + 0.6)
-		if _free(pos):
-			return [pos, c[0], c[1], side, at[1], at[0]]
-	return []
+	return cands
 
 
 func _free(pos: Vector2) -> bool:
@@ -463,7 +511,7 @@ func _start(kind: String) -> void:
 		if _start_special(kind, e0, []):
 			events.append(e0)
 		return
-	var sp := _spot()
+	var sp := _ground_spot(1.5, 0.6, 1.1) if kind in ["busker", "mime"] else _spot()   # performers play in the park or the plaza
 	if sp.is_empty():
 		return
 	var pos: Vector2 = sp[0]

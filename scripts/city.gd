@@ -2598,13 +2598,13 @@ func _update_rivals(delta: float) -> void:
 const RIVAL_CUT := 0.6   # tiles: how far a rival cuts the corners of its route
 
 ## Moves a rival along its path. Returns true when the path is finished.
-## Rivals cruise at 75% of their FTP, so they slow down on climbs and fly down the other side just like you.
+## Rivals cruise at the difficulty's share of their FTP (Game.rival_share), so they slow down on climbs and fly down the other side just like you.
 func _follow(r: Dictionary, delta: float) -> bool:
 	var path: Array = r["path"]
 	if not path.is_empty():
 		var bk: Dictionary = r["bike"]
 		var g := PowerUps.felt_grade(clampf(grade_at(r["pos"], path[0] - r["pos"]), -0.1, 0.1), r["roller"])
-		var mps := minf(Game.speed_from_power(float(r["ftp"]) * 0.75, bk["mass"], bk["cda"], bk["crr"], g, r["mass"]), MAX_TOWN_SPEED)
+		var mps := minf(Game.speed_from_power(float(r["ftp"]) * Game.rival_share(), bk["mass"], bk["cda"], bk["crr"], g, r["mass"]), MAX_TOWN_SPEED)
 		if r["socks"] > 0.0:
 			mps *= PowerUps.SOCKS_BOOST
 		if r["blocked"]:

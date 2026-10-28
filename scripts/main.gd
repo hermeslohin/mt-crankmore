@@ -479,7 +479,7 @@ func _setup_menu(finish: Callable) -> Dictionary:
 			"detail": "Riding against you: %s." % ", ".join(names)},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
-	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a similar W/kg, scaled by difficulty." % Game.wkg(), "items": items}
+	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}
 
 
 func _start_game() -> void:

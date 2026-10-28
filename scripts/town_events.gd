@@ -9,7 +9,7 @@ extends RefCounted
 ## Bigger happenings come round on their own clocks (see SPECIALS): a soapbox speaker with hecklers, a club group ride,
 ## a fire with the fire brigade, someone hurt and an ambulance, a robber chased by the police (ride into him to stop
 ## him), and fireworks once a night.
-## Every few minutes the whole Crankmore Marching Band parades round the Plaza Loop (see PARADE): the drum major
+## Every twenty minutes or so the whole Crankmore Marching Band parades round the Plaza Loop (see PARADE): the drum major
 ## out in front, flags and batons, then the brass, woodwinds and drums, sousaphones at the back, in their own lane,
 ## with the traffic queueing behind and the townsfolk cheering them on.
 ## The crew at the Crankmore Heights construction site is always about: walking the site, stopping to work, calling
@@ -17,7 +17,11 @@ extends RefCounted
 ## Each happening is a handful of actors (people, animals, a parked vehicle, a ball or a balloon) that City sorts into
 ## its drawing like everything else (see actors()). Anything without art is skipped.
 
-const GAP_MIN := 20.0         # seconds between happenings
+## Every event clock (the small happenings, the parade, SPECIALS and TownHappenings) runs this many times slower than
+## the intervals written below, so each happening stays a rare treat. Fireworks (nightly) and the already-rare chaos
+## and Santa keep their own timing.
+const RARITY := 4.0
+const GAP_MIN := 20.0         # seconds between happenings (times RARITY)
 const GAP_MAX := 40.0
 const MAX_LIVE := 2           # happenings going on at once
 var near := 7.0               # tiles from the player a happening starts
@@ -30,7 +34,7 @@ const CROWD_SHOUTS := ["Go {n}!", "PIZZA!", "Woooo!", "Faster!", "Legend!", "We 
 
 var city                       # the City node (untyped: City has no class_name)
 var events: Array = []         # {kind, t (seconds left), actors: [...], ...}
-var next_t := 6.0
+var next_t := 6.0 * RARITY
 var t_ := 0.0
 var critters: Array = []
 var leaving: Array = []       # actors still in sight when they were done: making their way out of it (see _leave)
@@ -38,7 +42,7 @@ var crew: Array = []          # the construction site's workers (see _step_crew)
 const CREW_SIZE := 4
 const CREW_LINES := ["*clang* *clang*", "Measure twice!", "Lunch yet?", "Watch your head!", "Hand me that wrench!",
 	"Pizza later?", "Easy... easy...", "Who ordered the anchovies?", "Hard hats on!", "BEEP BEEP BEEP"]
-var parade_t := randf_range(60.0, 150.0)   # seconds until the band next marches
+var parade_t := randf_range(60.0, 150.0) * RARITY   # seconds until the band next marches
 const PARADE_EVERY := [300.0, 540.0]
 const PARADE_SPEED := 0.75     # m/s, a brisk march
 const PARADE_LAPS := 2.0
@@ -69,7 +73,7 @@ func clear() -> void:
 	events.clear()
 	critters.clear()
 	leaving.clear()
-	next_t = 6.0
+	next_t = 6.0 * RARITY
 
 
 func _spawn_critters() -> void:
@@ -183,12 +187,12 @@ func update(delta: float) -> void:
 	_update_specials(delta)
 	parade_t -= delta
 	if parade_t <= 0.0 and city.active:
-		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1])
+		parade_t = randf_range(PARADE_EVERY[0], PARADE_EVERY[1]) * RARITY
 		if not events.any(func(e): return e["kind"] == "parade"):
 			_start_parade(city.p_pos)
 	next_t -= delta
 	if next_t <= 0.0 and events.filter(func(e): return e["kind"] != "parade" and e["kind"] != "fireworks" and not SPECIALS.has(e["kind"])).size() < MAX_LIVE and city.active:
-		next_t = randf_range(GAP_MIN, GAP_MAX)
+		next_t = randf_range(GAP_MIN, GAP_MAX) * RARITY
 		_start(_pick_kind())
 	for i in range(events.size() - 1, -1, -1):
 		var e: Dictionary = events[i]
@@ -358,6 +362,64 @@ func _has(sheet: String) -> bool:
 
 ## A spot on a pavement near the player: [pos, road index, s, side, road direction] or [] if none.
 func _spot() -> Array:
+	var cands := _spot_cands()
+	for _try in 12:
+		if cands.is_empty():
+			return []
+		var c: Array = cands.pick_random()
+		var at: Array = c[2]
+		var side := 1.0 if randf() < 0.5 else -1.0
+		var n := Vector2(-at[1].y, at[1].x)
+		var pos: Vector2 = at[0] + n * side * (city.ROAD_HW + 0.6)
+		if _free(pos):
+			return [pos, c[0], c[1], side, at[1], at[0]]
+	return []
+
+
+## Like _spot, but back from the kerb on open ground (grass, the plaza, the beach) for a happening that doesn't belong
+## in the street: a busker, a market, movie night. Everything from `back` behind the spot to `front` in front of it
+## (towards the road) and `half_along` either side must be clear of the road and the pavement, of buildings and of
+## trees. "across" still points towards the road, so people face the passing traffic. [] when there's nowhere.
+func _ground_spot(half_along: float, back: float, front: float) -> Array:
+	var cands := _spot_cands()
+	for _try in 24:
+		if cands.is_empty():
+			return []
+		var c: Array = cands.pick_random()
+		var at: Array = c[2]
+		var side := 1.0 if randf() < 0.5 else -1.0
+		var n: Vector2 = Vector2(-at[1].y, at[1].x) * side
+		for d in [front + 0.5, front + 1.5, front + 3.0, front + 5.0, front + 7.0]:
+			var pos: Vector2 = at[0] + n * (city.ROAD_HW + 0.6 + d)
+			if (allow_in_view or not city._in_view(pos)) and _ground_clear(pos, at[1], n, half_along, back, front):
+				return [pos, c[0], c[1], side, at[1], at[0]]
+	return []
+
+
+func _ground_clear(pos: Vector2, along: Vector2, to_road: Vector2, half_along: float, back: float, front: float) -> bool:
+	var u := -half_along
+	while u <= half_along + 0.01:
+		var v := -back
+		while v <= front + 0.01:
+			var q: Vector2 = pos + along * u + to_road * v
+			var ix := floori(q.x)
+			var iy := floori(q.y)
+			if ix < 0 or iy < 0 or ix >= city.N or iy >= city.N:
+				return false
+			var i: int = iy * city.N + ix
+			if not city.tiles[i] in [city.T.GRASS, city.T.PLAZA, city.T.SAND] or city.solid[i] != 0 or city.reserved[i] == 2 \
+					or city.road_d[i] < city.ROAD_HW + 1.2:
+				return false
+			for t in city.tree_chunks.get(Vector2i(floori(q.x / city.CHUNK), floori(q.y / city.CHUNK)), []):
+				if (t["pos"] as Vector2).distance_squared_to(q) < 0.5:
+					return false
+			v += 0.7
+		u += 0.7
+	return city.road_dist(pos) >= city.ROAD_HW + 1.2 + front   # exact, unlike road_d (per tile), but slow: last
+
+
+## Road points near the player where a happening could start: ahead of you and just out of sight.
+func _spot_cands() -> Array:
 	var p: Vector2 = city.p_pos
 	var cands: Array = []
 	for ri in city.roads.size():
@@ -372,17 +434,7 @@ func _spot() -> Array:
 			if d > near and d < far and ahead and (allow_in_view or not city._in_view(at[0])):
 				cands.append([ri, s, at])
 			s += 2.0
-	for _try in 12:
-		if cands.is_empty():
-			return []
-		var c: Array = cands.pick_random()
-		var at: Array = c[2]
-		var side := 1.0 if randf() < 0.5 else -1.0
-		var n := Vector2(-at[1].y, at[1].x)
-		var pos: Vector2 = at[0] + n * side * (city.ROAD_HW + 0.6)
-		if _free(pos):
-			return [pos, c[0], c[1], side, at[1], at[0]]
-	return []
+	return cands
 
 
 func _free(pos: Vector2) -> bool:
@@ -459,7 +511,7 @@ func _start(kind: String) -> void:
 		if _start_special(kind, e0, []):
 			events.append(e0)
 		return
-	var sp := _spot()
+	var sp := _ground_spot(1.5, 0.6, 1.1) if kind in ["busker", "mime"] else _spot()   # performers play in the park or the plaza
 	if sp.is_empty():
 		return
 	var pos: Vector2 = sp[0]
@@ -1066,10 +1118,10 @@ func _update_specials(delta: float) -> void:
 		return
 	for k in SPECIALS:
 		if not special_t.has(k):
-			special_t[k] = randf_range(30.0, float(SPECIALS[k][0]))
+			special_t[k] = randf_range(30.0, float(SPECIALS[k][0])) * RARITY
 		special_t[k] -= delta
 		if special_t[k] <= 0.0:
-			special_t[k] = randf_range(SPECIALS[k][0], SPECIALS[k][1])
+			special_t[k] = randf_range(SPECIALS[k][0], SPECIALS[k][1]) * RARITY
 			if not events.any(func(e): return e["kind"] == k):
 				_start(k)
 	# fireworks: once a night, a while after it gets properly dark

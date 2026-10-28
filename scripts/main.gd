@@ -158,8 +158,8 @@ func _notification(what: int) -> void:
 		_quit()
 
 
-## Quitting (the title screen's Quit or closing the window) saves the game. The ride isn't posted: it stays saved
-## until you post it from the Strava menu or the pause menu.
+## Quitting (the title screen's Quit or closing the window) saves the game. A ride that wasn't posted is thrown away:
+## rides are only kept once they're on Strava.
 func _quit() -> void:
 	if not viewer.is_empty():   # the event viewer never saves (Game.no_save), so there's nothing to put back
 		get_tree().quit()
@@ -255,7 +255,7 @@ func _show_title() -> void:
 				{"label": "Controls", "fn": _open_controls.bind(_show_title), "detail": "Change the keyboard keys and the handlebar controller buttons."},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
 				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
-				{"label": "Quit", "fn": _quit},
+				{"label": "Quit", "fn": _quit, "detail": "Saves the game. A ride you haven't posted to Strava is thrown away." if Ride.seconds() > 0 else "Saves the game."},
 			], "live": true}, true)
 	if not Game.has_save():
 		hud.menu_index = 1  # nothing to continue: start on "New game"
@@ -396,7 +396,7 @@ func _strava_menu(back: Callable) -> Dictionary:
 			Strava.client_secret = ""
 			Strava._save(), "detail": "Clears the Client Secret so you can paste new app details."})
 	else:
-		lines.append(Strava.status_text() + ". Post your ride here or from the pause menu; it's kept until you do.")
+		lines.append(Strava.status_text() + ". Post your ride here or from the pause menu before you quit: an unposted ride isn't kept.")
 		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
 		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
 			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
@@ -479,7 +479,7 @@ func _setup_menu(finish: Callable) -> Dictionary:
 			"detail": "Riding against you: %s." % ", ".join(names)},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
-	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a similar W/kg, scaled by difficulty." % Game.wkg(), "items": items}
+	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}
 
 
 func _start_game() -> void:
@@ -725,10 +725,8 @@ func _leave_race() -> void:
 
 
 ## Dev helper: PIZZA_DEBUG=ride [PIZZA_OUT=dir] rides the town for a few seconds, then writes the Strava TCX file to
-## PIZZA_OUT (default user://shots) and prints the ride summary and notes. The recorded ride is put back afterwards.
+## PIZZA_OUT (default user://shots) and prints the ride summary and notes.
 func _debug_ride() -> void:
-	var path := Ride.DIR.path_join("ride.json")
-	var backup := FileAccess.get_file_as_string(path)
 	Ride.reset()
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
@@ -743,14 +741,11 @@ func _debug_ride() -> void:
 	print("RIDE notes:\n", Ride.description())
 	FileAccess.open(out.path_join("ride.tcx"), FileAccess.WRITE).store_string(Ride.to_tcx())
 	print("RIDE tcx: ", ProjectSettings.globalize_path(out.path_join("ride.tcx")))
+	Ride.save_shots(out)
 	for s in Ride.shots:
-		DirAccess.copy_absolute(Ride.DIR.path_join(s["file"]), out.path_join(s["file"]))
-		print("RIDE shot: ", s["kind"], " ", s["file"])
+		print("RIDE shot: ", s["kind"])
 	Game.deliveries -= 2
 	Ride.reset()
-	if backup != "" and not Game.no_save:   # saving off: nothing was written, and the file may now be newer than our copy
-		FileAccess.open(path, FileAccess.WRITE).store_string(backup)
-		Ride._load()
 	get_tree().quit()
 
 

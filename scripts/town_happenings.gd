@@ -1,6 +1,6 @@
 class_name TownHappenings
 extends TownEvents
-## More going on in Crankmore, on top of TownEvents: every minute or two something happens near you.
+## More going on in Crankmore, on top of TownEvents: every five minutes or so something happens near you.
 ##
 ## Town: a giant pizza balloon floated round the Plaza Loop, a farmers market, a car-wash fundraiser, a wedding at
 ## the town hall, a flash mob, cows loose in the street, a hot-air balloon going up at dawn, movie night in the park
@@ -14,7 +14,7 @@ extends TownEvents
 ## A happening is a TownEvents event; its actors are people and animals as usual plus "image" (a picture, maybe up in
 ## the air) and "fx" (drawn by a function: rice, snowballs, ropes, water...).
 
-const EVERY := [60.0, 120.0]          # seconds between happenings
+const EVERY := [60.0, 120.0]          # seconds between happenings (times RARITY)
 const CHAOS := {"outage": [7200.0, 14400.0], "cart": [7200.0, 14400.0], "hydrant": [7200.0, 14400.0]}
 const GULLS_EVERY := [1500.0, 2100.0]  # seagulls: every half hour or so (when you've a pizza on board)
 const KID_RACE_EVERY := [240.0, 480.0]
@@ -25,14 +25,18 @@ const RUNNERS := ["jogger", "walkman_jogger", "norm_woman_ponytail_runner_casual
 const RUN_LEN := 18.0                  # tiles of road closed for a fun run
 const SEASONAL := {"winter": ["snowball_fight", "sledding", "tree_lighting"], "spring": ["egg_hunt", "duck_crossing"],
 	"summer": ["volleyball", "fishing", "lemonade"], "fall": ["trick_or_treat", "hayride", "harvest_festival", "zombie_kids"]}
+## Happenings that belong on open ground (a park, the plaza, the beach) rather than at the kerb, and how much room
+## they need: [either side along the road, behind, in front towards the road] in tiles (see TownEvents._ground_spot).
+const OFF_ROAD := {"market": [2.7, 1.3, 0.5], "harvest_festival": [3.0, 2.9, 0.5], "movie_night": [2.0, 2.6, 2.6],
+	"volleyball": [1.8, 1.8, 1.8]}
 const ZOMBIES := ["zombie_kid_1", "zombie_kid_2", "zombie_kid_3", "zombie_kid_4"]
 const KIDS := ["kid", "bucket_hat_kid", "skater_kid", "norm_boy_kid", "scout", "norm_teen_girl", "norm_teen_boy"]
 const EGG_COLS := [Color(1.0, 0.55, 0.75), Color(0.55, 0.8, 1.0), Color(1.0, 0.9, 0.4), Color(0.6, 1.0, 0.6), Color(0.85, 0.6, 1.0)]
 
-var happen_t := randf_range(40.0, 80.0)
+var happen_t := randf_range(40.0, 80.0) * RARITY
 var chaos_t := {}
 var gulls_t := randf_range(GULLS_EVERY[0], GULLS_EVERY[1])
-var kid_t := randf_range(90.0, KID_RACE_EVERY[1])
+var kid_t := randf_range(90.0, KID_RACE_EVERY[1]) * RARITY
 var santa_t := randf_range(SANTA_EVERY[0] * 0.25, SANTA_EVERY[1])
 var recent: Array = []                 # the last few kinds, so it doesn't repeat itself
 
@@ -55,15 +59,18 @@ func update(delta: float) -> void:
 		return
 	happen_t -= delta
 	if happen_t <= 0.0:
-		happen_t = randf_range(EVERY[0], EVERY[1])
+		happen_t = randf_range(EVERY[0], EVERY[1]) * RARITY
 		var kinds: Array = TOWN + SEASONAL.get(Season.current, [])
 		kinds = kinds.filter(func(k): return not k in recent and not events.any(func(e): return e["kind"] == k) and _fits(k))
-		if not kinds.is_empty():
-			var k: String = kinds.pick_random()
+		kinds.shuffle()
+		for k in kinds:   # one with nowhere to go now (a market needs open ground) makes way for the next
+			var n := events.size()
 			_start(k)
-			recent.append(k)
-			if recent.size() > 6:
-				recent.pop_front()
+			if events.size() > n:
+				recent.append(k)
+				if recent.size() > 6:
+					recent.pop_front()
+				break
 	for k in CHAOS:
 		if not chaos_t.has(k):
 			chaos_t[k] = randf_range(CHAOS[k][0] * 0.3, CHAOS[k][1])
@@ -77,7 +84,7 @@ func update(delta: float) -> void:
 		_start("santa")
 	kid_t -= delta
 	if kid_t <= 0.0 and city.challenge.is_empty() and city.p_speed > 0.5:
-		kid_t = randf_range(KID_RACE_EVERY[0], KID_RACE_EVERY[1])
+		kid_t = randf_range(KID_RACE_EVERY[0], KID_RACE_EVERY[1]) * RARITY
 		_start("kid_race")
 	gulls_t -= delta
 	if gulls_t <= 0.0 and not city.carry.is_empty() and city.challenge.is_empty():
@@ -173,7 +180,7 @@ func _start(kind: String) -> void:
 	if not kind in all_kinds():
 		super._start(kind)
 		return
-	var sp := _spot()
+	var sp := _ground_spot(OFF_ROAD[kind][0], OFF_ROAD[kind][1], OFF_ROAD[kind][2]) if OFF_ROAD.has(kind) else _spot()
 	var e := {"kind": kind, "t": 60.0, "actors": [], "clock": 0.0, "stage": ""}
 	if not sp.is_empty():
 		e.merge({"pos": sp[0], "road": sp[1], "s": sp[2], "side": sp[3], "along": sp[4], "across": ((sp[5] as Vector2) - (sp[0] as Vector2)).normalized()})

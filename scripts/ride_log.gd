@@ -1,11 +1,12 @@
 extends Node
 ## Records your ride for Strava: once a second while you're riding (town or race) it logs distance, speed,
 ## altitude (built up from the road grade), power and cadence, counts the pizzas delivered and races won,
-## and grabs up to 4 screenshots along the way. The ride is kept in user://ride/ (so it survives quitting)
-## until it is posted or discarded, and is written out as a TCX file for the upload.
+## and grabs up to 4 screenshots along the way. The ride and its screenshots live in memory only: nothing is written
+## to disk until it is posted (then the screenshots go to user://rides/<activity>), so quitting without posting throws
+## it away. It is written out as a TCX file for the upload.
 ## Power and cadence only come from a real trainer: keyboard riding logs speed and distance, never made-up watts.
 
-const DIR := "user://ride"
+const OLD_DIR := "user://ride"   # where older versions kept the unposted ride on disk
 const MAX_SHOTS := 4
 const MIN_SECONDS := 60          # shorter rides aren't worth posting
 const START_ALT := 1250.0        # metres: Crankmore Village sits up in the mountains
@@ -17,21 +18,20 @@ var distance := 0.0
 var altitude := START_ALT
 var pizzas := 0
 var races_won := 0
-var shots: Array = []            # {"file", "kind", "t"}
+var shots: Array = []            # {"image": Image, "kind", "t"}
 var _seen_deliveries := -1
 var _riding := 0.0               # seconds ridden (pauses don't count)
 var _next_scenic := 90.0
 var _last_sec := 0
-var _last_save := 0
 
 
+## Clears out the unposted ride (and stray screenshots) older versions left on disk.
 func _ready() -> void:
-	DirAccess.make_dir_recursive_absolute(DIR)
-	_load()
-
-
-func _exit_tree() -> void:
-	save()
+	if Game.no_save or not DirAccess.dir_exists_absolute(OLD_DIR):
+		return
+	for f in DirAccess.get_files_at(OLD_DIR):
+		DirAccess.remove_absolute(OLD_DIR.path_join(f))
+	DirAccess.remove_absolute(OLD_DIR)
 
 
 ## Called every frame you're actually riding, with your speed (m/s) and the road grade (0.05 = 5%).
@@ -56,15 +56,12 @@ func tick(delta: float, speed_mps: float, grade: float) -> void:
 		var live := Trainer.trainer_live
 		samples.append([now, snappedf(distance, 0.1), snappedf(altitude, 0.1), snappedf(v, 0.01),
 			roundi(Trainer.power()) if live else -1, roundi(Trainer.cadence()) if live else -1])
-		if now - _last_save >= 30:
-			save()
 
 
 func on_race_finished(place: int) -> void:
 	if place == 1:
 		races_won += 1
 	snap("race_win" if place == 1 else "race", 0.3)
-	save()
 
 
 func seconds() -> int:
@@ -96,20 +93,10 @@ func description() -> String:
 
 
 ## Forget the current ride (after posting it, or when the rider throws it away). Screenshots of a posted ride are
-## kept in `keep_dir` so they can still be added to the activity.
+## written to `keep_dir` so they can still be added to the activity.
 func reset(keep_dir := "") -> void:
-	if Game.no_save:   # dev helpers: forget it in memory only, the player's files stay as they are
-		samples = []
-		shots = []
-		return
 	if keep_dir != "":
-		DirAccess.make_dir_recursive_absolute(keep_dir)
-	for s in shots:
-		var src := DIR.path_join(s["file"])
-		if keep_dir != "":
-			DirAccess.rename_absolute(src, keep_dir.path_join(s["file"]))
-		else:
-			DirAccess.remove_absolute(src)
+		save_shots(keep_dir)
 	samples = []
 	shots = []
 	distance = 0.0
@@ -119,7 +106,6 @@ func reset(keep_dir := "") -> void:
 	_riding = 0.0
 	_next_scenic = 90.0
 	_seen_deliveries = -1
-	save()
 
 
 # ---- screenshots -----------------------------------------------------------
@@ -140,16 +126,15 @@ func snap(kind: String, wait := 0.0) -> void:
 				drop = i
 		if drop < 0:
 			return
-		DirAccess.remove_absolute(DIR.path_join(shots[drop]["file"]))
 		shots.remove_at(drop)
-	var file := "crankmore_%d_%s.png" % [int(Time.get_unix_time_from_system()), kind]
-	if get_viewport().get_texture().get_image().save_png(DIR.path_join(file)) == OK:
-		shots.append({"file": file, "kind": kind, "t": int(Time.get_unix_time_from_system())})
-		save()
+	shots.append({"image": get_viewport().get_texture().get_image(), "kind": kind, "t": int(Time.get_unix_time_from_system())})
 
 
-func shot_paths() -> Array:
-	return shots.map(func(s): return ProjectSettings.globalize_path(DIR.path_join(s["file"])))
+## Writes the screenshots to `dir` as PNGs.
+func save_shots(dir: String) -> void:
+	DirAccess.make_dir_recursive_absolute(dir)
+	for s in shots:
+		(s["image"] as Image).save_png(dir.path_join("crankmore_%d_%s.png" % [int(s["t"]), s["kind"]]))
 
 
 # ---- TCX -------------------------------------------------------------------
@@ -181,31 +166,3 @@ func to_tcx() -> String:
 	out.append("</Track></Lap><Creator><Name>Mt. Crankmore</Name></Creator></Activity></Activities></TrainingCenterDatabase>")
 	return "\n".join(out)
 
-
-# ---- save ------------------------------------------------------------------
-
-func save() -> void:
-	if Game.no_save:   # dev helpers (tests, screenshot runs, the event viewer) never touch the player's ride
-		return
-	_last_save = int(Time.get_unix_time_from_system())
-	var f := FileAccess.open(DIR.path_join("ride.json"), FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(JSON.stringify({"samples": samples, "distance": distance, "altitude": altitude, "pizzas": pizzas,
-		"races_won": races_won, "shots": shots, "riding": _riding, "next_scenic": _next_scenic}))
-
-
-func _load() -> void:
-	if not FileAccess.file_exists(DIR.path_join("ride.json")):
-		return
-	var d = JSON.parse_string(FileAccess.get_file_as_string(DIR.path_join("ride.json")))
-	if typeof(d) != TYPE_DICTIONARY:
-		return
-	samples = d.get("samples", [])
-	distance = float(d.get("distance", 0.0))
-	altitude = float(d.get("altitude", START_ALT))
-	pizzas = int(d.get("pizzas", 0))
-	races_won = int(d.get("races_won", 0))
-	shots = d.get("shots", []).filter(func(s): return FileAccess.file_exists(DIR.path_join(s["file"])))
-	_riding = float(d.get("riding", 0.0))
-	_next_scenic = float(d.get("next_scenic", 90.0))

@@ -2577,7 +2577,10 @@ func _draw_deco(e: Dictionary) -> void:
 				e["looks"] = [e["design"]] + Sprites._order(e)
 			var design := Sprites.cast(e, e.get("looks", []))
 			if design != "":
-				Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
+				# right by you, half the fans switch to their other cheer (Sprites.PASS_MOVES)
+				var by_you: bool = absf(float(riders[0]["s"]) - float(e["s"])) < 12.0 and int((e["pos"] as Vector2).x * 7.0) % 2 == 0
+				if not (by_you and Sprites.draw_pass(self, design, b, t_ + (e["pos"] as Vector2).x * 0.37)):
+					Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
 		"skier":

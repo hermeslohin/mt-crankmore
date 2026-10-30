@@ -375,6 +375,46 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	return true
 
 
+## Each bystander's other way of cheering you on as you ride past, besides jumping (art/ped_<design>_pass.png, a strip
+## like _cheer, and winter_ped_<design>_pass.png in winter). The move is what the art was made from; without the art
+## they just jump.
+const PASS_MOVES := {
+	"kid": "jumping fist pump", "tourist": "waving a small flag", "grandpa": "thumbs up", "lady": "clapping overhead",
+	"teen": "raise the roof", "grandma": "waving a handkerchief", "dad_stroller": "thumbs up",
+	"tourist_family": "waving both arms", "norm_man_jeans": "fist pump", "norm_woman_sundress": "blowing a kiss and waving",
+	"norm_man_plaid": "flexing both biceps", "norm_woman_jeans_jacket": "double thumbs up", "norm_old_man_cane": "raising his cane",
+	"norm_old_woman": "clapping", "norm_teen_girl": "pointing at you and cheering", "norm_teen_boy": "air guitar",
+	"norm_student": "waving a pennant flag", "norm_mom_bags": "thumbs up", "norm_man_suit_casual": "salute",
+	"norm_woman_sweater": "cupped hands shouting", "norm_man_heavy": "flexing both biceps", "norm_woman_tall": "big two-arm wave",
+	"norm_couple_kid": "fist pump", "norm_man_shorts": "waving a towel overhead", "norm_man_windbreaker": "double fist pump",
+	"norm_woman_cardigan": "clapping overhead", "norm_man_overalls": "waving his cap", "norm_woman_tracksuit": "running in place and pumping fists",
+	"norm_man_bald_glasses": "thumbs up", "norm_woman_curly_hair": "jumping star jump", "norm_teen_skater_plain": "raise the roof",
+	"norm_man_fleece": "ringing a cowbell", "norm_woman_office": "waving a scarf", "norm_old_man_vest": "salute",
+	"norm_woman_ponytail_runner_casual": "fist pump", "norm_man_denim_jacket": "pointing at you", "norm_woman_hat_scarf": "waving her hat",
+	"norm_boy_kid": "flexing both biceps", "norm_man_tall_thin": "big two-arm wave", "norm_woman_short_hair": "double thumbs up",
+	"grunge_teen": "rock-on horns with both hands", "neon_windbreaker": "waving a neon flag", "fanny_pack": "thumbs up",
+	"mullet_dad": "flexing both biceps", "scrunchie_girl": "clapping", "bucket_hat_kid": "jumping fist pump",
+	"pager_guy": "cupped hands shouting", "jogger": "running in place and pumping fists", "hiker": "raising trekking pole",
+	"surfer": "shaka sign with both hands", "artist": "waving paintbrush", "skater_kid": "raise the roof",
+	"businesswoman": "fist pump", "doctor": "thumbs up", "musician": "air guitar", "baker": "waving rolling pin",
+	"cyclist_fan": "waving a big flag", "photographer": "taking a photo", "mailman": "salute", "nurse": "double thumbs up",
+	"dogwalker": "big wave", "construction": "flexing both biceps", "sweeper": "raising broom overhead",
+	"courier": "fist pump", "police": "thumbs up", "gardener": "waving trowel", "newsboy": "waving newspaper",
+	"crossing_guard": "waving stop sign", "barista": "raising coffee cup", "scout": "salute",
+	"balloon_vendor": "waving balloons", "rollerblader": "spinning and pointing", "boombox": "lifting boombox overhead",
+	"walkman_jogger": "fist pump",
+	# the race-course fans
+	"fan_sign": "shaking the sign overhead", "fan_flag": "waving the flag in big circles", "fan_cowbell": "ringing cowbell overhead",
+	"fan_highfive_kid": "holding out a hand for a high five",
+}
+const PASS_FPS := 8.0
+
+
+## A bystander's other cheer (see PASS_MOVES). False when there is no art for it.
+static func draw_pass(ci: CanvasItem, design: String, at: Vector2, t: float) -> bool:
+	return draw_strip(ci, "ped_%s_pass" % design, at, t, PASS_FPS)
+
+
 const CHEER_FPS := 6.5   # a cheering person's jump (art/ped_<design>_cheer.png): about one hop every 1.2 s
 static var _hops := {}    # cheer texture -> hops in one loop of its frames
 

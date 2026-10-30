@@ -18,7 +18,7 @@ const RACE_FANS := ["fan_sign", "fan_flag", "fan_cowbell", "fan_highfive_kid"]
 const FAN_SHOUTS := ["ALLEZ!", "GO GO GO!", "Dig deep!", "Venga!", "Allez allez!", "You got this!", "Hup hup!", "Pedal!"]
 const RUN_CHANCE := 0.35      # share of the roadside fans who run along with you as you go by
 const RUN_MAX := 6.8          # m/s: a fan flat out
-const RUN_LAT := 1.7          # m from the middle of the road they run at, just off the gravel
+const RUN_LAT := 1.7          # tiles from the middle of the road they run at, just off the gravel (plus Race.ROAD_GROW)
 const NO_RUN := ["photographer_kneel", "feed_helper"]   # busy: they stay put
 const MedHeli := preload("res://scripts/med_heli.gd")
 const FLYOVER_EVERY := [90.0, 240.0]   # seconds between the air ambulance flying over
@@ -98,19 +98,20 @@ func _build_start_finish(rng: RandomNumberGenerator, length: float) -> void:
 	for end in [0, 1]:
 		var base := 12.0 if end == 0 else length - 12.0
 		var dir := 1.0 if end == 0 else -1.0
+		var g: float = race.ROAD_GROW   # everything here stands this much further out, beside the wider road
 		for k in 3:
-			_sprite(tents[(k + end) % 3], base + dir * k * 14.0, (3.4 if k % 2 == 0 else -3.6), k % 2 == 1)
-		_sprite("race_bunting_flags", base - dir * 6.0, 2.3)
-		_sprite("race_bunting_flags", base - dir * 6.0, -2.3, true)
+			_sprite(tents[(k + end) % 3], base + dir * k * 14.0, (3.4 + g if k % 2 == 0 else -3.6 - g), k % 2 == 1)
+		_sprite("race_bunting_flags", base - dir * 6.0, 2.3 + g)
+		_sprite("race_bunting_flags", base - dir * 6.0, -2.3 - g, true)
 		var s := base - dir * 12.0
 		for k in 8:
-			_sprite("race_crowd_barrier", s + dir * k * 4.0, 1.45)
-			_sprite("race_crowd_barrier", s + dir * k * 4.0, -1.45, true)
+			_sprite("race_crowd_barrier", s + dir * k * 4.0, 1.45 + g)
+			_sprite("race_crowd_barrier", s + dir * k * 4.0, -1.45 - g, true)
 			if k % 2 == 0:
-				_fan(s + dir * k * 4.0 + 1.0, 2.1, rng)
-				_fan(s + dir * k * 4.0 + 2.0, -2.1, rng)
-	_fan(30.0, 1.2, rng, "fan_highfive_kid")
-	_fan(length - 40.0, -1.2, rng, "fan_highfive_kid")
+				_fan(s + dir * k * 4.0 + 1.0, 2.1 + g, rng)
+				_fan(s + dir * k * 4.0 + 2.0, -2.1 - g, rng)
+	_fan(30.0, 1.2 + race.ROAD_GROW, rng, "fan_highfive_kid")
+	_fan(length - 40.0, -1.2 - race.ROAD_GROW, rng, "fan_highfive_kid")
 
 
 func _build_hairpins(rng: RandomNumberGenerator) -> void:
@@ -121,15 +122,15 @@ func _build_hairpins(rng: RandomNumberGenerator) -> void:
 		var dx: float = h["dx"]
 		for fr in [0.26, 0.42, 0.58, 0.74]:   # hay bales round the outside, between the chevrons
 			var a: float = PI * fr
-			var p: Vector2 = c + Vector2(sin(a) * dx, cos(a)) * (race.HAIRPIN_R + 0.95)
+			var p: Vector2 = c + Vector2(sin(a) * dx, cos(a)) * (race.HAIRPIN_R + 0.95 + race.ROAD_GROW)
 			if Sprites.sheet("race_hay_bale_barrier") != null:
 				race._put_static(2, {"kind": "sprite", "name": "race_hay_bale_barrier", "pos": p, "z": race._tz(p), "flip": rng.randf() < 0.5}, [])
 		# the crowd packs the inside of the bend, with a marshal at the apex
 		for k in rng.randi_range(4, 7):
 			var a: float = PI * rng.randf_range(0.15, 0.85)
-			var p: Vector2 = c + Vector2(sin(a) * dx, cos(a)) * (race.HAIRPIN_R - rng.randf_range(1.3, 2.6))
+			var p: Vector2 = c + Vector2(sin(a) * dx, cos(a)) * (race.HAIRPIN_R - rng.randf_range(1.3, 2.6) - race.ROAD_GROW)
 			race._put_static(2, {"kind": "fan", "s": float(h["s"]), "pos": p, "z": race._tz(p), "design": _fan_design(rng), "col": Color.WHITE}, [])
-		var m: Vector2 = c + Vector2(dx, 0.0) * (race.HAIRPIN_R - 1.1)
+		var m: Vector2 = c + Vector2(dx, 0.0) * (race.HAIRPIN_R - 1.1 - race.ROAD_GROW)
 		race._put_static(2, {"kind": "fan", "s": float(h["s"]), "pos": m, "z": race._tz(m), "design": "marshal_flag", "col": Color.WHITE}, [])
 
 
@@ -141,13 +142,13 @@ func _build_ramps(rng: RandomNumberGenerator, length: float) -> void:
 		while s < float(r["s1"]) and s < length - 30.0:
 			if not race._in_tunnel(s, 6.0):
 				var side := 1.0 if rng.randf() < 0.5 else -1.0
-				_fan(s, side * rng.randf_range(1.3, 1.9), rng, ["fan_cowbell", "fan_flag", "fan_sign", ""][rng.randi() % 4])
+				_fan(s, side * (rng.randf_range(1.3, 1.9) + race.ROAD_GROW), rng, ["fan_cowbell", "fan_flag", "fan_sign", ""][rng.randi() % 4])
 				if rng.randf() < 0.4:
-					_sprite("race_cowbell_post", s + 2.0, -side * 1.6)
+					_sprite("race_cowbell_post", s + 2.0, -side * (1.6 + race.ROAD_GROW))
 			s += rng.randf_range(10.0, 18.0)
 	for ob in race.obstacles:
 		if ob["kind"] == "jump":
-			_fan(float(ob["s"]) + 7.0, 1.4, rng, "photographer_kneel")
+			_fan(float(ob["s"]) + 7.0, 1.4 + race.ROAD_GROW, rng, "photographer_kneel")
 
 
 func _build_feed_zone(rng: RandomNumberGenerator, length: float) -> void:
@@ -156,9 +157,9 @@ func _build_feed_zone(rng: RandomNumberGenerator, length: float) -> void:
 		if race._grade_at(s) < 0.035 and race._clear_of(s, 30.0):
 			break
 		s = length * rng.randf_range(0.35, 0.65)
-	_sprite("race_water_table", s, 2.1)
+	_sprite("race_water_table", s, 2.1 + race.ROAD_GROW)
 	for k in 3:
-		_fan(s - 6.0 + k * 6.0, 1.25, rng, "feed_helper")
+		_fan(s - 6.0 + k * 6.0, 1.25 + race.ROAD_GROW, rng, "feed_helper")
 	race._put_static(2, {"kind": "board", "s": s - 60.0, "icon": "up", "l1": "FEED", "l2": "ZONE", "side": 1.0}, [])
 
 
@@ -168,10 +169,11 @@ func _build_camps(rng: RandomNumberGenerator, length: float) -> void:
 		if race._in_tunnel(s, 20.0):
 			continue
 		var side := 1.0 if k % 2 == 0 else -1.0
-		_sprite("race_campervan_fans", s, side * 3.8, side < 0.0)
-		_sprite("race_portaloo", s + 7.0, side * 3.2)
-		_fan(s - 3.0, side * 2.2, rng)
-		_fan(s + 2.0, side * 2.0, rng)
+		var g: float = race.ROAD_GROW
+		_sprite("race_campervan_fans", s, side * (3.8 + g), side < 0.0)
+		_sprite("race_portaloo", s + 7.0, side * (3.2 + g))
+		_fan(s - 3.0, side * (2.2 + g), rng)
+		_fan(s + 2.0, side * (2.0 + g), rng)
 
 
 func _build_devil(rng: RandomNumberGenerator, length: float) -> void:
@@ -244,7 +246,7 @@ func _build_railway(rng: RandomNumberGenerator, length: float) -> void:
 		var s: float = c["s"]
 		if s < length:
 			for side in [-1.0, 1.0]:
-				var p: Vector2 = Vector2(rail_x + side * 1.0, float(c["y"]) + side * 1.25)
+				var p: Vector2 = Vector2(rail_x + side * 1.0, float(c["y"]) + side * (1.25 + race.ROAD_GROW))
 				race._put_static(2, {"kind": "crossing", "pos": p, "z": race._tz(p), "c": c}, [])
 			# a warning board, unless a hairpin's board already stands there (the hairpins come thick and fast)
 			if not race.hairpins.any(func(h): return absf(float(h["s"]) - 105.0 - (s - 80.0)) < 45.0):
@@ -252,7 +254,7 @@ func _build_railway(rng: RandomNumberGenerator, length: float) -> void:
 	# a little halt half way up
 	var sy: float = lerpf(rail_y0, rail_y1, 0.45)
 	var sp := Vector2(rail_x + 2.2, sy)
-	if race._rd(sp) > 3.0 and Sprites.sheet("race_rail_station") != null:
+	if race._rd(sp) > 3.0 + race.ROAD_GROW and Sprites.sheet("race_rail_station") != null:
 		race._put_static(2, {"kind": "sprite", "name": "race_rail_station", "pos": sp, "z": race._tz(sp), "flip": false}, [])
 
 
@@ -310,7 +312,7 @@ func _snowy(p: Vector2) -> bool:
 
 
 func _sprite_at(name: String, p: Vector2, flip := false) -> void:
-	if Sprites.sheet(name) != null and race._rd(p) > 2.2:
+	if Sprites.sheet(name) != null and race._rd(p) > 2.2 + race.ROAD_GROW:
 		race._put_static(2, {"kind": "sprite", "name": name, "pos": p, "z": race._tz(p), "flip": flip}, [])
 
 
@@ -326,7 +328,7 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 	for j in range(0, race.gh, 2):
 		for i in range(0, race.gw, 2):
 			var p := Vector2(race.ox + i + 0.5, race.oy + j + 0.5)
-			if _snowy(p) and race._rd(p) > 3.0:
+			if _snowy(p) and race._rd(p) > 3.0 + race.ROAD_GROW:
 				snow.append(p)
 	if snow.size() < 30:
 		return
@@ -376,7 +378,7 @@ func _build_ski_area(rng: RandomNumberGenerator) -> void:
 		var towers: Array = []
 		var ty: float = float(rn[2]) - 2.0
 		while ty > float(rn[3]) + 2.0:
-			if race._rd(Vector2(bx, ty)) > 1.4 and not race._on_cliff(Vector2(bx, ty), true):   # the cable spans the cliffs
+			if race._rd(Vector2(bx, ty)) > 1.4 + race.ROAD_GROW and not race._on_cliff(Vector2(bx, ty), true):   # the cable spans the cliffs
 				towers.append(ty)
 			ty -= 7.0
 		lifts.append({"x": bx, "y0": rn[2], "y1": rn[3], "towers": towers, "ph": rng.randf() * 10.0})
@@ -511,7 +513,7 @@ func _draw_flyover(ci: CanvasItem) -> void:
 	var ground := Iso.to_screen(p, race._tz(p))
 	ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-16, 0), ground + Vector2(0, -5), ground + Vector2(16, 0), ground + Vector2(0, 5)]), Color(0, 0, 0, 0.16))
 	var at := Iso.to_screen(p, race._tz(race._pose(race.riders[0]["s"], 0.0)["pos"]) + FLYOVER_ALT) + Vector2(0.0, MedHeli.SKIDS + sin(t_ * 2.3) * 2.0)
-	Sprites.draw_vehicle(ci, "heli_medical", at, flyover["dir"], Color.WHITE, 0, flyover["turn"])
+	Sprites.draw_vehicle(ci, "heli_medical", at, flyover["dir"], Color.WHITE, MedHeli.TILT["nose_down"], flyover["turn"])   # cruising, nose down
 	MedHeli.draw_rotor(ci, at, t_, 1.0)
 
 
@@ -558,7 +560,7 @@ func _step_runners(delta: float) -> void:
 					e["run"] = ""
 					continue
 		e["rs"] = maxf(home, float(e["rs"]) + float(e["rv"]) * delta)
-		var to_lat := float(e["lat"]) if st == "back" and float(e["rs"]) - home < 2.0 else side * RUN_LAT
+		var to_lat := float(e["lat"]) if st == "back" and float(e["rs"]) - home < 2.0 else side * (RUN_LAT + float(race.ROAD_GROW))
 		e["rlat"] = move_toward(float(e["rlat"]), to_lat, 1.5 * delta)
 
 
@@ -587,7 +589,7 @@ func movers() -> Array:
 	if race.riders.is_empty():
 		return out
 	if race.rescue:   # the injured skier and the patroller waving you in
-		var pz: Dictionary = race._pose(race.rescue_s, 2.2)
+		var pz: Dictionary = race._pose(race.rescue_s, 2.2 + race.ROAD_GROW)
 		out.append([pz["pos"], _draw_casualty.bind(pz)])
 	var length: float = race.course["length"]
 	var me: Dictionary = race.riders[0]
@@ -598,10 +600,10 @@ func movers() -> Array:
 		last = minf(last, float(r["s"]))
 	# the motos ahead of the leader, the team car behind the last rider
 	if lead < length - 20.0:
-		_add_vehicle(out, "vehicle_tv_moto", lead + 9.0, -0.5)
-		_add_vehicle(out, "vehicle_marshal_moto", lead + 22.0, 0.45)
+		_add_vehicle(out, "vehicle_tv_moto", lead + 9.0, -0.5 * race.ROAD_W)
+		_add_vehicle(out, "vehicle_marshal_moto", lead + 22.0, 0.45 * race.ROAD_W)
 	if last > 20.0 and last < length:
-		_add_vehicle(out, "vehicle_team_car", last - 13.0, -0.35)
+		_add_vehicle(out, "vehicle_team_car", last - 13.0, -0.35 * race.ROAD_W)
 	# fans running with you
 	for e in run_fans:
 		if e.get("run", "") != "":
@@ -610,7 +612,7 @@ func movers() -> Array:
 	# the devil
 	if not devil.is_empty():
 		var s: float = me["s"]
-		var lat: float = 1.6 * float(devil["side"])
+		var lat: float = (1.6 + race.ROAD_GROW) * float(devil["side"])
 		var running: bool = s > float(devil["s0"]) and s < float(devil["s1"]) and race.countdown <= 0.0
 		var ds: float = clampf(s + 2.4, float(devil["s0"]), float(devil["s1"])) if running else (float(devil["s0"]) if s <= float(devil["s0"]) else float(devil["s1"]))
 		var pz: Dictionary = race._pose(ds, lat)

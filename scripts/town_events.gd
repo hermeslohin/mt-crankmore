@@ -2058,7 +2058,7 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				return
 			var racing: bool = c["state"] != "count"
 			var ahead: float = float(c.get("them_m", 0.0)) - float(c.get("me_m", 0.0))
-			var at: Array = city.challenge_pos(_rod_lane(e, rod, delta, racing and ahead > -1.0 and ahead < 4.0) if racing else city.CAR_LANE)
+			var at: Array = city.challenge_pos(_rod_lane(e, rod, delta, racing and ahead > -3.0 and ahead < 0.8) if racing else city.CAR_LANE)
 			_place(rod, at[0])
 			rod["face"] = at[1]
 			if racing:

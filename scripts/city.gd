@@ -2358,7 +2358,7 @@ func _wild_step(c: Dictionary, target: float, delta: float) -> float:
 
 ## Whether a car can go over the centre line to pass: no junction coming up and nothing coming the other way.
 func _clear_to_pass(c: Dictionary, r: Dictionary) -> bool:
-	if c.has("curve") or _car_next_j(c, r, 6.0)[0] >= 0:
+	if c.has("curve") or _car_next_j(c, r, 3.0)[0] >= 0:
 		return false
 	for o in cars:
 		if o != c and o["road"] == c["road"] and o["dir"] != c["dir"] and not o.get("hidden", false):

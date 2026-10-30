@@ -1225,6 +1225,8 @@ func _debug_powerups() -> void:
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	var save := func(file: String) -> void:
+		if DisplayServer.get_name() == "headless":   # (nothing's drawn: just the printout)
+			return
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
 	Trainer._autostart_clock = 0.0   # leave a real trainer alone
@@ -1246,8 +1248,20 @@ func _debug_powerups() -> void:
 			city._post_order()
 		if kind == "wrench":
 			Game.hp[Game.equipped] = 10.0
+		if kind == "mitt":   # the rival's out delivering a pizza for you to snatch
+			city.carry = {}
+			if city.orders.is_empty():
+				city._post_order()
+			var o: Dictionary = city.orders[0]
+			o["state"] = "rival"
+			o["rival"] = 0
+			r["order"] = o["id"]
+			r["state"] = "to_dest"
+			r["path"] = [city.p_pos + city.p_fwd * 1.0]
 		city.pu = kind
 		city._use_powerup(-1)
+		if kind == "mitt":
+			print("TOWN mitt: carry=%s rival_state=%s" % [not city.carry.is_empty(), r["state"]])
 		await get_tree().create_timer(0.7).timeout
 		cam.position = city.cam_target()
 		print("TOWN %s: active=%s used=%s rival_stun=%.1f hp=%d socks=%.1f bread=%.1f mascots=%d carry=%s" % [kind, city.active, city.pu == "",
@@ -1264,6 +1278,22 @@ func _debug_powerups() -> void:
 	await get_tree().process_frame
 	print("TOWN squash: rival_stun=%.1f" % rv["stun"])
 	city.bread_t = 0.0
+	# a giver hands over what they're holding up and holds up a different one
+	var gv: Dictionary = city.peds.filter(func(q): return q["giver"])[0]
+	gv["state"] = "ready"
+	gv["pos"] = city.p_pos + city.p_fwd * 0.5
+	city.pu = ""
+	city.p_down = 0.0
+	var held: String = gv["pu"]
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("TOWN giver: held %s, you got %s, now holds %s (%s)" % [held, city.pu, gv["pu"], gv["state"]])
+	await get_tree().create_timer(2.0).timeout
+	print("TOWN giver after: %s holding %s" % [gv["state"], gv["pu"]])
+	gv["pos"] = city.p_pos + city.p_fwd * 2.5 + Vector2(-city.p_fwd.y, city.p_fwd.x) * 1.2
+	city.pu = "socks"
+	await save.call("pu_town_giver.png")
+	city.pu = ""
 	# let the rivals loose: they should grab and use power-ups themselves
 	var grabbed := 0
 	var seen := {}
@@ -1296,7 +1326,11 @@ func _debug_powerups() -> void:
 		r["down"] = 0.0
 		me["down"] = 0.0
 		me["pu"] = kind
+		if kind == "mitt":
+			r["pu"] = "socks"
 		race._use_powerup(0)
+		if kind == "mitt":
+			print("RACE mitt: you have %s, rival has '%s'" % [me["pu"], r["pu"]])
 		await get_tree().create_timer(0.7).timeout
 		cam.position = race.cam_target()
 		var downs: int = race.riders.filter(func(o): return float(o["down"]) > 0.0).size()

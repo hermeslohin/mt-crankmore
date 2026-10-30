@@ -2191,7 +2191,7 @@ func _leave_er() -> void:
 	place_on(zone_anchor("er"))
 	rdir = 1.0
 	invuln = 2.0
-	if Game.damage_bike(26.0):
+	if Game.damage_bike(40.0):   # hit by a car: the bike takes 40 HP
 		Talk.say_random("bike_destroyed", true)
 	Game.save_game()
 

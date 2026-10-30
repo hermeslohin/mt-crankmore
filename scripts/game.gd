@@ -142,22 +142,23 @@ func give_bike(i: int) -> bool:
 	return true
 
 
-const REPAIR_MIN := 200    # the bike shop's charge for the smallest repair
-const REPAIR_MAX := 1500   # ...rising with the share of HP missing, to this for a wreck
-
-## What the bike shop charges to put the bike back to full HP (0 when it's perfect).
-func repair_cost() -> int:
-	var missing := 1.0 - bike_hp() / float(bike()["hp"])
-	if missing <= 0.001:
-		return 0
-	return int(roundf(lerpf(REPAIR_MIN, REPAIR_MAX, clampf(missing, 0.0, 1.0)) / 5.0) * 5.0)
+## The mechanic at Spokes & Stuff takes one look at you and fixes the bike for nothing.
+const MECHANIC_PITY := ["Oh, you poor thing. You look like you need help. This one's on the house.",
+	"Yikes. Did a truck do this? Or a bear? Don't answer. No charge.",
+	"Kid, you look like you need help more than the bike does. Free. Go eat something.",
+	"I've seen pizzas in better shape. Put your wallet away, it's on me.",
+	"You look like you need a hug. I don't do hugs. I do free repairs."]
 
 
+## Whether the bike is short of full HP (repairs are free: see repair).
+func needs_repair() -> bool:
+	return bike_hp() < float(bike()["hp"]) - 0.01
+
+
+## Puts the bike back to full HP, free. False when it didn't need it.
 func repair() -> bool:
-	var cost := repair_cost()
-	if cost <= 0 or money < cost:
+	if not needs_repair():
 		return false
-	add_money(-cost)
 	hp[equipped] = bike()["hp"]
 	save_game()
 	return true

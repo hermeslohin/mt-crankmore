@@ -2,7 +2,8 @@ class_name PowerUps
 extends RefCounted
 ## Power-ups: about 1 in 8 townsfolk (and spectators along the race course) hand them out as you ride past.
 ## A rider carries one at a time (shown on the WEEHOO) and uses it with Y. Rivals grab and use them too.
-## Town only: portal, wrench, walkie. Town and race: frisbee, socks, breadsticks, roller.
+## Town only: portal, wrench, walkie. Town and race: frisbee, socks, breadsticks, roller, mitt.
+## Each giver holds up the one they'll hand over (its icon over their head); when it's taken they hold up another.
 
 const DEFS := {
 	"portal": {"name": "Pepperoni Portal", "short": "PORTAL", "col": Color(0.9, 0.25, 0.2),
@@ -11,17 +12,20 @@ const DEFS := {
 	"walkie": {"name": "Walkie Talkie", "short": "WALKIE", "col": Color(0.25, 0.7, 0.35),
 		"blurb": "summons a dancing pizza mascot to block a rival"},
 	"frisbee": {"name": "Pizza Frisbee", "short": "FRISBEE", "col": Color(1.0, 0.7, 0.2),
-		"blurb": "toss it at a rival within 5 m to knock them down"},
+		"blurb": "toss it at a rival within 10 m to knock them down"},
 	"socks": {"name": "Fire Socks", "short": "FIRE SOCKS", "col": Color(1.0, 0.4, 0.1), "blurb": "30% faster for 15 s"},
 	"breadsticks": {"name": "Breadsticks", "short": "BREADSTICKS", "col": Color(0.9, 0.7, 0.35),
 		"blurb": "grow huge and run over your rivals"},
 	"roller": {"name": "Dough Roller", "short": "ROLLER", "col": Color(0.85, 0.6, 0.35), "blurb": "hills feel flat for 15 s"},
+	"mitt": {"name": "Oven Mitt", "short": "OVEN MITT", "col": Color(0.95, 0.25, 0.25),
+		"blurb": "snatch the pizza off a rider within 10 m (in a race, their power-up)"},
 }
-const TOWN := ["portal", "wrench", "walkie", "frisbee", "socks", "breadsticks", "roller"]
-const RACE := ["frisbee", "socks", "breadsticks", "roller"]
+const TOWN := ["portal", "wrench", "walkie", "frisbee", "socks", "breadsticks", "roller", "mitt"]
+const RACE := ["frisbee", "socks", "breadsticks", "roller", "mitt"]
 
 const GIVER_ODDS := 8          # 1 in 8 people hand out power-ups
-const FRISBEE_RANGE_M := 5.0
+const FRISBEE_RANGE_M := 10.0
+const MITT_RANGE_M := 10.0     # Oven Mitt: how close you have to be to snatch something
 const DOWN_TIME := 5.0         # seconds on the ground after a frisbee hit
 const SQUASH_TIME := 3.0       # seconds on the ground after being run over
 const SOCKS_TIME := 15.0
@@ -41,7 +45,10 @@ static func felt_grade(g: float, roller: float) -> float:
 const ODDS := {"walkie": 0.3}
 
 
-static func pick(pool: Array) -> String:
+## A random one from `pool`, not `other` (a giver holding up the next one after `other` is taken).
+static func pick(pool: Array, other := "") -> String:
+	if other != "" and pool.size() > 1:
+		pool = pool.filter(func(k): return k != other)
 	var total := 0.0
 	for k in pool:
 		total += float(ODDS.get(k, 1.0))
@@ -66,7 +73,16 @@ static func draw_icon(ci: CanvasItem, c: Vector2, kind: String, k := 1.0) -> voi
 	Sprites.draw_image(ci, "scenery_icon_%s" % kind, c + Vector2(0, 8.0 * k), false, 1.0, 0.5 * k)
 
 
-## A wrapped gift box with a "?" on it, held up by the people who hand out power-ups.
+## The power-up a giver is holding up, floating over their head (`ground` is where they stand) and bobbing.
+static func draw_held(ci: CanvasItem, ground: Vector2, kind: String, t: float) -> void:
+	if kind == "":
+		return
+	var c := ground + Vector2(0, -50.0 + sin(t * 3.0) * 2.0)
+	ci.draw_circle(c, 9.0, Color(0, 0, 0, 0.35))
+	ci.draw_arc(c, 9.0, 0.0, TAU, 20, col(kind), 1.0)
+	draw_icon(ci, c, kind, 0.9)
+
+
 ## A spinning pizza in flight, `u` (0..1) along the way from `a` to `b` in a shallow arc.
 static func draw_frisbee(ci: CanvasItem, a: Vector2, b: Vector2, u: float, t: float) -> void:
 	var p := a.lerp(b, u) + Vector2(0, -sin(u * PI) * 14.0)

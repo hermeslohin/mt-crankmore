@@ -89,6 +89,9 @@ const VEHICLE_DIMS := {
 	"sedan_4x4_skis": [0.6, 0.31, 2.2, 3.0], "van_ski_shuttle": [0.75, 0.33, 1.8, 2.6], "sedan_retro_wagon_wood": [0.6, 0.3, 1.8, 2.6],
 	"sedan_sports_blue": [0.55, 0.3, 2.8, 3.8], "truck_moving_van": [0.95, 0.35, 1.6, 2.2], "sedan_rally": [0.55, 0.3, 3.0, 4.0]}
 const PAINTED_VEHICLES := ["car", "truck"]
+## Drive like maniacs: weave about their lane and, alone of all the traffic, won't wait behind you but swing over the
+## centre line to get by (see _wild_step).
+const WILD_VEHICLES := ["sedan_hotrod_orange"]
 const CAR_COUNT := 66    # vehicles in the town's traffic
 const PLAZA_PEOPLE := 13   # townsfolk milling about the plaza
 const STREET_PEOPLE := 140 # and strolling the pavements (a crowd, not a crush)
@@ -1629,7 +1632,7 @@ func _spawn_cars() -> void:
 			s0 = randf_range(3.0, float(r["len"]) - 3.0)
 		var c := {"road": ri, "s": s0, "dir": 1.0 if randf() < 0.5 else -1.0,
 			"speed": 0.0, "max": randf_range(d[2], d[3]) * PACE, "col": CAR_COLORS[randi() % CAR_COLORS.size()], "kind": kind, "art": kinds[k][1],
-			"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT}
+			"hl": d[0], "hw": d[1], "wait": 0.0, "pos": Vector2.ZERO, "fwd": Vector2.RIGHT, "wild": kind in WILD_VEHICLES}
 		_car_pose(c)
 		cars.append(c)
 
@@ -1637,7 +1640,10 @@ func _spawn_cars() -> void:
 func _car_pose(c: Dictionary) -> void:
 	var at := _road_at(roads[c["road"]], c["s"])
 	var fwd: Vector2 = at[1] * c["dir"]
-	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * (CAR_LANE + 0.5 * float(c.get("pull", 0.0)))   # pulled over onto the kerb
+	var lane := CAR_LANE + 0.5 * float(c.get("pull", 0.0))   # pulled over onto the kerb
+	if c.get("wild", false):   # weaving about, or out on the wrong side of the road getting past you
+		lane += sin(float(c.get("odo", 0.0)) * 0.9) * 0.1 - float(c.get("swing", 0.0))
+	c["pos"] = at[0] + Vector2(-fwd.y, fwd.x) * lane
 	c["fwd"] = fwd
 
 
@@ -1686,7 +1692,7 @@ func _spawn_life() -> void:
 	# the gift-givers: their own people, standing on the pavement with a present (see _update_giver)
 	for k in GIVER_COUNT:
 		var g := {"giver": true, "gcool": randf_range(0.0, 20.0), "state": "away", "pos": Vector2.ZERO, "road": -1, "phase": randf() * TAU,
-			"t": 0.0, "cool": 0.0, "cheer": 0.0, "shout": "", "face": Vector2(1, 1)}
+			"t": 0.0, "cool": 0.0, "cheer": 0.0, "shout": "", "face": Vector2(1, 1), "pu": PowerUps.pick(PowerUps.TOWN)}
 		_giver_spot(g)
 		peds.append(g)
 	for k in 3:
@@ -2306,12 +2312,18 @@ func _update_cars(delta: float) -> void:
 		if active and er_timer <= 0.0 and not c.get("hidden", false) and not c.has("park_s"):
 			var rel: Vector2 = rail_pos - c["pos"]
 			var ahead := rel.dot(f)
-			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction
+			# cars queue behind a rider in their lane, but don't expect riders cutting across a junction (a hot rod won't
+			# queue: over the centre line it goes, if nothing's coming)
 			if ahead > 0.0 and ahead < 2.4 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.8 and f.dot(p_fwd) > 0.5:
-				target = 0.0
+				if c.get("wild", false) and (c.get("passing", false) or _clear_to_pass(c, r)):
+					c["passing"] = true
+				else:
+					target = 0.0
 			# and an oncoming car brakes for a rider coming at it on its side of the road, and waits
 			elif ahead > 0.0 and ahead < 4.5 + float(c["hl"]) and absf(rel.dot(Vector2(-f.y, f.x))) < 0.9 and f.dot(p_fwd) < -0.5:
 				target = 0.0
+		if c.get("wild", false):
+			target = _wild_step(c, target, delta)
 		c["speed"] = move_toward(c["speed"], target, (4.0 if target > c["speed"] else 2.0 * CAR_BRAKE) * delta)
 		var moved: float = c["speed"] * delta
 		c["odo"] = float(c.get("odo", randf() * 10.0)) + moved   # distance driven: turns the wheels, bounces the body
@@ -2328,6 +2340,43 @@ func _update_cars(delta: float) -> void:
 			var jp: Vector2 = junctions[c["claim"]]["pos"]
 			if (jp - (c["pos"] as Vector2)).dot(c["fwd"]) < -0.3:
 				c["claim"] = -1
+
+
+## A hot rod's driving (WILD_VEHICLES): once it's decided to pass you it swings out over the centre line, floors it,
+## and cuts back in once you're behind it. Returns the speed it's going for.
+func _wild_step(c: Dictionary, target: float, delta: float) -> float:
+	if c.get("passing", false):
+		var behind: float = (rail_pos - (c["pos"] as Vector2)).dot(c["fwd"])
+		if not active or c.has("curve") or behind < -(1.4 + float(c["hl"])) or behind > 5.0:
+			c["passing"] = false
+		else:
+			target = maxf(target, float(c["max"]) * 1.2)
+	c["swing"] = move_toward(float(c.get("swing", 0.0)), 2.0 * CAR_LANE if c.get("passing", false) else 0.0, delta * 2.2)
+	# and the odd burst of speed, just because
+	return target * (1.0 + 0.2 * maxf(0.0, sin(float(c.get("odo", 0.0)) * 0.25)))
+
+
+## Whether a car can go over the centre line to pass: no junction coming up and nothing coming the other way.
+func _clear_to_pass(c: Dictionary, r: Dictionary) -> bool:
+	if c.has("curve") or _car_next_j(c, r, 6.0)[0] >= 0:
+		return false
+	for o in cars:
+		if o != c and o["road"] == c["road"] and o["dir"] != c["dir"] and not o.get("hidden", false):
+			var d: float = (float(o["s"]) - float(c["s"])) * float(c["dir"])
+			if d > -1.5 and d < 14.0:
+				return false
+	return true
+
+
+## Knocked flat by something that isn't a rider (the hot rod swerving into you): down on the road for `secs`.
+func knock_over(secs: float, text: String) -> void:
+	if _is_down(-1) or invuln > 0.0:
+		return
+	p_down = secs
+	p_fall = 0.0
+	p_fall_pizza = not carry.is_empty()
+	p_speed = 0.0
+	Game.toast.emit(text, Color(1.0, 0.45, 0.35))
 
 
 ## The next junction ahead of a car on its road within `reach` m: [junction, distance], or [-1, 0].
@@ -3354,12 +3403,12 @@ func _update_climb(c: Dictionary) -> void:
 
 ## Where the quarry is: [world position, heading] — the gap ahead of you along your road (the hot rod: its lead over
 ## you, in the car lane beside you).
-func challenge_pos() -> Array:
+func challenge_pos(lane := CAR_LANE) -> Array:
 	var tpm := TILES_PER_MS * PACE
-	if challenge.get("kind", "") == "race":   # waiting beside you for GO, then along the route
+	if challenge.get("kind", "") == "race":   # waiting beside you for GO, then along the route (`lane`: where the hot rod's got to)
 		if challenge["state"] == "count":
-			return _rail_ahead(0.4, CAR_LANE)
-		return route_at(challenge["route"], float(challenge["them_m"]) * tpm + 0.4, CAR_LANE)
+			return _rail_ahead(0.4, lane)
+		return route_at(challenge["route"], float(challenge["them_m"]) * tpm + 0.4, lane)
 	if challenge.get("kind", "") == "kid_race":   # riding alongside you, nearer the middle of the road
 		if challenge["state"] == "count":
 			return _rail_ahead(0.0, BIKE_LANE - 0.4)
@@ -3453,9 +3502,9 @@ func _draw_line_banner(f: Vector2, fwd: Vector2, text: String, col: Color, banne
 
 const GIVER_COUNT := 8
 
-## A gift-giver's day: "ready" (on the pavement, present held high, a present on the map), "thanks" (just handed it
-## over), then "away": once you can't see them they move on to another spot out of sight, and some time later they
-## are ready there with a new present. They never walk, and never pop up where you can see.
+## A gift-giver's day: "away" until they turn up at a spot out of sight, then "ready" (on the pavement, holding up the
+## power-up they'll hand over, a present on the map). When someone takes it, a moment's "thanks" and they hold up
+## another one, a different one at random. They never walk, and never pop up where you can see.
 func _update_giver(p: Dictionary, delta: float, riding: bool) -> void:
 	p["phase"] = float(p["phase"]) + delta
 	p["say_t"] = maxf(0.0, float(p.get("say_t", 0.0)) - delta)
@@ -3464,12 +3513,12 @@ func _update_giver(p: Dictionary, delta: float, riding: bool) -> void:
 			_try_give(p, riding)
 			if p["gcool"] > 0.0:
 				p["state"] = "thanks"
-				p["t"] = 3.0
+				p["t"] = 1.5
 		"thanks":
 			p["t"] -= delta
-			if p["t"] <= 0.0 and not _in_view(p["pos"]):
-				_giver_spot(p)
-				p["state"] = "away"
+			if p["t"] <= 0.0:
+				p["state"] = "ready"
+				p["gcool"] = 0.0
 		"away":
 			p["gcool"] = maxf(0.0, p["gcool"] - delta)
 			if p["gcool"] <= 0.0:
@@ -3527,11 +3576,14 @@ func _draw_giver(p: Dictionary, ground: Vector2) -> void:
 		Sprites.draw_strip(self, "giver_%s_wave" % look, ground, float(p["phase"]) if p["state"] == "ready" else 0.0, 8.0)
 	if p["state"] == "thanks" and p["shout"] != "":
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
+	elif p["state"] == "ready":
+		PowerUps.draw_held(self, ground, p["pu"], float(p["phase"]))
 
 
 func _try_give(p: Dictionary, riding: bool) -> void:
 	if riding and pu == "" and p_down <= 0.0 and p_pos.distance_to(p["pos"]) < 2.0:
-		pu = PowerUps.pick(PowerUps.TOWN)
+		pu = p["pu"]
+		p["pu"] = PowerUps.pick(PowerUps.TOWN, pu)
 		p["gcool"] = 25.0
 		p["cheer"] = 1.5
 		p["shout"] = "Catch!"
@@ -3540,7 +3592,8 @@ func _try_give(p: Dictionary, riding: bool) -> void:
 	for i in rival_state.size():
 		var r: Dictionary = rival_state[i]
 		if r["pu"] == "" and r["stun"] <= 0.0 and r["pos"].distance_to(p["pos"]) < 2.0:
-			r["pu"] = PowerUps.pick(PowerUps.TOWN)
+			r["pu"] = p["pu"]
+			p["pu"] = PowerUps.pick(PowerUps.TOWN, r["pu"])
 			r["pu_hold"] = 0.0
 			p["gcool"] = 25.0
 			if active and p_pos.distance_to(r["pos"]) < 25.0:
@@ -3609,10 +3662,21 @@ func _use_powerup(who: int) -> bool:
 			var v := _nearest_opponent(who, PowerUps.FRISBEE_RANGE_M / M_PER_TILE)
 			if v == -2:
 				if who < 0:
-					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
+					Game.toast.emit("Nobody within %d m. Get closer to a rival, then toss!" % int(PowerUps.FRISBEE_RANGE_M), Color(1.0, 0.8, 0.5))
 				return false
 			frisbees.append({"from": who, "to": v, "u": 0.0})
 			Sprites.start_throw("YOU" if who < 0 else str(Talk.rivals[who]["short"]))
+		"mitt":
+			if not _carrying(who).is_empty():
+				if who < 0:
+					Game.toast.emit("Your hands are full: you've got a pizza on board. Save the mitt for later!", Color(1.0, 0.8, 0.5))
+				return false
+			var v := _mitt_target(who)
+			if v == -2:
+				if who < 0:
+					Game.toast.emit("Nobody carrying a pizza within %d m. Get closer, then grab!" % int(PowerUps.MITT_RANGE_M), Color(1.0, 0.8, 0.5))
+				return false
+			_snatch_pizza(who, v)
 			if who < 0:
 				player_bubble = {"text": "Pizza frisbee!", "t": 1.5}
 		"socks":
@@ -3660,6 +3724,8 @@ func _rival_wants(i: int) -> bool:
 			return near_player or hold > 40.0
 		"frisbee":
 			return _nearest_opponent(i, PowerUps.FRISBEE_RANGE_M / M_PER_TILE) != -2
+		"mitt":
+			return r["state"] != "to_dest" and _mitt_target(i) != -2
 		"socks":
 			return r["state"] in ["to_shop", "to_dest"]
 		"breadsticks":
@@ -3668,6 +3734,66 @@ func _rival_wants(i: int) -> bool:
 			var path: Array = r["path"]
 			return r["state"] in ["to_shop", "to_dest"] and not path.is_empty() and grade_at(r["pos"], path[0] - r["pos"]) > 0.03
 	return false
+
+
+## The order `who` is out delivering ({} if none).
+func _carrying(who: int) -> Dictionary:
+	if who < 0:
+		return carry
+	var r: Dictionary = rival_state[who]
+	return _order_by_id(r["order"]) if r["state"] == "to_dest" else {}
+
+
+## The nearest rider to `who` within the Oven Mitt's reach who has a pizza on board to snatch (-2 if none). A pizza
+## rush's party pizzas are too many to grab.
+func _mitt_target(who: int) -> int:
+	var me := _rider_pos(who)
+	var best := -2
+	var bd := PowerUps.MITT_RANGE_M / M_PER_TILE
+	for v in range(-1, rival_state.size()):
+		if v == who or (v < 0 and (not active or er_timer > 0.0)):
+			continue
+		var o := _carrying(v)
+		if o.is_empty() or o.has("rush"):
+			continue
+		var d := _rider_pos(v).distance_to(me)
+		if d < bd:
+			bd = d
+			best = v
+	return best
+
+
+## The Oven Mitt: `who` grabs the pizza `from` is carrying and takes it on to the customer themselves.
+func _snatch_pizza(who: int, from: int) -> void:
+	var o := _carrying(from)
+	if from < 0:
+		carry = {}
+		Game.toast.emit("%s snatched your pizza with an Oven Mitt!" % _rider_name(who), Color(1.0, 0.45, 0.35))
+		Talk.say(who, "pu_hit_player", true)
+	else:
+		var r: Dictionary = rival_state[from]
+		r["state"] = "idle"
+		r["idle"] = 1.5
+		r["path"] = []
+		if who < 0 or (active and p_pos.distance_to(r["pos"]) < 25.0):
+			Talk.say(from, "pu_ouch", true)
+	if who < 0:
+		o["state"] = "player"
+		o["rival"] = -1
+		o["t_total"] = 15.0 + _path_len(p_pos, spots[o["dest"]]["pos"]) / (1.6 * PACE)
+		o["t_left"] = o["t_total"]
+		carry = o
+		Game.toast.emit("OVEN MITT! Snatched %s's pizza. Deliver to %s in %ds!" % [_rider_name(from), spots[o["dest"]]["name"], int(o["t_total"])], PowerUps.col("mitt"))
+		player_bubble = {"text": "Mine now!", "t": 1.5}
+	else:
+		var r: Dictionary = rival_state[who]
+		o["state"] = "rival"
+		o["rival"] = who
+		r["order"] = o["id"]
+		r["path"] = _route(r["pos"], spots[o["dest"]]["pos"], r["off"])
+		r["state"] = "to_dest"
+		if from >= 0 and active and p_pos.distance_to(r["pos"]) < 25.0:
+			Game.feed.emit("%s snatched %s's pizza!" % [_rider_name(who), _rider_name(from)], Talk.rivals[who]["color"])
 
 
 ## Pizza mascots dance just in front of their victim, slowing them to a crawl.

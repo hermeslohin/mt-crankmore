@@ -1390,10 +1390,15 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			var cars: Array = ["vehicle_sedan_hotrod_orange", "vehicle_sedan_muscle_black", "vehicle_sedan_sports_red"].filter(func(n): return _has(n))
 			if cars.is_empty():
 				return false
+			# (rolls up from out of sight behind you, along your road: not when you've only just turned onto it)
+			var back_s: float = float(city.rs) - float(city.rdir) * 16.0
+			if back_s < 0.5 or back_s > float(city.roads[city.rr]["len"]) - 0.5:
+				return false
 			e["t"] = 70.0
 			e["stage"] = "roll_up"
 			e["clock"] = 0.0
-			var behind: Array = city._rail_ahead(-16.0, city.CAR_LANE)   # (rolls up from out of sight behind you)
+			e["road"] = [city.rr, city.rdir]
+			var behind: Array = city._rail_ahead(-16.0, city.CAR_LANE)
 			var rod := {"type": "vehicle", "name": cars[0], "pos": behind[0], "face": behind[1], "phase": 0.0, "label_t": 0.0}
 			_give_face(rod, "hotrod", "Hot Rod", Color(1.0, 0.6, 0.2))
 			e["actors"].append(rod)
@@ -1983,16 +1988,62 @@ func _step_dog(e: Dictionary, delta: float) -> void:
 				owner["anim"] = "idle"
 
 
+## The hot rod drives like a maniac: weaving about its lane, swinging over the centre line to get by when you're out
+## in its way, and now and then, alongside you, a honk and a swerve at the kerb that knocks you flat if you're there.
+## Returns how far right of the road's middle it is (it never leaves the road).
+func _rod_lane(e: Dictionary, rod: Dictionary, delta: float, swerve_ok: bool) -> float:
+	var t := float(e["clock"])
+	var lane: float = city.CAR_LANE + sin(t * 2.3) * 0.13 + sin(t * 5.7) * 0.05
+	var you: float = city.BIKE_LANE + city.p_lat
+	rod["over"] = move_toward(float(rod.get("over", 0.0)), 1.0 if you < city.CAR_LANE + 0.5 else 0.0, delta * 2.5)
+	lane = lerpf(lane, -city.CAR_LANE, float(rod["over"]))
+	# the swerve: a honk, then over towards the kerb and back
+	rod["swerve_cool"] = maxf(0.0, float(rod.get("swerve_cool", 4.0)) - delta)
+	if swerve_ok and float(rod["swerve_cool"]) <= 0.0 and float(rod["over"]) < 0.1 and randf() < delta * 0.35:
+		rod["swerve"] = 0.0
+		rod["swerve_cool"] = 7.0
+		_say(rod, ["HONK HONK!", "Outta my way!", "Move it, pizza kid!", "Coming through!"].pick_random(), 1.2, "smug")
+	if rod.has("swerve"):
+		rod["swerve"] = float(rod["swerve"]) + delta
+		var k := float(rod["swerve"]) - 0.8   # (the honk first, so you can get out of the way)
+		if k > 1.0:
+			rod.erase("swerve")
+		elif k > 0.0:   # (not if you've pulled out into the road: it's going round you instead)
+			lane = lerpf(lane, city.BIKE_LANE - 0.2, sin(k * PI) * (1.0 - float(rod["over"])))
+	return lane
+
+
+## Whether the hot rod has run into you: knocked flat (once a run-in; it doesn't stop).
+func _rod_hits(e: Dictionary, rod: Dictionary) -> void:
+	if e.get("hit", false) or not city.active:
+		return
+	var d: Array = city.VEHICLE_DIMS.get(String(rod["name"]).trim_prefix("vehicle_"), [0.55, 0.3])
+	var rel: Vector2 = city.rail_pos - (rod["pos"] as Vector2)
+	var f: Vector2 = rod["face"]
+	if absf(rel.dot(f)) < float(d[0]) * city.CAR_BODY + city.CAR_HIT_R and absf(rel.dot(Vector2(-f.y, f.x))) < float(d[1]) * city.CAR_BODY + city.CAR_HIT_R * 0.5:
+		e["hit"] = true
+		city.knock_over(3.0, "The HOT ROD knocked you flat! Down for 3 s.")
+		_say(rod, ["Ha! Road hog!", "Shoulda moved!", "Beep beep!"].pick_random(), 2.0, "smug")
+
+
 func _step_hotrod(e: Dictionary, delta: float) -> void:
 	var rod: Dictionary = e["actors"][0]
 	e["clock"] = float(e["clock"]) + delta
 	match e["stage"]:
 		"roll_up":
-			# comes up from behind in the car lane and draws level
+			# comes up from behind and draws level, on your road (turn off it or round and it just drives on by)
+			if [city.rr, city.rdir] != e["road"]:
+				e["stage"] = "off"
+				e["clock"] = 0.0
+				e["own"] = [int(e["road"][0]), float(e.get("rod_s", city.rs)), float(e["road"][1])]
+				return
 			var u := clampf(float(e["clock"]) / 3.0, 0.0, 1.0)
-			var at: Array = city._rail_ahead(lerpf(-16.0, 0.4, u * (2.0 - u)), city.CAR_LANE)   # from out of sight behind
+			var d := lerpf(-16.0, 0.4, u * (2.0 - u))
+			var at: Array = city._rail_ahead(d, _rod_lane(e, rod, delta, false))   # from out of sight behind
+			e["rod_s"] = float(city.rs) + float(city.rdir) * d
 			_place(rod, at[0])
 			rod["face"] = at[1]
+			_rod_hits(e, rod)
 			if u >= 1.0:
 				_say(rod, ["Race you to that line! Winner gets $300!", "Hey pizza kid! First to the line, $300!", "Think you can beat this? To the line!"].pick_random(), 3.0)
 				if city.start_challenge("race"):
@@ -2005,9 +2056,13 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["stage"] = "off"
 				e["clock"] = 0.0
 				return
-			var at: Array = city.challenge_pos()
+			var racing: bool = c["state"] != "count"
+			var ahead: float = float(c.get("them_m", 0.0)) - float(c.get("me_m", 0.0))
+			var at: Array = city.challenge_pos(_rod_lane(e, rod, delta, racing and ahead > -1.0 and ahead < 4.0) if racing else city.CAR_LANE)
 			_place(rod, at[0])
 			rod["face"] = at[1]
+			if racing:
+				_rod_hits(e, rod)
 			if c["state"] != "count":   # where it is on the route, for driving off afterwards
 				e["route"] = c["route"]
 				e["route_d"] = float(c["them_m"]) * city.TILES_PER_MS * city.PACE + 0.4
@@ -2024,14 +2079,27 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 		"off":
 			# roars off up the road (following it, bends and all) and away
 			if not e.has("leave_d"):
-				e["leave_d"] = float(e["route_d"]) if e.has("route") else ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
-			# on along the race route at full chat (or up your road, if the race never got going)
-			e["leave_d"] = float(e["leave_d"]) + (minf(3.0 + float(e["clock"]) * 4.0, 9.0) if e.has("route") else city.p_speed + minf(float(e["clock"]) * 4.0, 7.0)) * delta
-			var at: Array = city.route_at(e["route"], float(e["leave_d"]), city.CAR_LANE) if e.has("route") \
-				else city._rail_ahead(float(e["leave_d"]), city.CAR_LANE)
+				e["leave_d"] = float(e["route_d"]) if e.has("route") else 0.0
+			if not e.has("route") and not e.has("own"):   # (up the road it's on, if the race never got going)
+				var rel: float = ((rod["pos"] as Vector2) - city.p_pos).dot(city.p_fwd)
+				e["own"] = [city.rr, float(city.rs) + float(city.rdir) * rel, float(city.rdir)]
+			# on along the race route at full chat, weaving all over
+			var v := minf(3.0 + float(e["clock"]) * 4.0, 9.0)
+			e["leave_d"] = float(e["leave_d"]) + v * delta
+			var lane := _rod_lane(e, rod, delta, false)
+			var at: Array
+			if e.has("route"):
+				at = city.route_at(e["route"], float(e["leave_d"]), lane)
+			else:
+				var own: Array = e["own"]
+				var r: Dictionary = city.roads[int(own[0])]
+				var w: Array = city._road_at(r, city._wrap_s(r, float(own[1]) + float(own[2]) * float(e["leave_d"])))
+				var fwd: Vector2 = (w[1] as Vector2) * float(own[2])
+				at = [(w[0] as Vector2) + Vector2(-fwd.y, fwd.x) * lane, fwd]
 			_place(rod, at[0])
 			rod["face"] = at[1]
-			if float(e["clock"]) > 5.0:
+			_rod_hits(e, rod)
+			if float(e["clock"]) > 5.0 or (float(e["clock"]) > 1.0 and not city.on_screen(rod["pos"])):
 				rod["gone"] = true
 				e["t"] = minf(float(e["t"]), 0.3)
 

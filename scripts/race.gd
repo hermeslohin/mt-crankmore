@@ -99,7 +99,7 @@ var countdown := 0.0
 var over := false
 var over_clock := 0.0
 var finish_count := 0
-var givers: Array = []                # power-up people along the course {s, lat, shirt, skin, hair, phase}, sorted by s
+var givers: Array = []                # power-up people along the course {s, lat, shirt, skin, hair, phase, pu (what they're holding up)}, sorted by s
 var frisbees: Array = []              # pizzas in flight {"from", "to", "u"} (rider indices)
 var stamina := 1.0
 var kick_t := 0.0
@@ -1366,7 +1366,7 @@ func _build_givers(rng: RandomNumberGenerator) -> void:
 		if _clear_of(s, 25.0):
 			givers.append({"s": s, "lat": side * (1.25 + ROAD_GROW), "shirt": shirts[rng.randi() % shirts.size()],
 				"skin": Color(0.96, 0.8, 0.65).lerp(Color(0.55, 0.38, 0.28), rng.randf()), "hair": Color(0.3, 0.2, 0.1).lerp(Color(0.9, 0.8, 0.4), rng.randf()),
-				"phase": rng.randf() * TAU})
+				"phase": rng.randf() * TAU, "pu": PowerUps.pick(PowerUps.RACE)})
 			side = -side
 			s += rng.randf_range(300.0, 420.0)
 		else:
@@ -1761,9 +1761,12 @@ func _tick_powerups(k: int, delta: float) -> void:
 	if r["pu"] != "":
 		r["pu_hold"] = float(r["pu_hold"]) + delta
 	while int(r["gv"]) < givers.size() and float(r["s"]) >= float(givers[int(r["gv"])]["s"]):
+		var g: Dictionary = givers[int(r["gv"])]
 		r["gv"] = int(r["gv"]) + 1
 		if r["pu"] == "" and float(r["down"]) <= 0.0:
-			r["pu"] = PowerUps.pick(PowerUps.RACE)
+			# what they were holding up, and then they hold up another one for whoever's next
+			r["pu"] = g["pu"]
+			g["pu"] = PowerUps.pick(PowerUps.RACE, r["pu"])
 			r["pu_hold"] = 0.0
 			if r["player"]:
 				Game.toast.emit("POWER-UP: %s! Press Y." % PowerUps.label(r["pu"]), PowerUps.col(r["pu"]))
@@ -1790,6 +1793,20 @@ func _nearest_opponent(k: int, within: float) -> int:
 	return best
 
 
+## The nearest rider to `k` within the Oven Mitt's reach who's holding a power-up (-1 if none).
+func _mitt_target(k: int) -> int:
+	var best := -1
+	var bd := PowerUps.MITT_RANGE_M
+	for o in riders.size():
+		if o == k or riders[o]["done"] or riders[o]["pu"] == "":
+			continue
+		var d := _gap_m(k, o)
+		if d < bd:
+			bd = d
+			best = o
+	return best
+
+
 func _use_powerup(k: int) -> bool:
 	var r: Dictionary = riders[k]
 	var kind: String = r["pu"]
@@ -1800,10 +1817,27 @@ func _use_powerup(k: int) -> bool:
 			var v := _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M)
 			if v < 0:
 				if r["player"]:
-					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
+					Game.toast.emit("Nobody within %d m. Get closer to a rival, then toss!" % int(PowerUps.FRISBEE_RANGE_M), Color(1.0, 0.8, 0.5))
 				return false
 			frisbees.append({"from": k, "to": v, "u": 0.0})
 			Sprites.start_throw("YOU" if r["player"] else str(r["short"]))
+		"mitt":
+			# snatch the power-up off the nearest rider within reach who has one (and it's yours to use)
+			var v := _mitt_target(k)
+			if v < 0:
+				if r["player"]:
+					Game.toast.emit("Nobody with a power-up within %d m. Get closer, then grab!" % int(PowerUps.MITT_RANGE_M), Color(1.0, 0.8, 0.5))
+				return false
+			var o: Dictionary = riders[v]
+			r["pu"] = o["pu"]
+			r["pu_hold"] = 0.0
+			o["pu"] = ""
+			_pop(k, "OVEN MITT!", PowerUps.col(kind))
+			if r["player"]:
+				Game.toast.emit("OVEN MITT! You snatched %s's %s. Press Y." % [o["short"], PowerUps.label(r["pu"])], PowerUps.col(r["pu"]))
+			elif o["player"]:
+				Game.toast.emit("%s snatched your %s with an Oven Mitt!" % [r["short"], PowerUps.label(r["pu"])], Color(1.0, 0.45, 0.35))
+			return true
 		"socks":
 			r["socks"] = PowerUps.SOCKS_TIME
 			_pop(k, "FIRE SOCKS!", PowerUps.col(kind))
@@ -1825,6 +1859,8 @@ func _rival_wants(k: int) -> bool:
 	match r["pu"]:
 		"frisbee":
 			return _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M) >= 0
+		"mitt":
+			return _mitt_target(k) >= 0
 		"socks":
 			return _grade_at(r["s"]) > 0.03 or hold > 12.0
 		"breadsticks":
@@ -2945,6 +2981,7 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 func _draw_giver(g: Dictionary, gp: Dictionary) -> void:
 	var ground := Iso.to_screen(gp["pos"], gp["z"])
 	Sprites.draw_strip(self, "giver_%s_wave" % ("red" if int(float(g["phase"]) * 10.0) % 2 == 0 else "blue"), ground, t_ + float(g["phase"]), 8.0)
+	PowerUps.draw_held(self, ground, g["pu"], t_ + float(g["phase"]))
 
 
 func _wrap(text: String, width: int) -> Array:

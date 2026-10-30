@@ -1,5 +1,6 @@
 extends RefCounted
-## St. Pedro's air ambulance (art/heli_medical.png: 8 isometric directions, like the vehicles). It sits on the helipad on the
+## St. Pedro's air ambulance (art/heli_medical.png: 8 isometric directions like the vehicles, and a column per tilt: level,
+## nose down, nose up, banked left, banked right; see TILT). It sits on the helipad on the
 ## hospital roof, and every so often spins up, climbs, flies off over the town and out past the edge of the map, then
 ## some minutes later comes back in, lands on the pad and spins down. A shadow follows it over the ground.
 
@@ -10,6 +11,9 @@ const CRUISE := 210.0           # px up when cruising
 const PAD := Vector2(-4.0, -113.0)   # the pad on hospital.png, from the lot's near corner on screen
 const SPIN := 3.0               # seconds to spin the rotor up (or down)
 const CLIMB := 5.0              # seconds to climb off the pad (or settle onto it)
+const TURN_RATE := 1.1          # radians a second it can swing round
+const SLOW := 9.0               # tiles out from the pad it starts slowing to land, nose up
+const TILT := {"level": 0, "nose_down": 1, "nose_up": 2, "bank_left": 3, "bank_right": 4}   # columns of the sheet
 const SKIDS := -20.0            # from where its skids touch down to the middle of its frame (Sprites.draw_vehicle)
 const HUB := -24.0              # from the middle of its frame up to the rotor hub
 
@@ -20,8 +24,11 @@ var alt := 0.0                  # px above the pad's height
 var state := "parked"
 var t := 0.0
 var rotor := 0.0                # 0 = still, 1 = full speed
-var dir := Vector2(1, 0)        # world direction of travel
+var dir := Vector2(1, 0)        # world direction it wants to go
+var heading := Vector2(1, 0)    # world direction its nose points (turns towards dir at TURN_RATE)
+var tilt := "level"
 var target := Vector2.ZERO
+var approach := Vector2.ZERO    # where it comes to a hover just short of the pad before it settles
 var t_ := 0.0
 var turn := {}                  # its turning between views (Sprites.turn_rows)
 
@@ -47,6 +54,10 @@ func update(delta: float) -> void:
 		return
 	t_ += delta
 	t -= delta
+	# swing round towards where it's going, banking into the turn
+	var turn_by := heading.angle_to(dir)
+	heading = heading.rotated(clampf(turn_by, -TURN_RATE * delta, TURN_RATE * delta))
+	tilt = "level"
 	match state:
 		"parked":
 			if t <= 0.0:
@@ -66,8 +77,9 @@ func update(delta: float) -> void:
 			if t <= 0.0:
 				state = "out"
 		"out":
-			pos += dir * SPEED * delta
-			if pos.distance_to(target) < SPEED * delta * 2.0 or pos.dot(dir) > target.dot(dir):
+			pos += heading * SPEED * delta
+			tilt = "nose_down"
+			if pos.distance_to(target) < SPEED * delta * 2.0 or (pos - target).dot(dir) > 0.0:
 				state = "away"
 				t = randf_range(AWAY[0], AWAY[1])
 		"away":
@@ -75,20 +87,29 @@ func update(delta: float) -> void:
 				state = "in"
 				pos = Vector2(city.N, city.N) * 0.5 + Vector2.from_angle(randf() * TAU) * city.N * 0.95
 				dir = (pad - pos).normalized()
+				heading = dir
+				approach = pad - dir * 2.0
 		"in":
-			var to := pad + dir * -2.0 - pos   # to just short of the pad, then it settles onto it
-			var step := SPEED * delta
-			if to.length() <= step:
+			var to := approach - pos   # to just short of the pad, then it settles onto it
+			var near_pad := to.length() < SLOW
+			var step := SPEED * delta * (clampf(to.length() / SLOW, 0.25, 1.0) if near_pad else 1.0)
+			tilt = "nose_up" if near_pad else "nose_down"
+			if to.length() <= maxf(step, 0.05):
 				state = "land"
 				t = CLIMB
 			else:
-				pos += to.normalized() * step
+				dir = to.normalized()
+				if to.length() < 1.5:   # lined up by now: no circling the pad
+					heading = dir
+				pos += heading * step
 		"land":
+			tilt = "nose_up" if t > CLIMB * 0.6 else "level"
 			alt = CRUISE * smoothstep(0.0, 1.0, t / CLIMB)
-			pos = pad + dir * -2.0 * (t / CLIMB)
+			pos = pad.lerp(approach, t / CLIMB)
 			if t <= 0.0:
 				state = "spindown"
 				alt = 0.0
+				dir = heading
 				pos = pad
 				t = SPIN
 		"spindown":
@@ -96,6 +117,13 @@ func update(delta: float) -> void:
 			if t <= 0.0:
 				state = "parked"
 				t = randf_range(EVERY[0], EVERY[1])
+
+
+## Which way it leans now: into a turn, else nose down cruising / nose up slowing, else level.
+func lean() -> int:
+	if rotor > 0.5 and alt > 5.0 and absf(heading.angle_to(dir)) > 0.06:
+		return TILT["bank_right"] if heading.angle_to(dir) > 0.0 else TILT["bank_left"]   # (screen y points down: + is clockwise, a right turn)
+	return TILT[tilt]
 
 
 ## The blades spinning (0-1 = how fast) over a helicopter drawn at `at` with Sprites.draw_vehicle: a flickering disc
@@ -124,7 +152,7 @@ func draw(ci: CanvasItem) -> void:
 		ci.draw_colored_polygon(PackedVector2Array([sh + Vector2(-20, 0) * k, sh + Vector2(0, -6) * k, sh + Vector2(20, 0) * k, sh + Vector2(0, 6) * k]), Color(0, 0, 0, 0.18))
 	var bob := sin(t_ * 2.3) * 2.0 * rotor if alt > 5.0 else 0.0
 	var at := base + Vector2(0.0, bob + SKIDS)
-	Sprites.draw_vehicle(ci, "heli_medical", at, dir, Color.WHITE, 0, turn)
+	Sprites.draw_vehicle(ci, "heli_medical", at, heading, Color.WHITE, lean(), turn)
 	if rotor > 0.0:
 		draw_rotor(ci, at, t_, rotor)
 	if state in ["spinup", "climb", "land"] and int(t_ * 3.0) % 2 == 0:

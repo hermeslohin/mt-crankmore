@@ -31,6 +31,9 @@ const PX_PER_M := 12.0        # screen lift per metre of height
 const LEG_GAP := 16.0         # tiles between switchback legs (a course's "gap" can widen it)
 const HAIRPIN_R := 8.0        # radius of a hairpin (LEG_GAP / 2)
 const STEP := 0.5             # road sample spacing (tiles)
+const ROAD_W := 2.0           # how much wider the race road is than it was first drawn
+const ROAD_HW := 0.64 * ROAD_W  # half the road's width (tiles)
+const ROAD_GROW := ROAD_HW - 0.64   # how much further out everything beside the road stands
 const VIEW_R := 17            # terrain cells drawn around the player
 const MAX_SPEED := 16.0       # m/s cap on the descents
 const RUNOUT := 400.0         # metres of cool-down road past the finish arch
@@ -96,7 +99,7 @@ var countdown := 0.0
 var over := false
 var over_clock := 0.0
 var finish_count := 0
-var givers: Array = []                # power-up people along the course {s, lat, shirt, skin, hair, phase}, sorted by s
+var givers: Array = []                # power-up people along the course {s, lat, shirt, skin, hair, phase, pu (what they're holding up)}, sorted by s
 var frisbees: Array = []              # pizzas in flight {"from", "to", "u"} (rider indices)
 var stamina := 1.0
 var kick_t := 0.0
@@ -122,6 +125,13 @@ var life: RaceLife                    # the race-day crowds, motos, helicopter a
 ## none going on. Nobody waits: the race clock and the rivals carry on, so the whole scene costs you BEAR_DOWN seconds.
 var patrol: Dictionary = {}
 const BEAR_DOWN := 15.0       # seconds down after the bear catches you
+const BEAR_FTP := 1.1         # the bear runs as fast as you'd ride at this share of your FTP: hold it to get away
+const BEAR_CHASE := 19.5      # seconds it keeps after you
+const BEAR_ROUSE := 0.7       # seconds it rears up and roars where it stood before it sets off
+const BEAR_ACCEL := 5.0       # m/s per second as it gets going
+const BEAR_REACH := 1.6       # m behind you when it swipes
+const BEAR_SWIPE := 0.75      # seconds of the swipe; the paw lands at BEAR_HIT through it
+const BEAR_HIT := 0.4
 const SP_LIE := 1.3           # the wipe-out animation is over (13 frames at Sprites.FALL_FPS): lying there now
 const SP_IN := 1.4            # the patroller sets off from off screen
 const SP_WALK := 3.2          # seconds for each walk between off screen and your bike
@@ -532,10 +542,10 @@ func _build_terrain() -> void:
 		var a := pts[i]
 		var i2 := mini(i + 2, M - 1)
 		var b := pts[i2]
-		var x0 := clampi(floori(minf(a.x, b.x) - 3.5) - ox, 0, gw)
-		var x1 := clampi(ceili(maxf(a.x, b.x) + 3.5) - ox, 0, gw)
-		var y0 := clampi(floori(minf(a.y, b.y) - 3.5) - oy, 0, gh)
-		var y1 := clampi(ceili(maxf(a.y, b.y) + 3.5) - oy, 0, gh)
+		var x0 := clampi(floori(minf(a.x, b.x) - 3.5 - ROAD_GROW) - ox, 0, gw)
+		var x1 := clampi(ceili(maxf(a.x, b.x) + 3.5 + ROAD_GROW) - ox, 0, gw)
+		var y0 := clampi(floori(minf(a.y, b.y) - 3.5 - ROAD_GROW) - oy, 0, gh)
+		var y1 := clampi(ceili(maxf(a.y, b.y) + 3.5 + ROAD_GROW) - oy, 0, gh)
 		var ab := maxf(a.distance_to(b), 0.001)
 		for cy in range(y0, y1 + 1):
 			for cx in range(x0, x1 + 1):
@@ -556,13 +566,15 @@ func _build_terrain() -> void:
 			var y := float(oy + cy)
 			var idx := cy * n1 + cx
 			var d := rdist[idx]
-			var e := _base_m(x, y) + _noise_m(x, y) * smoothstep(1.0, 4.0, d)
-			e -= 0.45 * (1.0 - smoothstep(0.2, 1.6, _stream_d(x, y))) * smoothstep(0.9, 2.5, d)
-			if d < 3.5:
-				e = lerpf(re[idx], e, smoothstep(0.75, 3.2, d))
+			# (measured from the road's edge: the wider road is flat across, its shoulders as they were)
+			var de := d - ROAD_GROW
+			var e := _base_m(x, y) + _noise_m(x, y) * smoothstep(1.0, 4.0, de)
+			e -= 0.45 * (1.0 - smoothstep(0.2, 1.6, _stream_d(x, y))) * smoothstep(0.9, 2.5, de)
+			if de < 3.5:
+				e = lerpf(re[idx], e, smoothstep(0.75, 3.2, de))
 			if cliff_off.has(idx):   # a rock wall up from the shoulder, or a drop away from it (never on a road)
 				var co: Vector2 = cliff_off[idx]
-				var k := smoothstep(2.0, 3.5, d)
+				var k := smoothstep(2.0, 3.5, de)
 				e += co.x * k
 				cliff_m[idx] = co.y * k
 			zgrid[idx] = e * vz
@@ -786,10 +798,10 @@ func _cliff_offsets(n1: int, count: int) -> Dictionary:
 			var a := pts[i]
 			var b := pts[mini(i + 2, M - 1)]
 			var taper := smoothstep(float(i0), i0 + ramp, float(i)) * smoothstep(float(i1), i1 - ramp, float(i))
-			var x0 := clampi(floori(minf(a.x, b.x) - 11.5) - ox, 0, gw)
-			var x1 := clampi(ceili(maxf(a.x, b.x) + 11.5) - ox, 0, gw)
-			var y0 := clampi(floori(minf(a.y, b.y) - 11.5) - oy, 0, gh)
-			var y1 := clampi(ceili(maxf(a.y, b.y) + 11.5) - oy, 0, gh)
+			var x0 := clampi(floori(minf(a.x, b.x) - 11.5 - ROAD_GROW) - ox, 0, gw)
+			var x1 := clampi(ceili(maxf(a.x, b.x) + 11.5 + ROAD_GROW) - ox, 0, gw)
+			var y0 := clampi(floori(minf(a.y, b.y) - 11.5 - ROAD_GROW) - oy, 0, gh)
+			var y1 := clampi(ceili(maxf(a.y, b.y) + 11.5 + ROAD_GROW) - oy, 0, gh)
 			for cy in range(y0, y1 + 1):
 				for cx in range(x0, x1 + 1):
 					var p := Vector2(ox + cx, oy + cy)
@@ -800,7 +812,7 @@ func _cliff_offsets(n1: int, count: int) -> Dictionary:
 					if not best.has(idx) or d < float(best[idx][0]):
 						best[idx] = [d, taper]
 		for idx in best:
-			var d: float = best[idx][0]
+			var d: float = float(best[idx][0]) - ROAD_GROW   # from the road's edge
 			var t: float = best[idx][1]
 			var f := 0.0
 			if h > 0.0:   # a wall: straight up off the shoulder, a ledge, then back down into the hillside
@@ -883,7 +895,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 		_put_static(2, {"kind": "warn", "s": float(ob["s"]) - 30.0, "icon": ob["kind"], "side": side}, [])
 		if ob["kind"] == "jump":
 			for k in 4:
-				_put_fan(float(ob["s"]) + rng.randf_range(-6.0, 6.0), (1.0 if k % 2 == 0 else -1.0) * rng.randf_range(1.2, 2.0), rng)
+				_put_fan(float(ob["s"]) + rng.randf_range(-6.0, 6.0), (1.0 if k % 2 == 0 else -1.0) * (rng.randf_range(1.2, 2.0) + ROAD_GROW), rng)
 	_put_static(2, {"kind": "arch", "s": 0.0, "label": "START"}, [])
 	_put_static(2, {"kind": "arch", "s": length - 2.0, "label": "FINISH"}, [])
 	var km := 500.0
@@ -893,7 +905,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	_build_course_signs(rng)
 	for k in 18:
 		_put_fan(rng.randf_range(0.0, 30.0) if k < 9 else length - rng.randf_range(0.0, 30.0),
-			(1.0 if rng.randf() < 0.5 else -1.0) * rng.randf_range(1.1, 2.4), rng)
+			(1.0 if rng.randf() < 0.5 else -1.0) * (rng.randf_range(1.1, 2.4) + ROAD_GROW), rng)
 
 
 ## Tunnels bored through the hillside along a straight stretch of a few of the middle legs.
@@ -931,7 +943,13 @@ func _build_tunnels(rng: RandomNumberGenerator) -> void:
 
 ## The mound over a tunnel: a hillside strip along the road, drawn over the road (so riders vanish into it unless it is
 ## see-through), with a stone portal at the end the camera sees.
-const TUN_PROFILE := [[-1.9, 0.0], [-1.6, 34.0], [-0.95, 50.0], [0.0, 56.0], [0.95, 50.0], [1.6, 34.0], [1.9, 0.0]]
+## (the sides stand ROAD_GROW further out than they were first drawn, round the wider road; the same goes for the portal)
+const TUN_PROFILE := [[-1.9 - ROAD_GROW, 0.0], [-1.6 - ROAD_GROW, 34.0], [-0.95 - ROAD_GROW, 50.0], [0.0, 56.0], [0.95 + ROAD_GROW, 50.0],
+	[1.6 + ROAD_GROW, 34.0], [1.9 + ROAD_GROW, 0.0]]
+const TUN_RING := [[-1.25 - ROAD_GROW, 0.0], [-1.25 - ROAD_GROW, 27.0], [-0.75 - ROAD_GROW, 41.0], [0.0, 45.0], [0.75 + ROAD_GROW, 41.0],
+	[1.25 + ROAD_GROW, 27.0], [1.25 + ROAD_GROW, 0.0]]
+const TUN_HOLE := [[-0.95 - ROAD_GROW, 0.0], [-0.95 - ROAD_GROW, 24.0], [-0.55 - ROAD_GROW, 36.0], [0.0, 39.0], [0.55 + ROAD_GROW, 36.0],
+	[0.95 + ROAD_GROW, 24.0], [0.95 + ROAD_GROW, 0.0]]
 const TUN_SHADE := [0.72, 0.86, 1.08, 1.04, 0.9, 0.7]
 const TUN_STEP := 4   # road samples per piece
 
@@ -955,7 +973,8 @@ func _draw_tunnel_piece(it: Dictionary) -> void:
 			_tun_p(ib, TUN_PROFILE[k + 1][0], TUN_PROFILE[k + 1][1]), _tun_p(ia, TUN_PROFILE[k + 1][0], TUN_PROFILE[k + 1][1])])
 		draw_colored_polygon(q, col)
 	if a < 0.95:   # inside: it is dim, with a lamp every few metres
-		var gloom := PackedVector2Array([_tun_p(ia, -0.95, 1.0), _tun_p(ib, -0.95, 1.0), _tun_p(ib, 0.95, 1.0), _tun_p(ia, 0.95, 1.0)])
+		var w := 0.95 + ROAD_GROW
+		var gloom := PackedVector2Array([_tun_p(ia, -w, 1.0), _tun_p(ib, -w, 1.0), _tun_p(ib, w, 1.0), _tun_p(ia, w, 1.0)])
 		draw_colored_polygon(gloom, Color(0.02, 0.02, 0.1, 0.5 * (1.0 - a)))
 		var lamp := _tun_p(ia, 0.0, 46.0)
 		draw_circle(lamp, 9.0, Color(1.0, 0.85, 0.4, 0.12 * (1.0 - a)))
@@ -970,11 +989,11 @@ func _draw_tunnel_piece(it: Dictionary) -> void:
 		draw_colored_polygon(outer, Color(stone.r, stone.g, stone.b, pa))
 		var j: int = ib if it["at_b"] else ia
 		var ring := PackedVector2Array()
-		for pr in [[-1.25, 0.0], [-1.25, 27.0], [-0.75, 41.0], [0.0, 45.0], [0.75, 41.0], [1.25, 27.0], [1.25, 0.0]]:
+		for pr in TUN_RING:
 			ring.append(_tun_p(j, pr[0], pr[1]))
 		draw_colored_polygon(ring, Color(0.72, 0.69, 0.66, pa))
 		var hole := PackedVector2Array()
-		for pr in [[-0.95, 0.0], [-0.95, 24.0], [-0.55, 36.0], [0.0, 39.0], [0.55, 36.0], [0.95, 24.0], [0.95, 0.0]]:
+		for pr in TUN_HOLE:
 			hole.append(_tun_p(j, pr[0], pr[1]))
 		draw_colored_polygon(hole, Color(0.03, 0.03, 0.06, 0.85 * pa))
 		draw_polyline(outer, Color(edge.r, edge.g, edge.b, pa), 1.0)
@@ -1047,7 +1066,7 @@ func _build_course_signs(rng: RandomNumberGenerator) -> void:
 		for fr in [0.18, 0.34, 0.5, 0.66, 0.82]:
 			var a: float = PI * fr
 			var dirv := Vector2(sin(a) * dx, cos(a))
-			var p := c + dirv * (HAIRPIN_R + 1.5)
+			var p := c + dirv * (HAIRPIN_R + 1.5 + ROAD_GROW)
 			var tv := Vector2(cos(a) * dx, -sin(a))
 			_put_static(2, {"kind": "chevron", "pos": p, "z": _tz(p), "tan": tv, "s": float(h["s"])}, [])
 	# the tunnel mounds: one piece per few road samples, in the bucket just after the riders on it
@@ -1062,13 +1081,13 @@ func _build_course_signs(rng: RandomNumberGenerator) -> void:
 			var far := pts[qb] if pts[qb].x > pts[q].x else pts[q]
 			var cover := _snow_cover(far.x, far.y, elev[q] * vz / peak)
 			var portal := (qb == i1 and at_b) or (q == i0 and not at_b)
-			_put_static(6, {"kind": "tunnel", "t": ti, "ia": q, "ib": qb, "cover": cover, "portal": portal, "at_b": qb == i1 and at_b, "pos": far + Vector2(1.6, 0.0)}, [])
+			_put_static(6, {"kind": "tunnel", "t": ti, "ia": q, "ib": qb, "cover": cover, "portal": portal, "at_b": qb == i1 and at_b, "pos": far + Vector2(1.6 + ROAD_GROW, 0.0)}, [])
 			q = qb
 
 
 func _draw_board(e: Dictionary) -> void:
 	var pz: Dictionary = e["pz"]
-	var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 1.45 * float(e["side"]), pz["z"])
+	var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (1.45 + ROAD_GROW) * float(e["side"]), pz["z"])
 	var ink := Color(0.1, 0.1, 0.15)
 	var yellow := Color(1.0, 0.82, 0.12)
 	draw_line(b + Vector2(-16, 0), b + Vector2(-16, -14), ink, 2.0)
@@ -1155,7 +1174,7 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
 			var sd := _stream_d(x, y)
-			if _rd(p) < 2.0 or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1 and y > life.rail_y0 - 1.0 and y < life.rail_y1 + 1.0):
+			if _rd(p) < 2.0 + ROAD_GROW or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1 and y > life.rail_y0 - 1.0 and y < life.rail_y1 + 1.0):
 				continue
 			var cc := cell_cliff[j * gw + i]
 			if cc == 2:
@@ -1213,7 +1232,7 @@ func _build_stream_geometry() -> void:
 			var p := Vector2(_stream_x(st, y), y)
 			var mid := (prev + p) * 0.5
 			k += 1
-			if _rd(mid) > 0.95 and mid.x > ox and mid.x < ox + gw:
+			if _rd(mid) > 0.95 + ROAD_GROW and mid.x > ox and mid.x < ox + gw:   # off the road: a ford's water covers it there
 				var nn := (p - prev).normalized()
 				var side := Vector2(-nn.y, nn.x) * (0.16 + 0.2 * clampf((y - float(st["y0"])) / 40.0, 0.0, 1.0))
 				var za := _tz(prev) + 1.5
@@ -1237,19 +1256,20 @@ func _build_road_geometry() -> void:
 		var ub := nrm[i + 1]
 		var za := elev[i] * vz + 1.5
 		var zb := elev[i + 1] * vz + 1.5
-		var edge := PackedVector2Array([Iso.to_screen(pa - ua * 0.64, za), Iso.to_screen(pb - ub * 0.64, zb),
-			Iso.to_screen(pb + ub * 0.64, zb), Iso.to_screen(pa + ua * 0.64, za)])
+		var edge := PackedVector2Array([Iso.to_screen(pa - ua * ROAD_HW, za), Iso.to_screen(pb - ub * ROAD_HW, zb),
+			Iso.to_screen(pb + ub * ROAD_HW, zb), Iso.to_screen(pa + ua * ROAD_HW, za)])
 		var pb2 := pb + (pb - pa).normalized() * 0.08   # overlap the next piece a little, so no seam shows between them
-		var gravel := PackedVector2Array([Iso.to_screen(pa - ua * 0.52, za + 0.3), Iso.to_screen(pb2 - ub * 0.52, zb + 0.3),
-			Iso.to_screen(pb2 + ub * 0.52, zb + 0.3), Iso.to_screen(pa + ua * 0.52, za + 0.3)])
+		var gravel_hw := 0.52 * ROAD_W   # the gravel, inside the dirt edge
+		var gravel := PackedVector2Array([Iso.to_screen(pa - ua * gravel_hw, za + 0.3), Iso.to_screen(pb2 - ub * gravel_hw, zb + 0.3),
+			Iso.to_screen(pb2 + ub * gravel_hw, zb + 0.3), Iso.to_screen(pa + ua * gravel_hw, za + 0.3)])
 		var ruts: Array = []
-		for off in [-0.25, 0.25]:
-			ruts.append(PackedVector2Array([Iso.to_screen(pa + ua * (off - 0.05), za + 0.5), Iso.to_screen(pb + ub * (off - 0.05), zb + 0.5),
-				Iso.to_screen(pb + ub * (off + 0.05), zb + 0.5), Iso.to_screen(pa + ua * (off + 0.05), za + 0.5)]))
+		for off in [-0.25 * ROAD_W, 0.25 * ROAD_W]:
+			ruts.append(PackedVector2Array([Iso.to_screen(pa + ua * (off - 0.07), za + 0.5), Iso.to_screen(pb + ub * (off - 0.07), zb + 0.5),
+				Iso.to_screen(pb + ub * (off + 0.07), zb + 0.5), Iso.to_screen(pa + ua * (off + 0.07), za + 0.5)]))
 		var pebbles := PackedVector2Array()
-		for k in 3:
+		for k in 6:   # more of them on the wider road, so it isn't bare
 			var f := fposmod(i * 0.618 + k * 0.29, 1.0)
-			var lat := fposmod(i * 0.377 + k * 0.53, 1.0) * 1.0 - 0.5
+			var lat := (fposmod(i * 0.377 + k * 0.382, 1.0) - 0.5) * ROAD_W
 			pebbles.append(Iso.to_screen(pa.lerp(pb, f) + ua * lat, lerpf(za, zb, f) + 0.6))
 		var snow := _snow_cover(pa.x, pa.y, elev[i] * vz / peak)
 		var seg := {"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2), "snow": snow,
@@ -1262,8 +1282,10 @@ func _build_road_geometry() -> void:
 			var col := Color(0.35, 0.65, 1.0) if g <= -0.02 else (Color(0.4, 0.85, 0.35) if g < 0.03 else (Color(1.0, 0.85, 0.2) if g < 0.06 else (Color(1.0, 0.5, 0.15) if g < 0.09 else Color(0.95, 0.2, 0.2))))
 			var chev: Array = []
 			for k in (2 if g >= 0.09 else 1):
-				var c := pa + t * (k * 0.32)
-				chev.append(PackedVector2Array([Iso.to_screen(c - t * 0.16 + n * 0.32, za + 0.6), Iso.to_screen(c + t * 0.16, za + 0.6), Iso.to_screen(c - t * 0.16 - n * 0.32, za + 0.6)]))
+				var c := pa + t * (k * 0.32 * ROAD_W)
+				var cl := 0.16 * ROAD_W   # half its length along the road
+				var cw := 0.32 * ROAD_W   # half its width across
+				chev.append(PackedVector2Array([Iso.to_screen(c - t * cl + n * cw, za + 0.6), Iso.to_screen(c + t * cl, za + 0.6), Iso.to_screen(c - t * cl - n * cw, za + 0.6)]))
 			seg["chev"] = chev
 			seg["chev_col"] = col
 		road_segs.append(seg)
@@ -1323,8 +1345,8 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 		var side := 1.0 if rng.randf() < 0.5 else -1.0
 		for q in group:
 			var ss := s + rng.randf_range(-6.0, 6.0)
-			var p: Vector2 = _pose(ss, side * rng.randf_range(1.8, 4.2))["pos"]
-			if _rd(p) < 1.4 or _in_tunnel(ss, 14.0):
+			var p: Vector2 = _pose(ss, side * (rng.randf_range(1.8, 4.2) + ROAD_GROW))["pos"]
+			if _rd(p) < 1.4 + ROAD_GROW or _in_tunnel(ss, 14.0):
 				continue
 			animals.append({"kind": kind, "pos": p, "home": p, "s": ss, "side": side, "state": "idle", "t": rng.randf() * 3.0,
 				"face": 1.0 if rng.randf() < 0.5 else -1.0, "vel": Vector2.ZERO, "phase": rng.randf() * TAU, "run": false,
@@ -1342,9 +1364,9 @@ func _build_givers(rng: RandomNumberGenerator) -> void:
 	var side := 1.0
 	while s < length - 120.0:
 		if _clear_of(s, 25.0):
-			givers.append({"s": s, "lat": side * 1.25, "shirt": shirts[rng.randi() % shirts.size()],
+			givers.append({"s": s, "lat": side * (1.25 + ROAD_GROW), "shirt": shirts[rng.randi() % shirts.size()],
 				"skin": Color(0.96, 0.8, 0.65).lerp(Color(0.55, 0.38, 0.28), rng.randf()), "hair": Color(0.3, 0.2, 0.1).lerp(Color(0.9, 0.8, 0.4), rng.randf()),
-				"phase": rng.randf() * TAU})
+				"phase": rng.randf() * TAU, "pu": PowerUps.pick(PowerUps.RACE)})
 			side = -side
 			s += rng.randf_range(300.0, 420.0)
 		else:
@@ -1364,17 +1386,20 @@ func _build_season() -> void:
 	while s < length - 40.0:
 		s += rng.randf_range(35.0, 80.0)
 		var side := 1.0 if rng.randf() < 0.5 else -1.0
-		var p: Vector2 = _pose(s, side * rng.randf_range(2.2, 4.0))["pos"]
-		if _rd(p) < 1.8 or _stream_d(p.x, p.y) < 1.2 or not _clear_of(s, 6.0) or _in_cliff(s, 8.0):
+		var p: Vector2 = _pose(s, side * (rng.randf_range(2.2, 4.0) + ROAD_GROW))["pos"]
+		if _rd(p) < 1.8 + ROAD_GROW or _stream_d(p.x, p.y) < 1.2 or not _clear_of(s, 6.0) or _in_cliff(s, 8.0):
 			continue
 		var kind: String = kinds[rng.randi() % kinds.size()]
 		if kind == "skier":
 			for k in 7:
 				var q := p + Vector2(0.8 if k % 2 == 0 else -0.8, k * 0.5)
-				if _rd(q) < 1.5 or _stream_d(q.x, q.y) < 0.8:
+				if _rd(q) < 1.5 + ROAD_GROW or _stream_d(q.x, q.y) < 0.8:
 					kind = "snowman"   # the run would cross the course or a creek
 		_put_static(2, {"kind": kind, "s": s, "pos": p, "z": _tz(p), "sd": rng.randi() % 100, "ph": rng.randf() * TAU,
 			"col": cols[rng.randi() % cols.size()]}, [p + Vector2(0, 3)] if kind == "skier" else [])
+
+
+var guest := {}                  # a guest rider for this race (the Tour de Crankmore champion), or {}
 
 
 func _build_riders() -> void:
@@ -1384,17 +1409,45 @@ func _build_riders() -> void:
 		"bike": b, "player": true, "phase": 0.0, "done": false, "time": 0.0, "mass": Game.weight_kg, "power": 0.0,
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
-	var n := Talk.rivals.size()
+	# a race with the champion brings out the whole roster, not just your usual rivals
+	var field: Array = Talk.roster if not guest.is_empty() and not rescue else Talk.rivals
+	var n := field.size()
 	for i in n:
-		var info: Dictionary = Talk.rivals[i]
+		var info: Dictionary = field[i]
 		var mass := Game.rival_mass(i)
-		var lane := (i - (n - 1) * 0.5) * 0.1 + 0.05
+		var lane := ((i - (n - 1) * 0.5) * 0.1 + 0.05) * ROAD_W   # spread across the road
 		riders.append({"name": info["name"], "short": info["short"], "color": info["color"], "frame": Color(info["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
-			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i,
+			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i if i < Talk.rivals.size() else -1, "sig": info["sig"],
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
+	if not guest.is_empty() and not rescue:
+		# the champion: CHAMPION_EDGE harder than the strongest rival here (idx -1: he talks for himself, see _say)
+		var top := 0.0
+		for r in riders:
+			if not r["player"]:
+				top = maxf(top, float(r["ftp"]) / float(r["mass"]))
+		var mass := 68.0
+		var lane := -0.45 * ROAD_W
+		riders.append({"name": guest["name"], "short": guest["short"], "color": guest["color"], "frame": Color(guest["color"]).lerp(Color.WHITE, 0.2),
+			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(guest), "player": false, "guest": true,
+			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": maxf(top, Game.wkg()) * Game.CHAMPION_EDGE * mass, "idx": -1,
+			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
+			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
+		Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
+
+
+## A rider says something: one of your usual rivals through Talk; the guest champion, or a rival who only came out for
+## his race, one of their own lines over their head.
+func _say(r: Dictionary, cat: String, force := false) -> void:
+	if int(r["idx"]) >= 0:
+		Talk.say(int(r["idx"]), cat, force)
+	elif force or randf() < 0.5:
+		var text: String = (guest["sig"] if r.get("guest", false) else r["sig"]).pick_random()
+		_pop(riders.find(r), text, r["color"])
+		Game.racer_says.emit(String(r["short"]).to_lower(), r["name"], text, Talk.MOODS.get(cat, "smug"), r["color"])
 
 
 # ---------------------------------------------------------------------
@@ -1551,7 +1604,7 @@ func _step_riders(delta: float) -> void:
 	var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
 	if not patrol.is_empty() and float(me["down"]) > 0.0:
 		steer = 0.0   # lying in the road while the ski patrol sees to you
-	me["lat"] = clampf(me["lat"] + steer * 1.1 * delta, -0.4, 0.4)
+	me["lat"] = clampf(me["lat"] + steer * 1.1 * ROAD_W * delta, -0.4 * ROAD_W, 0.4 * ROAD_W)
 	me["s"] += me["v"] * delta
 	if me["s"] >= road_len:
 		me["s"] = road_len
@@ -1599,7 +1652,7 @@ func _step_riders(delta: float) -> void:
 		if float(r["air"]) <= 0.0:
 			r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
 		r["s"] += r["v"] * delta
-		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.08
+		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.08 * ROAD_W
 		r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 		_terrain_events(k, delta)
 		if r["s"] >= length:
@@ -1679,7 +1732,7 @@ func _draft(i: int) -> float:
 		if o["done"] or float(o["down"]) > 0.0:   # nobody to hide behind
 			continue
 		var d: float = o["s"] - me["s"]
-		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35:
+		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35 * ROAD_W:   # the same line, on the wider road's wider lanes
 			return draft_saving(float(me["v"]) * 3.6)
 	return 0.0
 
@@ -1708,19 +1761,23 @@ func _tick_powerups(k: int, delta: float) -> void:
 	if r["pu"] != "":
 		r["pu_hold"] = float(r["pu_hold"]) + delta
 	while int(r["gv"]) < givers.size() and float(r["s"]) >= float(givers[int(r["gv"])]["s"]):
+		var g: Dictionary = givers[int(r["gv"])]
 		r["gv"] = int(r["gv"]) + 1
 		if r["pu"] == "" and float(r["down"]) <= 0.0:
-			r["pu"] = PowerUps.pick(PowerUps.RACE)
+			# what they were holding up, and then they hold up another one for whoever's next
+			r["pu"] = g["pu"]
+			g["pu"] = PowerUps.pick(PowerUps.RACE, r["pu"])
 			r["pu_hold"] = 0.0
 			if r["player"]:
 				Game.toast.emit("POWER-UP: %s! Press Y." % PowerUps.label(r["pu"]), PowerUps.col(r["pu"]))
 
 
-## Metres between two riders, counting the sideways gap across the road.
+## Metres between two riders, counting the sideways gap across the road (as it was before the road was widened, so a
+## rival a lane or two over is in reach as before).
 func _gap_m(a: int, b: int) -> float:
 	var ra: Dictionary = riders[a]
 	var rb: Dictionary = riders[b]
-	return Vector2(float(rb["s"]) - float(ra["s"]), (float(rb["lat"]) - float(ra["lat"])) * M_PER_TILE).length()
+	return Vector2(float(rb["s"]) - float(ra["s"]), (float(rb["lat"]) - float(ra["lat"])) / ROAD_W * M_PER_TILE).length()
 
 
 func _nearest_opponent(k: int, within: float) -> int:
@@ -1728,6 +1785,20 @@ func _nearest_opponent(k: int, within: float) -> int:
 	var bd := within
 	for o in riders.size():
 		if o == k or riders[o]["done"] or float(riders[o]["down"]) > 0.0:
+			continue
+		var d := _gap_m(k, o)
+		if d < bd:
+			bd = d
+			best = o
+	return best
+
+
+## The nearest rider to `k` within the Oven Mitt's reach who's holding a power-up (-1 if none).
+func _mitt_target(k: int) -> int:
+	var best := -1
+	var bd := PowerUps.MITT_RANGE_M
+	for o in riders.size():
+		if o == k or riders[o]["done"] or riders[o]["pu"] == "":
 			continue
 		var d := _gap_m(k, o)
 		if d < bd:
@@ -1746,10 +1817,27 @@ func _use_powerup(k: int) -> bool:
 			var v := _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M)
 			if v < 0:
 				if r["player"]:
-					Game.toast.emit("Nobody within 5 m. Get closer to a rival, then toss!", Color(1.0, 0.8, 0.5))
+					Game.toast.emit("Nobody within %d m. Get closer to a rival, then toss!" % int(PowerUps.FRISBEE_RANGE_M), Color(1.0, 0.8, 0.5))
 				return false
 			frisbees.append({"from": k, "to": v, "u": 0.0})
 			Sprites.start_throw("YOU" if r["player"] else str(r["short"]))
+		"mitt":
+			# snatch the power-up off the nearest rider within reach who has one (and it's yours to use)
+			var v := _mitt_target(k)
+			if v < 0:
+				if r["player"]:
+					Game.toast.emit("Nobody with a power-up within %d m. Get closer, then grab!" % int(PowerUps.MITT_RANGE_M), Color(1.0, 0.8, 0.5))
+				return false
+			var o: Dictionary = riders[v]
+			r["pu"] = o["pu"]
+			r["pu_hold"] = 0.0
+			o["pu"] = ""
+			_pop(k, "OVEN MITT!", PowerUps.col(kind))
+			if r["player"]:
+				Game.toast.emit("OVEN MITT! You snatched %s's %s. Press Y." % [o["short"], PowerUps.label(r["pu"])], PowerUps.col(r["pu"]))
+			elif o["player"]:
+				Game.toast.emit("%s snatched your %s with an Oven Mitt!" % [r["short"], PowerUps.label(r["pu"])], Color(1.0, 0.45, 0.35))
+			return true
 		"socks":
 			r["socks"] = PowerUps.SOCKS_TIME
 			_pop(k, "FIRE SOCKS!", PowerUps.col(kind))
@@ -1771,6 +1859,8 @@ func _rival_wants(k: int) -> bool:
 	match r["pu"]:
 		"frisbee":
 			return _nearest_opponent(k, PowerUps.FRISBEE_RANGE_M) >= 0
+		"mitt":
+			return _mitt_target(k) >= 0
 		"socks":
 			return _grade_at(r["s"]) > 0.03 or hold > 12.0
 		"breadsticks":
@@ -1787,9 +1877,9 @@ func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
 	if r["player"]:
 		Game.toast.emit("%s %s! Down for %d s." % [riders[by]["short"], how, int(secs)], Color(1.0, 0.45, 0.35))
-		Talk.say(int(riders[by]["idx"]), "pu_hit_player", true)
+		_say(riders[by], "pu_hit_player", true)
 	elif riders[by]["player"]:
-		Talk.say(int(r["idx"]), "pu_ouch", true)
+		_say(r, "pu_ouch", true)
 
 
 ## The bear caught you: you wipe out and are down BEAR_DOWN seconds while the ski patrol swaps your bike for a new
@@ -1921,7 +2011,7 @@ func _squash() -> void:
 			var rb: Dictionary = riders[b]
 			if b == a or float(rb["bread"]) > 0.0 or float(rb["down"]) > 0.0 or rb["done"]:
 				continue
-			if absf(float(rb["s"]) - float(ra["s"])) < 1.8 and absf(float(rb["lat"]) - float(ra["lat"])) < 0.4:
+			if absf(float(rb["s"]) - float(ra["s"])) < 1.8 and absf(float(rb["lat"]) - float(ra["lat"])) < 0.4 * ROAD_W:
 				_knock_down(b, PowerUps.SQUASH_TIME, a, "flattened you with breadstick power")
 
 
@@ -1934,7 +2024,7 @@ func _step_animals(delta: float) -> void:
 	var ms: float = me["s"]
 	for a in animals:
 		var ds: float = float(a["s"]) - ms
-		if absf(ds) > 120.0 and a["state"] != "chase":
+		if absf(ds) > 120.0 and not a["state"] in ["rouse", "chase", "swipe"]:
 			continue
 		a["t"] = float(a["t"]) - delta
 		a["phase"] = float(a["phase"]) + delta
@@ -1948,10 +2038,17 @@ func _step_animals(delta: float) -> void:
 							_animal_cross(a)
 						elif ds < (5.0 if kind in SMALL_FLEERS else 9.0) and ds > -3.0:
 							_animal_flee(a, 1.4)
-					elif kind == "bear" and ds < 4.0 and ds > -4.0 and not me["done"]:
-						a["state"] = "chase"
-						a["cs"] = ms - 10.0
-						a["t"] = 6.5
+					elif kind == "bear" and ds <= 0.0 and ds > -3.0 and not me["done"]:
+						# you've just gone by: it rears up and roars where it stands, then comes after you from there
+						var at := _pose(a["s"], 0.0)
+						a["state"] = "rouse"
+						a["lat0"] = ((a["pos"] as Vector2) - (at["pos"] as Vector2)).dot(at["n"])
+						a["cs"] = float(a["s"])
+						a["bv"] = 0.0
+						a["run_t"] = 0.0
+						a["t"] = BEAR_ROUSE
+						a["vel"] = Vector2.ZERO
+						_face(a, (_pose(ms, 0.0)["pos"] as Vector2) - a["pos"])
 						a["done"] = true
 						_pop_at(a["pos"], "ROAR!", Color(1.0, 0.4, 0.3))
 						Game.toast.emit("BEAR! PEDAL!!", Color(1.0, 0.45, 0.3))
@@ -1977,25 +2074,51 @@ func _step_animals(delta: float) -> void:
 						a["state"] = "idle"
 						a["home"] = a["pos"]
 						a["vel"] = Vector2.ZERO
-				elif a["state"] == "cross" and not a.get("whoa", false) and absf(ds) < 2.5 and _rd(a["pos"]) < 0.7 and not me["done"]:
+				elif a["state"] == "cross" and not a.get("whoa", false) and absf(ds) < 2.5 and _rd(a["pos"]) < 0.7 + ROAD_GROW and not me["done"]:
 					a["whoa"] = true
 					me["v"] = float(me["v"]) * 0.85
 					_pop(0, "WHOA!", Color(1.0, 0.6, 0.3))
-			"chase":
-				a["run"] = true
-				var cs: float = a["cs"]
-				var vb := clampf(float(me["v"]) * 1.04 + 0.35, 2.5, 10.0)
-				cs += vb * delta
+			"rouse":
+				a["run"] = false
+				if float(a["t"]) <= 0.0:
+					a["state"] = "chase"
+					a["t"] = BEAR_CHASE
+			"chase", "swipe":
+				# as fast as you'd go at BEAR_FTP of your FTP here, on your bike: below that it gains on you
+				var bk: Dictionary = me["bike"]
+				var top := Game.speed_from_power(Game.ftp * BEAR_FTP, bk["mass"], bk["cda"], _crr(bk), _grade_at(a["cs"]))
+				a["bv"] = move_toward(float(a["bv"]), top * (0.35 if a["state"] == "swipe" else 1.0), BEAR_ACCEL * delta)
+				var cs: float = float(a["cs"]) + float(a["bv"]) * delta
 				a["cs"] = cs
 				a["s"] = cs
-				var pz := _pose(cs, float(a["side"]) * 0.3)
-				var np: Vector2 = pz["pos"]
-				_face(a, np - a["pos"])
+				# off its spot by the trail and onto the course over the first couple of seconds
+				a["run_t"] = float(a["run_t"]) + delta
+				var lat := lerpf(float(a["lat0"]), float(a["side"]) * 0.3 * ROAD_W, smoothstep(0.0, 2.0, float(a["run_t"])))
+				var np: Vector2 = _pose(cs, lat)["pos"]
+				if a["state"] == "chase":
+					_face(a, np - a["pos"])
 				a["pos"] = np
 				a["vel"] = Vector2.ZERO
-				if ms - cs < 1.6 and not me["done"] and float(me["down"]) <= 0.0:
-					_bear_wipeout()
-					a["t"] = 0.0
+				var gap := ms - cs
+				if a["state"] == "chase":
+					a["run"] = true
+					if gap < BEAR_REACH and gap > -1.0 and not me["done"] and float(me["down"]) <= 0.0:
+						a["state"] = "swipe"
+						a["sw"] = 0.0
+						a["hit"] = false
+						a["phase"] = 0.0   # the swipe plays from its first frame
+				else:
+					a["run"] = false
+					a["sw"] = float(a["sw"]) + delta
+					if not a["hit"] and float(a["sw"]) >= BEAR_HIT:
+						a["hit"] = true
+						if gap < BEAR_REACH + 0.6 and gap > -1.0 and not me["done"] and float(me["down"]) <= 0.0:
+							_bear_wipeout()
+							a["t"] = 0.0
+						else:
+							_pop_at(a["pos"], "WHIFF!", Color(1.0, 0.85, 0.5))
+					if float(a["sw"]) >= BEAR_SWIPE:
+						a["state"] = "chase"
 				if float(a["t"]) <= 0.0 or me["done"]:
 					a["state"] = "roar"
 					a["t"] = 1.8
@@ -2004,7 +2127,7 @@ func _step_animals(delta: float) -> void:
 				a["run"] = false
 				if float(a["t"]) <= 0.0:
 					a["state"] = "idle"
-					a["home"] = _pose(a["s"], float(a["side"]) * 2.5)["pos"]
+					a["home"] = _pose(a["s"], float(a["side"]) * (2.5 + ROAD_GROW))["pos"]
 					a["t"] = 0.0
 		var vel: Vector2 = a["vel"]
 		if vel.length() > 0.01:
@@ -2016,10 +2139,12 @@ func _face(a: Dictionary, dir: Vector2) -> void:
 	var sx := dir.x - dir.y
 	if absf(sx) > 0.001:
 		a["face"] = signf(sx)
+	if dir.length() > 0.001:
+		a["wdir"] = dir.normalized()   # the way it's heading, for the 8-direction art (Sprites.draw_animal)
 
 
 func _animal_cross(a: Dictionary) -> void:
-	var target: Vector2 = _pose(float(a["s"]) + 2.0, -float(a["side"]) * 3.2)["pos"]
+	var target: Vector2 = _pose(float(a["s"]) + 2.0, -float(a["side"]) * (3.2 + ROAD_GROW))["pos"]
 	var speed: float = CROSS_SPEED.get(a["kind"], 3.5)
 	a["state"] = "cross"
 	a["vel"] = (target - a["pos"]).normalized() * speed
@@ -2061,9 +2186,9 @@ func _finish(i: int) -> void:
 		else:
 			for o in riders:
 				if o.get("place", 0) == 1 and not o["player"]:
-					Talk.say(int(o["idx"]), "race_lose_player", true)
+					_say(o, "race_lose_player", true)
 	elif finish_count == 1:
-		Talk.say(int(r["idx"]), "race_win_rival", true)
+		_say(r, "race_win_rival", true)
 
 
 func _banter() -> void:
@@ -2079,9 +2204,9 @@ func _banter() -> void:
 		if last_swap.has(k) and last_swap[k]["ahead"] != sign_now and clock - last_swap[k]["t"] > 6.0 and absf(r["s"] - me["s"]) < 20.0:
 			last_swap[k] = {"ahead": sign_now, "t": clock}
 			if sign_now:
-				Talk.say(int(r["idx"]), "race_pass_player")
+				_say(r, "race_pass_player")
 			else:
-				Talk.say(int(r["idx"]), "race_player_pass")
+				_say(r, "race_player_pass")
 		elif not last_swap.has(k):
 			last_swap[k] = {"ahead": sign_now, "t": clock}
 	if leader:
@@ -2116,7 +2241,7 @@ func _end_race() -> void:
 		return a["s"] > b["s"])
 	var place := order.find(riders[0]) + 1
 	var shares := [1.0, 0.5, 0.3, 0.15, 0.0, 0.0, 0.0, 0.0]
-	var prize := int(float(course["prize"]) * shares[place - 1])
+	var prize := int(float(course["prize"]) * shares[place - 1]) if place <= shares.size() else 0
 	var names: Array = []
 	for r in order:
 		names.append(r["name"])
@@ -2125,7 +2250,17 @@ func _end_race() -> void:
 	Game.add_money(prize)
 	Game.damage_bike(12.0)
 	Game.save_game()
-	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"]})
+	var champ := -1   # where the guest champion came, if he raced
+	for k in order.size():
+		if order[k].get("guest", false):
+			champ = k + 1
+	var new_bike := false
+	if champ > 0 and place < champ:   # you beat the champion: his bonus, and his bike
+		Game.add_money(Game.CHAMPION_BONUS)
+		new_bike = Game.give_bike(Game.CHAMPION_BIKE)
+		Game.save_game()
+	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
+		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike})
 
 
 # ---------------------------------------------------------------------
@@ -2552,11 +2687,11 @@ func _draw_deco(e: Dictionary) -> void:
 			var n: Vector2 = pz["n"]
 			var along := Vector2(-n.y, n.x)   # the way the riders go
 			var b := Iso.to_screen(pz["pos"], pz["z"])
-			Sprites.draw_vehicle(self, "obj_race_arch", b + Vector2(0, -34), along)
+			_wide(b, pz, ROAD_W, func(): Sprites.draw_vehicle(self, "obj_race_arch", b + Vector2(0, -34), along))
 			draw_string(font, b + Vector2(-60, -88), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 120.0, 12, Color(0.15, 0.15, 0.2) if e["label"] == "START" else Color.WHITE)
 		"sign":
 			var pz: Dictionary = e["pz"]
-			var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 1.1, pz["z"])
+			var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (1.1 + ROAD_GROW), pz["z"])
 			Sprites.draw_image(self, "scenery_sign_marker", b)
 			draw_string(font, b + Vector2(-24, -33), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 48.0, 8, Color(0.1, 0.1, 0.15))
 		"board":
@@ -2569,15 +2704,19 @@ func _draw_deco(e: Dictionary) -> void:
 			_draw_chevron(e)
 		"warn":
 			var pz: Dictionary = e["pz"]
-			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))
+			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (0.95 + ROAD_GROW) * float(e["side"]), pz["z"]))
 		"fan":
+			if e.get("run", "") != "":   # off running with you (RaceLife._step_runners)
+				return
 			var b := Iso.to_screen(e["pos"], e["z"])
 			# their costume if nobody on screen has it yet, else whoever's free (nobody shows up twice; see Sprites.cast)
 			if e.has("design") and not e.has("looks"):
 				e["looks"] = [e["design"]] + Sprites._order(e)
 			var design := Sprites.cast(e, e.get("looks", []))
 			if design != "":
-				Sprites.draw_cheer(self, "ped_%s_cheer" % design, b, t_ + (e["pos"] as Vector2).x * 0.37)
+				# right by you, fans switch to one of their other cheers (Sprites.PASS_MOVES), each their own
+				var by_you: bool = absf(float(riders[0]["s"]) - float(e["s"])) < 12.0
+				Sprites.draw_any_cheer(self, design, b, t_ + (e["pos"] as Vector2).x * 0.37, int((e["pos"] as Vector2).x * 7.0) + 1 if by_you else 0)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])
 		"skier":
@@ -2646,22 +2785,30 @@ func _draw_obstacle(ob: Dictionary) -> void:
 	var s: float = ob["s"]
 	match ob["kind"]:
 		"jump":
-			var j0 := _pose(s - 1.2, 0.0)
-			var j1 := _pose(s + 1.2, 0.0)
-			Sprites.draw_vehicle(self, "obj_dirt_jump", _sp(j0, 6.0), (j1["pos"] as Vector2) - (j0["pos"] as Vector2))
+			# kickers side by side across the wider road (one used to do), the far one first
+			var pp: Vector2 = _pose(s, 1.0)["pos"]
+			var pm: Vector2 = _pose(s, -1.0)["pos"]
+			var lats: Array = [-0.3 * ROAD_HW, 0.3 * ROAD_HW] if pp.x + pp.y > pm.x + pm.y else [0.3 * ROAD_HW, -0.3 * ROAD_HW]
+			for lat in lats:
+				var j0 := _pose(s - 1.2, lat)
+				var j1 := _pose(s + 1.2, lat)
+				Sprites.draw_vehicle(self, "obj_dirt_jump", _sp(j0, 6.0), (j1["pos"] as Vector2) - (j0["pos"] as Vector2))
 		"log":
+			# right across the road, its ends sticking out past the edges as far as ever
 			var flip := -1.0 if ob.get("flip", false) else 1.0
-			var pa := _pose(s, -1.35 * flip)
-			var pb := _pose(s, 1.55 * flip)
+			var pa := _pose(s, (-1.35 - ROAD_GROW) * flip)
+			var pb := _pose(s, (1.55 + ROAD_GROW) * flip)
 			var mid := _pose(s, 0.1 * flip)
-			Sprites.draw_vehicle(self, "obj_fallen_log", _sp(mid, 6.0), (pb["pos"] as Vector2) - (pa["pos"] as Vector2))
+			var at := _sp(mid, 6.0)
+			_wide(Iso.to_screen(mid["pos"], mid["z"]), mid, (2.9 + 2.0 * ROAD_GROW) / 2.9,
+				func(): Sprites.draw_vehicle(self, "obj_fallen_log", at, (pb["pos"] as Vector2) - (pa["pos"] as Vector2)))
 		"ford":
 			var left := PackedVector2Array()
 			var right := PackedVector2Array()
 			for q in 5:
 				var ss := s - FORD_HALF + FORD_HALF * 2.0 * q / 4.0
-				left.append(_sp(_pose(ss, -1.0), 0.2))
-				right.append(_sp(_pose(ss, 1.0), 0.2))
+				left.append(_sp(_pose(ss, -1.0 - ROAD_GROW), 0.2))
+				right.append(_sp(_pose(ss, 1.0 + ROAD_GROW), 0.2))
 			right.reverse()
 			var poly := left + right
 			if Season.bare() or Ground.tex("water_creek") == null:
@@ -2671,12 +2818,26 @@ func _draw_obstacle(ob: Dictionary) -> void:
 			for q in 3:
 				var u := fposmod(t_ * 0.5 + q / 3.0, 1.0)
 				var ss := s - FORD_HALF + FORD_HALF * 2.0 * u
-				draw_line(_sp(_pose(ss, -0.8), 0.4), _sp(_pose(ss, 0.8), 0.4), Color(0.85, 0.95, 1.0, 1.0 - absf(u - 0.5) * 2.0), 1.0)
-			for lat in [-0.85, 0.9]:
+				draw_line(_sp(_pose(ss, -0.8 - ROAD_GROW), 0.4), _sp(_pose(ss, 0.8 + ROAD_GROW), 0.4), Color(0.85, 0.95, 1.0, 1.0 - absf(u - 0.5) * 2.0), 1.0)
+			for lat in [-0.85 - ROAD_GROW, 0.9 + ROAD_GROW]:
 				for k in 2:
 					var rp := _sp(_pose(s + (k - 0.5) * 2.0, lat))
 					draw_rect(Rect2(rp - Vector2(3, 2), Vector2(6, 4)), Iso.OUTLINE)
 					draw_rect(Rect2(rp - Vector2(2, 1), Vector2(4, 2)), Color(0.66, 0.64, 0.6))
+
+
+## Draws `fn` (something standing on the road at screen point `at`, across the road at `pz`) `k` times as wide: stretched
+## sideways on screen and sheared so it still lines up across the road, uprights kept upright and as tall.
+func _wide(at: Vector2, pz: Dictionary, k: float, fn: Callable) -> void:
+	var n: Vector2 = pz["n"]
+	var ns := Vector2((n.x - n.y) * Iso.TW * 0.5, (n.x + n.y) * Iso.TH * 0.5)   # the road's normal on screen
+	if absf(ns.x) < 0.3 * ns.length():   # the road runs across the screen: nothing sideways to stretch
+		fn.call()
+		return
+	var m := Transform2D(Vector2(k, ns.y / ns.x * (k - 1.0)), Vector2(0, 1), Vector2.ZERO)
+	draw_set_transform_matrix(Transform2D(0.0, at) * m * Transform2D(0.0, -at))
+	fn.call()
+	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 ## A soft oval shadow on the ground.
@@ -2700,11 +2861,25 @@ func _draw_animal(a: Dictionary) -> void:
 	var base := Iso.to_screen(p, _tz(p) + 1.5).round()
 	var kind: String = a["kind"]
 	var look := "run" if a["run"] else "idle"
-	if kind == "bear" and a["state"] == "roar":
+	if kind == "bear" and a["state"] in ["roar", "rouse"]:
 		look = "roar"
+	elif kind == "bear" and a["state"] == "swipe" and Sprites.sheet("animal_bear_swipe") != null:
+		look = "swipe"
 	var tint := Color(0.5, 0.46, 0.46) if kind == "bear" and a["dark"] else Color.WHITE
 	_shadow(base, ANIMAL_SHADOW.get(kind, 14.0))
-	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t_ + float(a["phase"]), 14.0 if look == "run" else 8.0, true, float(a["face"]) < 0.0, tint)
+	var t := float(a["sw"]) if look == "swipe" else t_ + float(a["phase"])   # the swipe plays once, from the start
+	var fps := 14.0 if look == "run" else (_swipe_fps() if look == "swipe" else 8.0)
+	if look in ["roar", "swipe"]:   # (side-on only)
+		Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t, fps, true, float(a["face"]) < 0.0, tint)
+	else:
+		var w: Vector2 = a.get("wdir", Vector2(float(a["face"]), -float(a["face"])).normalized())
+		Sprites.draw_animal(self, kind, look, base, w, t, fps, tint, a)
+
+
+## Frames a second for the bear's swipe, so the whole strip plays once in BEAR_SWIPE.
+func _swipe_fps() -> float:
+	var tex := Sprites.sheet("animal_bear_swipe")
+	return float(tex.get_width() / tex.get_height()) / BEAR_SWIPE * 0.999
 
 
 ## A pair of eagles circling high over the course (art/animal_eagle_fly.png).
@@ -2806,6 +2981,7 @@ func _draw_rider(k: int, pz: Dictionary) -> void:
 func _draw_giver(g: Dictionary, gp: Dictionary) -> void:
 	var ground := Iso.to_screen(gp["pos"], gp["z"])
 	Sprites.draw_strip(self, "giver_%s_wave" % ("red" if int(float(g["phase"]) * 10.0) % 2 == 0 else "blue"), ground, t_ + float(g["phase"]), 8.0)
+	PowerUps.draw_held(self, ground, g["pu"], t_ + float(g["phase"]))
 
 
 func _wrap(text: String, width: int) -> Array:

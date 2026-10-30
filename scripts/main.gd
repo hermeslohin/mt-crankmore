@@ -603,10 +603,18 @@ func _on_interact(kind: String) -> void:
 	match kind:
 		"bike":
 			hud.open_menu(_bike_shop_menu)
+			_mechanic_says(["Welcome to Spokes & Stuff! Mind the grease.", "Back again? What did you break this time?",
+				"Looking for something faster? Or something that still has two wheels?", "Ah, my favourite customer. Kind of."].pick_random(),
+				"annoyed" if Game.hp_ratio() < 0.5 else "happy")
 		"race":
 			hud.open_menu(_race_menu)
 		"rescue":
 			_start_rescue()
+
+
+## The mechanic at Spokes & Stuff says something, in the message box with his face (art/face_mechanic.png).
+func _mechanic_says(text: String, mood := "happy") -> void:
+	Game.racer_says.emit("mechanic", "Mechanic", text, mood, Color(0.6, 0.9, 1.0))
 
 
 func _bike_shop_menu() -> Dictionary:
@@ -636,20 +644,34 @@ func _bike_shop_menu() -> Dictionary:
 			fn = func():
 				if Game.buy_bike(i):
 					Game.toast.emit("New ride: %s!" % b["name"], Color(0.5, 1.0, 0.6))
+					_mechanic_says(["She's a beauty. Try not to get her hit by a car.", "Good choice! Tyres are pumped, chain's oiled.",
+						"Ooh, the %s. Ride it like you stole it. But you didn't. You paid." % b["name"]].pick_random(), "happy")
 					Talk.say_random("new_bike", true)
 		var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
 		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
 		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail})
+	var hurt := Game.needs_repair()
 	var rc := Game.repair_cost()
-	items.append({"label": ("Repair bike   $%d" % rc) if rc > 0 else "Repair bike   (already perfect)",
-		"fn": func(): Game.repair(), "enabled": rc > 0 and Game.money >= rc,
-		"detail": "Fresh tape, fresh grease. Bike HP %d / %d." % [int(Game.bike_hp()), int(Game.bike()["hp"])]})
+	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
+	items.append({"label": ("Repair bike   FREE" if pity else "Repair bike   $%d" % rc) if hurt else "Repair bike   (already perfect)",
+		"fn": func():
+			if Game.repair():
+				if pity:
+					_mechanic_says(Game.MECHANIC_PITY.pick_random(), "shocked")
+				else:
+					_mechanic_says(["Good as new. Well, nearly.", "Trued the wheels, bled the brakes. You're welcome.", "There. Now please stop hitting cars."].pick_random(), "smug"),
+		"enabled": hurt and Game.money >= rc,
+		"detail": ("The mechanic looks at you, then at the Rusty Trash Bike, and winces. \"You look like you need help. Let me fix that for you, no charge.\"\nBike HP %d / %d." if pity
+			else "Fresh tape, fresh grease. Bike HP %d / %d.") % [int(Game.bike_hp()), int(Game.bike()["hp"])]})
 	items.append({"label": "Leave", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Spokes & Stuff Bike Shop", "sub": "Cash: $%d.   \"Careful out there. The cars don't brake for dreams.\"" % Game.money, "items": items}
 
 
 func _race_menu() -> Dictionary:
 	var items: Array = []
+	if city.champion_left > 0.0:   # the Tour de Crankmore champion is in town (see City._update_champion)
+		items.append({"label": "RACE %s, THE TOUR DE CRANKMORE CHAMPION!" % Game.CHAMPION["name"].to_upper(), "fn": func(): hud.open_menu(_champion_menu),
+			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
@@ -657,6 +679,17 @@ func _race_menu() -> Dictionary:
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
+
+
+func _champion_menu() -> Dictionary:
+	var items: Array = []
+	for i in race.COURSES.size():
+		var c: Dictionary = race.COURSES[i]
+		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
+			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
+	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
+	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
@@ -676,8 +709,11 @@ func _start_rescue() -> void:
 	cam.position = race.cam_target()
 
 
-func _start_race(i: int) -> void:
+func _start_race(i: int, champion := false) -> void:
 	race.rescue = false
+	race.guest = Game.CHAMPION if champion else {}
+	if champion:
+		city.champion_left = 0.0   # he's raced you: off he goes after
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -704,8 +740,17 @@ func _on_race_finished(result: Dictionary) -> void:
 		for i in result["order"].size():
 			lines += "%d. %s\n" % [i + 1, result["order"][i]]
 		var t: float = result["time"]
-		return {"title": "%s: you placed #%d!" % [result["course"], result["place"]],
-			"sub": "Time %d:%04.1f     Prize: $%d\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], lines],
+		var title := "%s: you placed #%d!" % [result["course"], result["place"]]
+		var reward := ""
+		if result.get("beat_champion", false):
+			title = "You beat %s, the Tour de Crankmore champion! #%d on %s" % [Game.CHAMPION["name"], result["place"], result["course"]]
+			reward = "\nChampion's bonus: $%d" % Game.CHAMPION_BONUS
+			reward += ("\nHe hands you his bike: the CHAMPION'S BIKE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
+				else "\n(You've already got his bike.)")
+		elif result.get("champion", false):
+			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
+		return {"title": title,
+			"sub": "Time %d:%04.1f     Prize: $%d%s\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 
 
@@ -1180,6 +1225,8 @@ func _debug_powerups() -> void:
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	var save := func(file: String) -> void:
+		if DisplayServer.get_name() == "headless":   # (nothing's drawn: just the printout)
+			return
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/%s" % [out, file])
 	Trainer._autostart_clock = 0.0   # leave a real trainer alone
@@ -1201,8 +1248,20 @@ func _debug_powerups() -> void:
 			city._post_order()
 		if kind == "wrench":
 			Game.hp[Game.equipped] = 10.0
+		if kind == "mitt":   # the rival's out delivering a pizza for you to snatch
+			city.carry = {}
+			if city.orders.is_empty():
+				city._post_order()
+			var o: Dictionary = city.orders[0]
+			o["state"] = "rival"
+			o["rival"] = 0
+			r["order"] = o["id"]
+			r["state"] = "to_dest"
+			r["path"] = [city.p_pos + city.p_fwd * 1.0]
 		city.pu = kind
 		city._use_powerup(-1)
+		if kind == "mitt":
+			print("TOWN mitt: carry=%s rival_state=%s" % [not city.carry.is_empty(), r["state"]])
 		await get_tree().create_timer(0.7).timeout
 		cam.position = city.cam_target()
 		print("TOWN %s: active=%s used=%s rival_stun=%.1f hp=%d socks=%.1f bread=%.1f mascots=%d carry=%s" % [kind, city.active, city.pu == "",
@@ -1219,6 +1278,22 @@ func _debug_powerups() -> void:
 	await get_tree().process_frame
 	print("TOWN squash: rival_stun=%.1f" % rv["stun"])
 	city.bread_t = 0.0
+	# a giver hands over what they're holding up and holds up a different one
+	var gv: Dictionary = city.peds.filter(func(q): return q["giver"])[0]
+	gv["state"] = "ready"
+	gv["pos"] = city.p_pos + city.p_fwd * 0.5
+	city.pu = ""
+	city.p_down = 0.0
+	var held: String = gv["pu"]
+	await get_tree().process_frame
+	await get_tree().process_frame
+	print("TOWN giver: held %s, you got %s, now holds %s (%s)" % [held, city.pu, gv["pu"], gv["state"]])
+	await get_tree().create_timer(2.0).timeout
+	print("TOWN giver after: %s holding %s" % [gv["state"], gv["pu"]])
+	gv["pos"] = city.p_pos + city.p_fwd * 2.5 + Vector2(-city.p_fwd.y, city.p_fwd.x) * 1.2
+	city.pu = "socks"
+	await save.call("pu_town_giver.png")
+	city.pu = ""
 	# let the rivals loose: they should grab and use power-ups themselves
 	var grabbed := 0
 	var seen := {}
@@ -1251,7 +1326,11 @@ func _debug_powerups() -> void:
 		r["down"] = 0.0
 		me["down"] = 0.0
 		me["pu"] = kind
+		if kind == "mitt":
+			r["pu"] = "socks"
 		race._use_powerup(0)
+		if kind == "mitt":
+			print("RACE mitt: you have %s, rival has '%s'" % [me["pu"], r["pu"]])
 		await get_tree().create_timer(0.7).timeout
 		cam.position = race.cam_target()
 		var downs: int = race.riders.filter(func(o): return float(o["down"]) > 0.0).size()

@@ -375,6 +375,128 @@ static func draw_strip(ci: CanvasItem, name: String, at: Vector2, t: float, fps 
 	return true
 
 
+## Each bystander's other ways of cheering you on as you ride past, besides jumping: the moves their art was made from,
+## art/ped_<design>_pass.png, _pass2.png, _pass3.png... in order (strips like _cheer; winter_ped_... in winter).
+## A move without art is skipped; with none they just jump.
+const PASS_MOVES := {
+	"kid": ["jumping fist pump", "victory V signs with both hands", "pointing at you and cheering"],
+	"tourist": ["waving a small flag", "spinning around once with arms out", "deep theatrical bow"],
+	"grandpa": ["thumbs up", "big two-arm wave", "salute"],
+	"lady": ["clapping overhead", "waving one arm in big circles", "throwing confetti"],
+	"teen": ["raise the roof", "victory V signs with both hands", "pointing at you and cheering"],
+	"grandma": ["waving a handkerchief", "deep theatrical bow", "pumping both fists"],
+	"dad_stroller": ["thumbs up", "salute", "doing the running man dance"],
+	"tourist_family": ["waving both arms", "throwing confetti", "double thumbs up"],
+	"norm_man_jeans": ["fist pump", "cupped hands shouting", "pointing at you and cheering"],
+	"norm_woman_sundress": ["blowing a kiss and waving", "pumping both fists", "jumping fist pump"],
+	"norm_man_plaid": ["flexing both biceps", "doing the running man dance", "dab"],
+	"norm_woman_jeans_jacket": ["double thumbs up", "dancing a little happy jig", "air punching"],
+	"norm_old_man_cane": ["raising his cane", "hands on head in amazement", "pointing at you and cheering"],
+	"norm_old_woman": ["clapping", "jumping fist pump", "shaking pom-pom fists"],
+	"norm_teen_girl": ["pointing at you and cheering", "dab", "blowing a kiss and waving"],
+	"norm_teen_boy": ["air guitar", "dancing a little happy jig", "raise the roof"],
+	"norm_student": ["waving a pennant flag", "pointing at you and cheering", "flexing both biceps"],
+	"norm_mom_bags": ["thumbs up", "shaking pom-pom fists", "bouncing on the spot clapping"],
+	"norm_man_suit_casual": ["salute", "blowing a kiss and waving", "clapping overhead"],
+	"norm_woman_sweater": ["cupped hands shouting", "air punching", "raise the roof"],
+	"norm_man_heavy": ["flexing both biceps", "high kick", "waving one arm in big circles"],
+	"norm_woman_tall": ["big two-arm wave", "bouncing on the spot clapping", "jumping jacks"],
+	"norm_couple_kid": ["fist pump", "clapping overhead", "spinning around once with arms out"],
+	"norm_man_shorts": ["waving a towel overhead", "raise the roof", "big two-arm wave"],
+	"norm_man_windbreaker": ["double fist pump", "high kick", "waving one arm in big circles"],
+	"norm_woman_cardigan": ["clapping overhead", "jumping jacks", "victory V signs with both hands"],
+	"norm_man_overalls": ["waving his cap", "spinning around once with arms out", "deep theatrical bow"],
+	"norm_woman_tracksuit": ["running in place and pumping fists", "big two-arm wave", "salute"],
+	"norm_man_bald_glasses": ["thumbs up", "waving one arm in big circles", "throwing confetti"],
+	"norm_woman_curly_hair": ["jumping star jump", "victory V signs with both hands", "pointing at you and cheering"],
+	"norm_teen_skater_plain": ["raise the roof", "deep theatrical bow", "pumping both fists"],
+	"norm_man_fleece": ["ringing a cowbell", "salute", "doing the running man dance"],
+	"norm_woman_office": ["waving a scarf", "throwing confetti", "double thumbs up"],
+	"norm_old_man_vest": ["salute", "cupped hands shouting", "pointing at you and cheering"],
+	"norm_woman_ponytail_runner_casual": ["fist pump", "pumping both fists", "bouncing on the spot clapping"],
+	"norm_man_denim_jacket": ["pointing at you", "doing the running man dance", "dab"],
+	"norm_woman_hat_scarf": ["waving her hat", "double thumbs up", "dancing a little happy jig"],
+	"norm_boy_kid": ["flexing both biceps", "hands on head in amazement", "pointing at you and cheering"],
+	"norm_man_tall_thin": ["big two-arm wave", "jumping fist pump", "high kick"],
+	"norm_woman_short_hair": ["double thumbs up", "dab", "blowing a kiss and waving"],
+	"grunge_teen": ["rock-on horns with both hands", "dancing a little happy jig", "air punching"],
+	"neon_windbreaker": ["waving a neon flag", "pointing at you and cheering", "flexing both biceps"],
+	"fanny_pack": ["thumbs up", "shaking pom-pom fists", "bouncing on the spot clapping"],
+	"mullet_dad": ["flexing both biceps", "blowing a kiss and waving", "clapping overhead"],
+	"scrunchie_girl": ["clapping", "air punching", "raise the roof"],
+	"bucket_hat_kid": ["jumping fist pump", "flexing both biceps", "high kick"],
+	"pager_guy": ["cupped hands shouting", "bouncing on the spot clapping", "jumping jacks"],
+	"jogger": ["running in place and pumping fists", "clapping overhead", "spinning around once with arms out"],
+	"hiker": ["raising trekking pole", "raise the roof", "big two-arm wave"],
+	"surfer": ["shaka sign with both hands", "high kick", "waving one arm in big circles"],
+	"artist": ["waving paintbrush", "jumping jacks", "victory V signs with both hands"],
+	"skater_kid": ["raise the roof", "spinning around once with arms out", "deep theatrical bow"],
+	"businesswoman": ["fist pump", "big two-arm wave", "salute"],
+	"doctor": ["thumbs up", "waving one arm in big circles", "throwing confetti"],
+	"musician": ["air guitar", "victory V signs with both hands", "pointing at you and cheering"],
+	"baker": ["waving rolling pin", "deep theatrical bow", "pumping both fists"],
+	"cyclist_fan": ["waving a big flag", "salute", "doing the running man dance"],
+	"photographer": ["taking a photo", "throwing confetti", "double thumbs up"],
+	"mailman": ["salute", "cupped hands shouting", "pointing at you and cheering"],
+	"nurse": ["double thumbs up", "pumping both fists", "jumping fist pump"],
+	"dogwalker": ["big wave", "doing the running man dance", "dab"],
+	"construction": ["flexing both biceps", "double thumbs up", "dancing a little happy jig"],
+	"sweeper": ["raising broom overhead", "hands on head in amazement", "pointing at you and cheering"],
+	"courier": ["fist pump", "holding the parcel up high and cheering", "bouncing on the spot clapping"],
+	"police": ["thumbs up", "dab", "blowing a kiss and waving"],
+	"gardener": ["waving trowel", "dancing a little happy jig", "air punching"],
+	"newsboy": ["waving newspaper", "pointing at you and cheering", "flexing both biceps"],
+	"crossing_guard": ["waving stop sign", "jumping up and down holding the stop sign", "free hand waving while holding the stop sign"],
+	"barista": ["raising coffee cup", "blowing a kiss and waving", "clapping overhead"],
+	"scout": ["salute", "air punching", "raise the roof"],
+	"balloon_vendor": ["waving balloons", "flexing both biceps", "high kick"],
+	"rollerblader": ["spinning and pointing", "bouncing on the spot clapping", "jumping jacks"],
+	"boombox": ["lifting boombox overhead", "spinning around once with arms out", "deep theatrical bow"],
+	"walkman_jogger": ["fist pump", "raise the roof", "big two-arm wave"],
+	"fan_sign": ["shaking the sign overhead", "bouncing on the spot holding the sign up high", "pumping the sign up and down overhead"],
+	"fan_flag": ["waving the flag in big circles", "jumping jacks", "victory V signs with both hands"],
+	"fan_cowbell": ["ringing cowbell overhead", "spinning around once with arms out", "deep theatrical bow"],
+	"fan_highfive_kid": ["holding out a hand for a high five", "big two-arm wave", "salute"],
+}
+const PASS_FPS := 8.0
+
+
+## An animal standing on `at`, heading `w` (a world direction): from art/animal_<kind>_<anim>8.png when there is one
+## (8 directions, rows as for people; made by tools/import_sprite.gd people), else the side-on strip
+## art/animal_<kind>_<anim>.png, facing right and mirrored to face left. `state`: its own dictionary, for smooth turning.
+static func draw_animal(ci: CanvasItem, kind: String, anim: String, at: Vector2, w: Vector2, t: float, fps: float, tint := Color.WHITE, state: Dictionary = {}) -> bool:
+	var dirs := "animal_%s_%s8" % [kind, anim]
+	if sheet(dirs) != null and w.length() > 0.001:
+		return draw_person(ci, dirs, at, w, t, fps, tint, state)
+	return draw_strip(ci, "animal_%s_%s" % [kind, anim], at, t, fps, true, w.x - w.y < 0.0, tint)
+
+
+## One of a bystander's other cheers (move `k` of PASS_MOVES). False when there is no art for it.
+static func draw_pass(ci: CanvasItem, design: String, at: Vector2, t: float, k := 0) -> bool:
+	return draw_strip(ci, pass_sheet(design, k), at, t, PASS_FPS)
+
+
+static func pass_sheet(design: String, k: int) -> String:
+	return "ped_%s_pass%s" % [design, "" if k == 0 else str(k + 1)]
+
+
+## Which way someone cheers, from a random `roll` kept for the whole cheer: -1 for the jump, else one of their
+## PASS_MOVES with art, each as likely.
+static func cheer_way(design: String, roll: int) -> int:
+	var ways := [-1]
+	for k in PASS_MOVES.get(design, []).size():
+		if sheet(pass_sheet(design, k)) != null:
+			ways.append(k)
+	return ways[posmod(roll, ways.size())]
+
+
+## Someone cheering: their jump or one of their other cheers (see cheer_way).
+static func draw_any_cheer(ci: CanvasItem, design: String, at: Vector2, t: float, roll: int) -> void:
+	var k := cheer_way(design, roll)
+	if k < 0 or not draw_pass(ci, design, at, t, k):
+		draw_cheer(ci, "ped_%s_cheer" % design, at, t)
+
+
 const CHEER_FPS := 6.5   # a cheering person's jump (art/ped_<design>_cheer.png): about one hop every 1.2 s
 static var _hops := {}    # cheer texture -> hops in one loop of its frames
 

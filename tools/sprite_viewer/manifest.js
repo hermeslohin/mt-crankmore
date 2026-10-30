@@ -893,6 +893,7 @@ window.SPRITES = [
 ["scenery_icon_gift",32,32],
 ["scenery_icon_portal",32,32],
 ["scenery_icon_roller",32,32],
+["scenery_icon_mitt",32,32],
 ["scenery_icon_socks",32,32],
 ["scenery_icon_walkie",32,32],
 ["scenery_icon_wrench",32,32],

@@ -4,6 +4,11 @@ extends Node
 signal toast(text: String, color: Color)
 signal feed(text: String, color: Color)
 signal rival_say(rival: int, text: String)
+## A racer speaking, for the message box with their face (Hud): `face` names their art/face_<face>.png, `mood` one of
+## FACE_MOODS.
+signal racer_says(face: String, who: String, text: String, mood: String, color: Color)
+## The expressions on a face sheet, in order; each is two frames, mouth shut then open (talking).
+const FACE_MOODS := ["happy", "smug", "annoyed", "shocked"]
 signal money_changed
 
 const RIDER_MASS := 75.0
@@ -22,6 +27,17 @@ const DIFFICULTIES := {
 	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
+
+## The reigning Tour de Crankmore champion. About once an hour of riding in town he's announced as visiting
+## (City._update_champion); get to Race HQ within CHAMPION_WAIT and you can race him and the rivals. He rides 10%
+## harder than the strongest of them (Race._build_riders). Art: bike_max.png / bike_max_fall.png.
+const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "tier": 3, "speed": 4.4,
+	"sig": ["The yellow jersey doesn't wear itself.", "I've won this town's tour three times. Keep up.", "Is that a pizza bike? Adorable.",
+		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels."]}
+const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
+const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
+const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
+const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
 const MAX_RIVALS := 8
 
 var bikes: Array = [
@@ -41,8 +57,12 @@ var bikes: Array = [
 	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
 	{"name": "Hoofy Bike", "price": 0, "gift": true, "mass": 16.5, "cda": 0.49, "crr": 0.0115, "hp": 70.0, "gravel": 0.95, "turn": 0.9,
 		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
+	# "gift": not for sale; yours for beating the Tour de Crankmore champion (see Race._end_race)
+	{"name": "Champion's Bike", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
+		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube."},
 ]
 const HOOFY := 6   # the Hoofy Bike's place in `bikes`
+const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
@@ -127,13 +147,35 @@ func give_bike(i: int) -> bool:
 	return true
 
 
+const REPAIR_MIN := 200    # the bike shop's charge for the smallest repair
+const REPAIR_MAX := 1500   # ...rising with the share of HP missing, to this for a wreck
+
+## The mechanic at Spokes & Stuff takes one look at you on the Rusty Trash Bike and fixes it for nothing.
+const MECHANIC_PITY := ["Oh, you poor thing. You look like you need help. This one's on the house.",
+	"Yikes. Did a truck do this? Or a bear? Don't answer. No charge.",
+	"Kid, you look like you need help more than the bike does. Free. Go eat something.",
+	"I've seen pizzas in better shape. Put your wallet away, it's on me.",
+	"You look like you need a hug. I don't do hugs. I do free repairs."]
+
+
+## Whether the bike is short of full HP.
+func needs_repair() -> bool:
+	return bike_hp() < float(bike()["hp"]) - 0.01
+
+
+## What the bike shop charges to put the bike back to full HP: nothing for the Rusty Trash Bike (the mechanic feels
+## sorry for you), else REPAIR_MIN rising with the share of HP missing to REPAIR_MAX.
 func repair_cost() -> int:
-	return int(ceilf((float(bike()["hp"]) - bike_hp()) * 1.5))
+	if equipped == 0 or not needs_repair():
+		return 0
+	var missing := clampf(1.0 - bike_hp() / float(bike()["hp"]), 0.0, 1.0)
+	return int(roundf(lerpf(REPAIR_MIN, REPAIR_MAX, missing) / 5.0) * 5.0)
 
 
+## Puts the bike back to full HP for repair_cost(). False when it didn't need it or you can't pay.
 func repair() -> bool:
 	var cost := repair_cost()
-	if cost <= 0 or money < cost:
+	if not needs_repair() or money < cost:
 		return false
 	add_money(-cost)
 	hp[equipped] = bike()["hp"]

@@ -641,12 +641,14 @@ func _bike_shop_menu() -> Dictionary:
 		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
 		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail})
 	var hurt := Game.needs_repair()
-	items.append({"label": "Repair bike   FREE" if hurt else "Repair bike   (already perfect)",
+	var rc := Game.repair_cost()
+	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
+	items.append({"label": ("Repair bike   FREE" if pity else "Repair bike   $%d" % rc) if hurt else "Repair bike   (already perfect)",
 		"fn": func():
-			if Game.repair():
+			if Game.repair() and pity:
 				Game.toast.emit("Mechanic: \"%s\"" % Game.MECHANIC_PITY.pick_random(), Color(0.6, 0.9, 1.0)),
-		"enabled": hurt,
-		"detail": ("The mechanic looks you up and down and winces. \"You look like you need help. Let me fix that for you, no charge.\"\nBike HP %d / %d." if hurt
+		"enabled": hurt and Game.money >= rc,
+		"detail": ("The mechanic looks at you, then at the Rusty Trash Bike, and winces. \"You look like you need help. Let me fix that for you, no charge.\"\nBike HP %d / %d." if pity
 			else "Fresh tape, fresh grease. Bike HP %d / %d.") % [int(Game.bike_hp()), int(Game.bike()["hp"])]})
 	items.append({"label": "Leave", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Spokes & Stuff Bike Shop", "sub": "Cash: $%d.   \"Careful out there. The cars don't brake for dreams.\"" % Game.money, "items": items}

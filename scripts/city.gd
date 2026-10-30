@@ -2473,7 +2473,7 @@ func _update_life(delta: float) -> void:
 			p["cool"] = randf_range(14.0, 24.0)
 			if randf() < 0.45:
 				p["cheer"] = 2.6
-				p["pass"] = randf() < 0.5   # half the time their other cheer (Sprites.PASS_MOVES)
+				p["roll"] = randi()   # the jump or one of their other cheers (Sprites.PASS_MOVES)
 				p["shout"] = String(CHEERS.pick_random()).replace("{n}", Game.player_name)
 				continue
 		# and the rivals, a little less loudly
@@ -2483,7 +2483,7 @@ func _update_life(delta: float) -> void:
 					p["cool"] = randf_range(10.0, 20.0)
 					if randf() < 0.5:
 						p["cheer"] = 2.0
-						p["pass"] = false
+						p["roll"] = 0   # (the jump)
 						p["shout"] = ["Go %s!", "Come on %s!", "Faster, %s!", "%s! %s!"].pick_random().replace("%s", Talk.rivals[i]["short"])
 					break
 			if p["cheer"] > 0.0:
@@ -4354,8 +4354,7 @@ func _draw_ped(p: Dictionary) -> void:
 	Sprites.fade = float(p.get("fade", 1.0))   # (going in at a door, or coming back out)
 	draw_colored_polygon(PackedVector2Array([ground + Vector2(-5, 0), ground + Vector2(0, -2.5), ground + Vector2(5, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2 * Sprites.fade))
 	if cheering:
-		if not (p.get("pass", false) and Sprites.draw_pass(self, design, ground, float(p["phase"]) / 11.0)):
-			Sprites.draw_cheer(self, "ped_%s_cheer" % design, ground, float(p["phase"]) / 11.0)
+		Sprites.draw_any_cheer(self, design, ground, float(p["phase"]) / 11.0, int(p.get("roll", 0)))
 		_label(p["shout"], ground + Vector2(0, -52), 8, Color(1.0, 0.95, 0.45))
 	else:
 		Sprites.draw_person(self, "ped_%s_walk" % design, ground, p.get("face", Vector2(1, 1)), float(p["phase"]) / 8.0, 8.0, Color.WHITE, p)

@@ -12,6 +12,8 @@ var speech: Array = []          # racers' lines waiting for (and in) the message
 const SPEECH_QUEUE := 3
 const SPEECH_CPS := 45.0        # letters a second as a line types out
 const SPEECH_HOLD := 2.2        # seconds a line stays up once it's all out
+const SPEECH_STAY := 2.0        # ...and the whole time a line's up (typing out + hold) is stretched by this much
+var toast_top := 0.0            # where the toasts start this frame, below a turn sign at the top (_draw_city_hud)
 const FACE := 64                # px, a face frame (art/face_<who>.png: 8 frames, two per mood in Game.FACE_MOODS order)
 var panel_sb := StyleBoxFlat.new()
 var weehoo_sb := StyleBoxFlat.new()
@@ -201,7 +203,7 @@ func _process(delta: float) -> void:
 		toasts = toasts.slice(toasts.size() - 3)
 	if not speech.is_empty():
 		speech[0]["t"] = float(speech[0]["t"]) + delta * (1.6 if speech.size() > 1 else 1.0)   # hurry along when others wait
-		if float(speech[0]["t"]) > String(speech[0]["text"]).length() / SPEECH_CPS + SPEECH_HOLD:
+		if float(speech[0]["t"]) > (String(speech[0]["text"]).length() / SPEECH_CPS + SPEECH_HOLD) * SPEECH_STAY:
 			speech.pop_front()
 	for f in feed:
 		f["t"] -= delta
@@ -444,17 +446,22 @@ func _draw_city_hud(w: float, h: float) -> void:
 		["MONEY", "$%d" % Game.money, Color(0.1, 0.45, 0.15) if Game.money >= 0 else Color(0.75, 0.1, 0.1)],
 		["HP", hp, Color(0.2, 0.7, 0.25) if hp > 0.5 else (Color(0.85, 0.6, 0.1) if hp > 0.25 else Color(0.85, 0.15, 0.1))],
 		_pu_slot(city.pu, city.socks_t, city.bread_t, city.roller_t))
+	# the turn signs go along the top, between the WEEHOO and the orders, clear of the message box at the bottom
+	var tmid := floorf((weehoo_rect().end.x + w - 214.0) * 0.5)
 	if not city.pending.is_empty():
-		_draw_junction(city.pending, w, h)
+		_draw_junction(city.pending, tmid)
+		toast_top = 98.0
 	elif city.queued != "":
-		var qr := Rect2(floorf(w * 0.5) - 70, h - 62, 140, 22)
+		var qr := Rect2(tmid - 70, 6, 140, 22)
 		_panel(qr)
 		_arrow_icon(qr.position + Vector2(16, 12), city.queued, Color(1.0, 0.85, 0.25))
 		_text("NEXT TURN: %s" % city.queued.to_upper(), qr.position + Vector2(30, 15), 9, Color(1, 1, 1))
+		toast_top = 44.0
 	elif city.uturn_hint:
-		_text("Wrong way?  DOWN = U-turn", Vector2(0, h - 44), 10, Color(1.0, 0.75, 0.45), w, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("Wrong way?  DOWN = U-turn", Vector2(tmid - 150, 16), 10, Color(1.0, 0.75, 0.45), 300, HORIZONTAL_ALIGNMENT_CENTER)
+		toast_top = 36.0
 	if city.prompt != "":
-		_text(city.prompt, Vector2(0, h - 118 if not city.pending.is_empty() else h - 46), 12, Color(1.0, 0.95, 0.4), w, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(city.prompt, Vector2(0, h - 46), 12, Color(1.0, 0.95, 0.4), w, HORIZONTAL_ALIGNMENT_CENTER)
 	if city.er_timer > 0.0:
 		draw_rect(Rect2(0, 0, w, h), Color(0.95, 0.97, 1.0, 0.86))
 		draw_rect(Rect2(w * 0.5 - 14, h * 0.18 - 14, 28, 28), Color(0.9, 0.1, 0.15))
@@ -468,10 +475,9 @@ func _draw_city_hud(w: float, h: float) -> void:
 
 ## Junction chooser: three arrows (left / straight / right), the selection in yellow,
 ## the GPS suggestion marked, and a bar that runs out as the junction gets close.
-func _draw_junction(pd: Dictionary, w: float, h: float) -> void:
+func _draw_junction(pd: Dictionary, cx: float) -> void:
 	var labels: Dictionary = pd["labels"]
-	var cx := floorf(w * 0.5)
-	var r := Rect2(cx - 96, h - 110, 192, 68)
+	var r := Rect2(cx - 96, 6, 192, 68)
 	_panel(r)
 	_text("TURN IN %dm" % int(float(pd["dist"]) * 4.0), Vector2(r.position.x, r.position.y + 11), 9, Color(1.0, 0.85, 0.3), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_text("GPS", Vector2(r.end.x - 26, r.position.y + 11), 8, Color(0.35, 1.0, 0.45))
@@ -493,7 +499,7 @@ func _draw_junction(pd: Dictionary, w: float, h: float) -> void:
 	_text(name, Vector2(r.position.x, r.end.y - 12), 8, Color(1, 1, 1), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_bar(Rect2(r.position.x + 8, r.end.y - 6, r.size.x - 16, 2), float(pd["dist"]) / float(pd["look"]), Color(1.0, 0.85, 0.3))
 	if pd.get("car", false) and int(Time.get_ticks_msec() / 250) % 2 == 0:
-		_text("CAR COMING!  no brakes, good luck" if Game.fixed_gear() else "CAR COMING!  brake to wait", Vector2(0, r.position.y - 6), 12, Color(1.0, 0.35, 0.3), w, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("CAR COMING!  no brakes, good luck" if Game.fixed_gear() else "CAR COMING!  brake to wait", Vector2(cx - 150, r.end.y + 14), 12, Color(1.0, 0.35, 0.3), 300, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _arrow_icon(c: Vector2, kind: String, col: Color) -> void:
@@ -770,7 +776,8 @@ func _draw_challenge(city, r: Rect2) -> void:
 
 
 func _draw_toasts(w: float) -> void:
-	var y := 70.0
+	var y := maxf(70.0, toast_top)
+	toast_top = 0.0
 	for t in toasts:
 		var a := clampf(t["t"] * 2.0, 0.0, 1.0)
 		var col: Color = t["color"]

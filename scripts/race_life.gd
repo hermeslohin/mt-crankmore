@@ -5,7 +5,8 @@ extends RefCounted
 ##   * a crowd and a marshal inside every hairpin, hay bales round the outside;
 ##   * cowbell fans, flag wavers and sign holders lining the steep ramps, photographers by the jumps;
 ##   * a feed zone with helpers holding out bottles, camper vans and portaloos where the fans camp;
-##   * a devil superfan who runs alongside you up one of the climbs;
+##   * a devil superfan who runs alongside you up one of the climbs, and roadside fans who chase after you for a few
+##     seconds as you go by, then stop, cheer and walk back to their spot;
 ##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, a TV helicopter overhead;
 ##   * a mountain cog railway straight down the hillside, with level crossings and a train that comes by now and then;
 ##   * up in the snow, a ski area: skiers and snowboarders carving down, a ski school snake, ski patrol, chairlifts with
@@ -14,6 +15,10 @@ extends RefCounted
 
 const RACE_FANS := ["fan_sign", "fan_flag", "fan_cowbell", "fan_highfive_kid"]
 const FAN_SHOUTS := ["ALLEZ!", "GO GO GO!", "Dig deep!", "Venga!", "Allez allez!", "You got this!", "Hup hup!", "Pedal!"]
+const RUN_CHANCE := 0.35      # share of the roadside fans who run along with you as you go by
+const RUN_MAX := 6.8          # m/s: a fan flat out
+const RUN_LAT := 1.7          # m from the middle of the road they run at, just off the gravel
+const NO_RUN := ["photographer_kneel", "feed_helper"]   # busy: they stay put
 const TRAIN_SPEED := 4.5      # tiles per second
 const TRAIN_GAP := 2.6        # tiles between the cars
 const TRAIN_CYCLE := 75.0     # seconds between trains
@@ -24,6 +29,7 @@ var rail_y0 := 0.0
 var rail_y1 := 0.0
 var crossings: Array = []      # {s, y}: where the railway crosses the road
 var devil := {}                # {s0, s1, side}
+var run_fans: Array = []       # the fans (their statics' data) who'll run with you; "run" in one says where they're at
 var skiers: Array = []         # {design, p0, len, amp, speed, ph}: each carves down its own run and starts again
 var lift := {}                 # {x, y0, y1, towers: [y...]}: the main chairlift (bottom y0 is the lower end, nearer the camera)
 var lifts: Array = []          # every chairlift up the mountain (the main one first)
@@ -41,6 +47,7 @@ func _init(r) -> void:
 
 func build(rng: RandomNumberGenerator) -> void:
 	var length: float = race.course["length"]
+	run_fans.clear()
 	_build_start_finish(rng, length)
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
@@ -69,8 +76,11 @@ func _sprite(name: String, s: float, lat: float, flip := false) -> void:
 
 func _fan(s: float, lat: float, rng: RandomNumberGenerator, design := "") -> void:
 	var p: Vector2 = race._pose(s, lat)["pos"]
-	race._put_static(2, {"kind": "fan", "s": s, "pos": p, "z": race._tz(p), "design": design if design != "" else _fan_design(rng),
-		"col": Color.from_hsv(rng.randf(), 0.7, 0.95)}, [])
+	var e := {"kind": "fan", "s": s, "lat": lat, "pos": p, "z": race._tz(p), "design": design if design != "" else _fan_design(rng),
+		"col": Color.from_hsv(rng.randf(), 0.7, 0.95)}
+	race._put_static(2, e, [])
+	if rng.randf() < RUN_CHANCE and not e["design"] in NO_RUN and Sprites.sheet("ped_%s_walk" % e["design"]) != null:
+		run_fans.append(e)
 
 
 func _build_start_finish(rng: RandomNumberGenerator, length: float) -> void:
@@ -461,6 +471,73 @@ func draw_lift_cables(ci: CanvasItem) -> void:
 
 func update(delta: float) -> void:
 	t_ += delta
+	_step_runners(delta)
+
+
+## Fans running with you: as you reach one they set off from their spot and sprint along the roadside beside you
+## (as fast as you, up to RUN_MAX) for a few seconds, then pull up, cheer, and walk back. Once a race each.
+func _step_runners(delta: float) -> void:
+	if race.riders.is_empty() or race.countdown > 0.0:
+		return
+	var me: Dictionary = race.riders[0]
+	var ms: float = me["s"]
+	var mv: float = me["v"]
+	for e in run_fans:
+		var st: String = e.get("run", "")
+		var home: float = e["s"]
+		if st == "":
+			if not e.get("ran", false) and ms > home - 2.5 and ms < home + 0.5 and mv > 2.0 and float(me["down"]) <= 0.0:
+				e["ran"] = true
+				e["run"] = "run"
+				e["rs"] = home
+				e["rlat"] = float(e["lat"])
+				e["rv"] = 0.0
+				e["rt"] = randf_range(3.0, 6.0)
+				e["say"] = FAN_SHOUTS.pick_random()
+			continue
+		var side := signf(float(e["lat"]))
+		match st:
+			"run":
+				# stay level with you or just behind, never out in front
+				var want := minf(minf(mv + 0.6, RUN_MAX), RUN_MAX if float(e["rs"]) < ms - 0.8 else mv)
+				e["rv"] = move_toward(float(e["rv"]), want, 7.0 * delta)
+				e["rt"] = float(e["rt"]) - delta
+				if float(e["rt"]) <= 0.0 or float(me["down"]) > 0.0:
+					e["run"] = "stop"
+					e["rt"] = 1.8
+					e["roll"] = randi()
+			"stop":
+				e["rv"] = move_toward(float(e["rv"]), 0.0, 6.0 * delta)
+				e["rt"] = float(e["rt"]) - delta
+				if float(e["rt"]) <= 0.0:
+					e["run"] = "back"
+			"back":
+				e["rv"] = -1.3
+				if float(e["rs"]) <= home:
+					e["run"] = ""
+					continue
+		e["rs"] = maxf(home, float(e["rs"]) + float(e["rv"]) * delta)
+		var to_lat := float(e["lat"]) if st == "back" and float(e["rs"]) - home < 2.0 else side * RUN_LAT
+		e["rlat"] = move_toward(float(e["rlat"]), to_lat, 1.5 * delta)
+
+
+func _draw_runner(e: Dictionary, pz: Dictionary) -> void:
+	var at := Iso.to_screen(pz["pos"], pz["z"])
+	var n: Vector2 = pz["n"]
+	var along := Vector2(n.y, -n.x)   # the way the race goes
+	var design := Sprites.cast(e, e.get("looks", []))
+	if design == "":
+		return
+	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-5, 0), at + Vector2(0, -2.5), at + Vector2(5, 0), at + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+	match e["run"]:
+		"run":
+			Sprites.draw_person(race, "ped_%s_walk" % design, at, along, t_ + float(e["s"]), 16.0)
+			if fmod(t_ + float(e["s"]), 2.4) < 1.4:
+				_shout(at + Vector2(0, -52), e["say"], Color(1.0, 0.95, 0.45))
+		"stop":
+			Sprites.draw_any_cheer(race, design, at, t_, int(e["roll"]))
+		"back":
+			Sprites.draw_person(race, "ped_%s_walk" % design, at, -along, t_ + float(e["s"]), 8.0)
 
 
 ## [world position, draw callable] for everything that moves this frame.
@@ -484,6 +561,11 @@ func movers() -> Array:
 		_add_vehicle(out, "vehicle_marshal_moto", lead + 22.0, 0.45)
 	if last > 20.0 and last < length:
 		_add_vehicle(out, "vehicle_team_car", last - 13.0, -0.35)
+	# fans running with you
+	for e in run_fans:
+		if e.get("run", "") != "":
+			var pz: Dictionary = race._pose(e["rs"], e["rlat"])
+			out.append([pz["pos"], _draw_runner.bind(e, pz)])
 	# the devil
 	if not devil.is_empty():
 		var s: float = me["s"]

@@ -2611,6 +2611,8 @@ func _draw_deco(e: Dictionary) -> void:
 			var pz: Dictionary = e["pz"]
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * 0.95 * float(e["side"]), pz["z"]))
 		"fan":
+			if e.get("run", "") != "":   # off running with you (RaceLife._step_runners)
+				return
 			var b := Iso.to_screen(e["pos"], e["z"])
 			# their costume if nobody on screen has it yet, else whoever's free (nobody shows up twice; see Sprites.cast)
 			if e.has("design") and not e.has("looks"):

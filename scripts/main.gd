@@ -650,6 +650,9 @@ func _bike_shop_menu() -> Dictionary:
 
 func _race_menu() -> Dictionary:
 	var items: Array = []
+	if city.champion_left > 0.0:   # the Tour de Crankmore champion is in town (see City._update_champion)
+		items.append({"label": "RACE %s, THE TOUR DE CRANKMORE CHAMPION!" % Game.CHAMPION["name"].to_upper(), "fn": func(): hud.open_menu(_champion_menu),
+			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
@@ -657,6 +660,17 @@ func _race_menu() -> Dictionary:
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
+
+
+func _champion_menu() -> Dictionary:
+	var items: Array = []
+	for i in race.COURSES.size():
+		var c: Dictionary = race.COURSES[i]
+		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
+			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			"detail": "%s\n%s and your rivals line up with you." % [c["blurb"], Game.CHAMPION["name"]]})
+	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
+	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
@@ -676,8 +690,11 @@ func _start_rescue() -> void:
 	cam.position = race.cam_target()
 
 
-func _start_race(i: int) -> void:
+func _start_race(i: int, champion := false) -> void:
 	race.rescue = false
+	race.guest = Game.CHAMPION if champion else {}
+	if champion:
+		city.champion_left = 0.0   # he's raced you: off he goes after
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -704,7 +721,12 @@ func _on_race_finished(result: Dictionary) -> void:
 		for i in result["order"].size():
 			lines += "%d. %s\n" % [i + 1, result["order"][i]]
 		var t: float = result["time"]
-		return {"title": "%s: you placed #%d!" % [result["course"], result["place"]],
+		var title := "%s: you placed #%d!" % [result["course"], result["place"]]
+		if result.get("beat_champion", false):
+			title = "You beat %s, the Tour de Crankmore champion! #%d on %s" % [Game.CHAMPION["name"], result["place"], result["course"]]
+		elif result.get("champion", false):
+			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
+		return {"title": title,
 			"sub": "Time %d:%04.1f     Prize: $%d\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 

@@ -134,7 +134,16 @@ var road_doors: Dictionary = {}   # road index -> [[s, side, building index], ..
 var pops = load("res://tools/pop_watch.gd").new(self) if OS.has_environment("PIZZA_POPS") else null   # dev helper: see tools/pop_watch.gd
 var events: TownEvents          # random happenings around the player (see TownEvents)
 const MedHeli := preload("res://scripts/med_heli.gd")
+const NewsHeli := preload("res://scripts/news_heli.gd")
+const NEWS_EVERY := [480.0, 900.0]   # seconds between the news helicopter coming to film you
+const NEWS_STAY := [60.0, 100.0]     # seconds it follows you
+const NEWS_ALT := 190.0
 var heli                        # the air ambulance on the hospital roof (MedHeli)
+var news                        # the news helicopter, when it's about (NewsHeli)
+var news_state := "off"         # off, on (following you), leaving
+var news_t := randf_range(240.0, NEWS_EVERY[1])
+var champion_t := randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])   # riding in town until the champion next visits
+var champion_left := 0.0        # > 0: he's in town and waiting at Race HQ for that many more seconds
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
@@ -1703,6 +1712,8 @@ func _process(delta: float) -> void:
 		events.settle()
 	_update_mascots(delta)
 	heli.update(delta)
+	_update_news(delta)
+	_update_champion(delta)
 	_update_frisbees(delta)
 	_update_squash()
 	if active:
@@ -2627,6 +2638,55 @@ func _update_rivals(delta: float) -> void:
 
 
 const RIVAL_CUT := 0.6   # tiles: how far a rival cuts the corners of its route
+
+## Now and then the news helicopter flies in from the edge of the map, follows you round town for a minute or so (off
+## to one side, a little ahead), then heads off again.
+func _update_news(delta: float) -> void:
+	match news_state:
+		"off":
+			if not active:
+				return
+			news_t -= delta
+			if news_t <= 0.0:
+				news = NewsHeli.new()
+				var from := Vector2(N, N) * 0.5 + Vector2.from_angle(randf() * TAU) * N * 0.7
+				news.place(from, p_pos - from)
+				news_state = "on"
+				news_t = randf_range(NEWS_STAY[0], NEWS_STAY[1])
+		"on":
+			news_t -= delta
+			news.update(delta, p_pos + p_fwd * 3.0 + Vector2(3.5, -3.5))
+			if news_t <= 0.0 or not active:
+				news_state = "leaving"
+				news_t = 0.0
+				news.set_meta("away", Vector2(N, N) * 0.5 + (news.pos - Vector2(N, N) * 0.5).normalized() * N * 0.9)
+		"leaving":
+			var away: Vector2 = news.get_meta("away")
+			news.update(delta, away)
+			if news.pos.distance_to(away) < 3.0:
+				news_state = "off"
+				news_t = randf_range(NEWS_EVERY[0], NEWS_EVERY[1])
+
+
+## The Tour de Crankmore champion's visits (see Game.CHAMPION): announced about once an hour, then he waits at Race HQ
+## for CHAMPION_WAIT seconds.
+func _update_champion(delta: float) -> void:
+	if not active:
+		return
+	if champion_left > 0.0:
+		var was := champion_left
+		champion_left = maxf(0.0, champion_left - delta)
+		if champion_left <= 0.0:
+			Game.toast.emit("%s has left town. Maybe next time." % Game.CHAMPION["name"], Color(0.8, 0.85, 1.0))
+		elif int(was / 60.0) != int(champion_left / 60.0):
+			Game.toast.emit("%s leaves Race HQ in %d minute%s!" % [Game.CHAMPION["name"], int(champion_left / 60.0) + 1, "" if champion_left < 60.0 else "s"], Game.CHAMPION["color"])
+		return
+	champion_t -= delta
+	if champion_t <= 0.0:
+		champion_t = randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])
+		champion_left = Game.CHAMPION_WAIT
+		Game.toast.emit("ANNOUNCEMENT: %s, winner of the Tour de Crankmore, is visiting town! Get to Race HQ within 5 minutes to race him!" % Game.CHAMPION["name"], Game.CHAMPION["color"])
+
 
 ## Moves a rival along its path. Returns true when the path is finished.
 ## Rivals cruise at the difficulty's share of their FTP (Game.rival_share), so they slow down on climbs and fly down the other side just like you.
@@ -4569,6 +4629,8 @@ func _draw_junction_arrows() -> void:
 
 func _draw_overlays() -> void:
 	heli.draw(self)
+	if news_state != "off" and Sprites.sheet("heli_news") != null:
+		news.draw(self, Iso.to_screen(news.pos), NEWS_ALT)
 	for i in bubbles:
 		var r: Dictionary = rival_state[i]
 		_bubble(Iso.to_screen(r["pos"]) + Vector2(0, -54), bubbles[i]["text"], Talk.rivals[i]["color"])

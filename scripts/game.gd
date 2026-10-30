@@ -22,6 +22,16 @@ const DIFFICULTIES := {
 	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your FTP on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
+
+## The reigning Tour de Crankmore champion. About once an hour of riding in town he's announced as visiting
+## (City._update_champion); get to Race HQ within CHAMPION_WAIT and you can race him and the rivals. He rides 10%
+## harder than the strongest of them (Race._build_riders). Art: bike_max.png / bike_max_fall.png.
+const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "tier": 3, "speed": 4.4,
+	"sig": ["The yellow jersey doesn't wear itself.", "I've won this town's tour three times. Keep up.", "Is that a pizza bike? Adorable.",
+		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels."]}
+const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
+const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
+const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const MAX_RIVALS := 8
 
 var bikes: Array = [

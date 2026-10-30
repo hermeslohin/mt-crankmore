@@ -396,8 +396,17 @@ func _draw_city_hud(w: float, h: float) -> void:
 		lines.append({"text": t, "col": Color(1.0, 0.8, 0.3) if chasers == 0 else Color(1.0, 0.55, 0.45)})
 	if lines.is_empty():
 		lines.append({"text": "Waiting for the phone to ring...", "col": Color(0.8, 0.85, 1.0)})
+	var below := 24 + lines.size() * 10
 	if not city.challenge.is_empty():
-		_draw_challenge(city, Rect2(w - 214, 24 + lines.size() * 10, 210, 50))
+		_draw_challenge(city, Rect2(w - 214, below, 210, 50))
+		below += 56
+	if city.champion_left > 0.0:   # the champion's in town (City._update_champion)
+		var r := Rect2(w - 214, below, 210, 30)
+		_panel(r)
+		_text("TOUR CHAMPION IN TOWN!", r.position + Vector2(6, 10), 8, Game.CHAMPION["color"])
+		var left := int(ceil(city.champion_left))
+		_text("Race %s at Race HQ:  %d:%02d" % [Game.CHAMPION["short"], left / 60, left % 60], r.position + Vector2(6, 22), 8,
+			Color.WHITE if left > 60 or int(Time.get_ticks_msec() / 400) % 2 == 0 else Color(1.0, 0.5, 0.4))
 	_panel(Rect2(w - 214, 4, 210, 16 + lines.size() * 10))
 	_text("PIZZA ORDERS", Vector2(w - 208, 14), 8, Color(1.0, 0.85, 0.3))
 	for i in lines.size():

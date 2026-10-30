@@ -1399,6 +1399,9 @@ func _build_season() -> void:
 			"col": cols[rng.randi() % cols.size()]}, [p + Vector2(0, 3)] if kind == "skier" else [])
 
 
+var guest := {}                  # a guest rider for this race (the Tour de Crankmore champion), or {}
+
+
 func _build_riders() -> void:
 	riders.clear()
 	var b := Game.bike()
@@ -1417,6 +1420,29 @@ func _build_riders() -> void:
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
+	if not guest.is_empty() and not rescue:
+		# the champion: CHAMPION_EDGE harder than the strongest rival here (idx -1: he talks for himself, see _say)
+		var top := 0.0
+		for r in riders:
+			if not r["player"]:
+				top = maxf(top, float(r["ftp"]) / float(r["mass"]))
+		var mass := 68.0
+		var lane := -0.45 * ROAD_W
+		riders.append({"name": guest["name"], "short": guest["short"], "color": guest["color"], "frame": Color(guest["color"]).lerp(Color.WHITE, 0.2),
+			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(guest), "player": false, "guest": true,
+			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": maxf(top, Game.wkg()) * Game.CHAMPION_EDGE * mass, "idx": -1,
+			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
+			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
+			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
+		Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
+
+
+## A rider says something: a rival through Talk, the guest champion one of his own lines over his head.
+func _say(r: Dictionary, cat: String, force := false) -> void:
+	if int(r["idx"]) >= 0:
+		Talk.say(int(r["idx"]), cat, force)
+	elif r.get("guest", false) and (force or randf() < 0.5):
+		_pop(riders.find(r), guest["sig"].pick_random(), guest["color"])
 
 
 # ---------------------------------------------------------------------
@@ -1810,9 +1836,9 @@ func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
 	if r["player"]:
 		Game.toast.emit("%s %s! Down for %d s." % [riders[by]["short"], how, int(secs)], Color(1.0, 0.45, 0.35))
-		Talk.say(int(riders[by]["idx"]), "pu_hit_player", true)
+		_say(riders[by], "pu_hit_player", true)
 	elif riders[by]["player"]:
-		Talk.say(int(r["idx"]), "pu_ouch", true)
+		_say(r, "pu_ouch", true)
 
 
 ## The bear caught you: you wipe out and are down BEAR_DOWN seconds while the ski patrol swaps your bike for a new
@@ -2117,9 +2143,9 @@ func _finish(i: int) -> void:
 		else:
 			for o in riders:
 				if o.get("place", 0) == 1 and not o["player"]:
-					Talk.say(int(o["idx"]), "race_lose_player", true)
+					_say(o, "race_lose_player", true)
 	elif finish_count == 1:
-		Talk.say(int(r["idx"]), "race_win_rival", true)
+		_say(r, "race_win_rival", true)
 
 
 func _banter() -> void:
@@ -2135,9 +2161,9 @@ func _banter() -> void:
 		if last_swap.has(k) and last_swap[k]["ahead"] != sign_now and clock - last_swap[k]["t"] > 6.0 and absf(r["s"] - me["s"]) < 20.0:
 			last_swap[k] = {"ahead": sign_now, "t": clock}
 			if sign_now:
-				Talk.say(int(r["idx"]), "race_pass_player")
+				_say(r, "race_pass_player")
 			else:
-				Talk.say(int(r["idx"]), "race_player_pass")
+				_say(r, "race_player_pass")
 		elif not last_swap.has(k):
 			last_swap[k] = {"ahead": sign_now, "t": clock}
 	if leader:
@@ -2172,7 +2198,7 @@ func _end_race() -> void:
 		return a["s"] > b["s"])
 	var place := order.find(riders[0]) + 1
 	var shares := [1.0, 0.5, 0.3, 0.15, 0.0, 0.0, 0.0, 0.0]
-	var prize := int(float(course["prize"]) * shares[place - 1])
+	var prize := int(float(course["prize"]) * shares[place - 1]) if place <= shares.size() else 0
 	var names: Array = []
 	for r in order:
 		names.append(r["name"])
@@ -2181,7 +2207,12 @@ func _end_race() -> void:
 	Game.add_money(prize)
 	Game.damage_bike(12.0)
 	Game.save_game()
-	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"]})
+	var champ := -1   # where the guest champion came, if he raced
+	for k in order.size():
+		if order[k].get("guest", false):
+			champ = k + 1
+	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
+		"beat_champion": champ > 0 and place < champ, "champion": champ > 0})
 
 
 # ---------------------------------------------------------------------

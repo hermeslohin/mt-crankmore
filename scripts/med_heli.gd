@@ -1,6 +1,6 @@
 extends RefCounted
-## St. Pedro's air ambulance (art/heli_medical.png: 8 isometric directions like the vehicles, and a column per tilt: level,
-## nose down, nose up, banked left, banked right; see TILT). It sits on the helipad on the
+## St. Pedro's air ambulance (art/heli_medical.png: 8 isometric directions like the vehicles; for each tilt (level,
+## nose down, nose up, banked left, banked right; see TILT) a run of frames of its rotor spinning). It sits on the helipad on the
 ## hospital roof, and every so often spins up, climbs, flies off over the town and out past the edge of the map, then
 ## some minutes later comes back in, lands on the pad and spins down. A shadow follows it over the ground.
 
@@ -14,6 +14,7 @@ const CLIMB := 5.0              # seconds to climb off the pad (or settle onto i
 const TURN_RATE := 1.1          # radians a second it can swing round
 const SLOW := 9.0               # tiles out from the pad it starts slowing to land, nose up
 const TILT := {"level": 0, "nose_down": 1, "nose_up": 2, "bank_left": 3, "bank_right": 4}   # columns of the sheet
+const SPIN_FPS := 18.0          # rotor frames a second at full speed
 const SKIDS := -20.0            # from where its skids touch down to the middle of its frame (Sprites.draw_vehicle)
 const HUB := -24.0              # from the middle of its frame up to the rotor hub
 
@@ -126,6 +127,20 @@ func lean() -> int:
 	return TILT[tilt]
 
 
+## A helicopter from its sheet (8 direction rows; for each TILT column group, frames of the rotor going round), leaning
+## `tilt`, its rotor at `speed` (0-1: 0 is the still first frame; while it spins up or down the blur disc goes over it).
+static func draw_heli(ci: CanvasItem, sheet: String, at: Vector2, heading: Vector2, tilt: int, t: float, speed: float, turn: Dictionary) -> void:
+	var tex := Sprites.sheet(sheet)
+	if tex == null:
+		return
+	var f := tex.get_height() / Sprites.DIRS
+	var per := maxi(1, tex.get_width() / f / TILT.size())   # rotor frames for each tilt
+	var k := int(t * SPIN_FPS * speed) % per if speed > 0.0 else 0
+	Sprites.draw_vehicle(ci, sheet, at, heading, Color.WHITE, tilt * per + k, turn)
+	if speed > 0.0 and (per == 1 or speed < 0.95):
+		draw_rotor(ci, at, t, speed)
+
+
 ## The blades spinning (0-1 = how fast) over a helicopter drawn at `at` with Sprites.draw_vehicle: a flickering disc
 ## and a blade sweeping round.
 static func draw_rotor(ci: CanvasItem, at: Vector2, t: float, speed: float) -> void:
@@ -152,8 +167,6 @@ func draw(ci: CanvasItem) -> void:
 		ci.draw_colored_polygon(PackedVector2Array([sh + Vector2(-20, 0) * k, sh + Vector2(0, -6) * k, sh + Vector2(20, 0) * k, sh + Vector2(0, 6) * k]), Color(0, 0, 0, 0.18))
 	var bob := sin(t_ * 2.3) * 2.0 * rotor if alt > 5.0 else 0.0
 	var at := base + Vector2(0.0, bob + SKIDS)
-	Sprites.draw_vehicle(ci, "heli_medical", at, heading, Color.WHITE, lean(), turn)
-	if rotor > 0.0:
-		draw_rotor(ci, at, t_, rotor)
+	draw_heli(ci, "heli_medical", at, heading, lean(), t_, rotor, turn)
 	if state in ["spinup", "climb", "land"] and int(t_ * 3.0) % 2 == 0:
 		city._label("WHUP WHUP", at + Vector2(0, -44), 8, Color(1, 1, 1))

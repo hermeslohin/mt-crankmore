@@ -7,8 +7,10 @@ extends RefCounted
 ##   * a feed zone with helpers holding out bottles, camper vans and portaloos where the fans camp;
 ##   * a devil superfan who runs alongside you up one of the climbs, and roadside fans who chase after you for a few
 ##     seconds as you go by, then stop, cheer and walk back to their spot;
-##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, a TV helicopter overhead,
-##     and now and then St. Pedro's air ambulance flying over;
+##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, the Channel 9 news helicopter
+##     following the race (you or the leader), and now and then St. Pedro's air ambulance flying over;
+##   * drone pilots at the roadside: as you go by, their camera drone takes off and follows you for a while, then flies
+##     back and lands by them;
 ##   * a mountain cog railway straight down the hillside, with level crossings and a train that comes by now and then;
 ##   * up in the snow, a ski area: skiers and snowboarders carving down, a ski school snake, ski patrol, chairlifts with
 ##     its chairs going round, the lodge, a cocoa stand, racks, slalom gates, a snowcat grooming and a snowmobile.
@@ -21,6 +23,13 @@ const RUN_MAX := 6.8          # m/s: a fan flat out
 const RUN_LAT := 1.7          # tiles from the middle of the road they run at, just off the gravel (plus Race.ROAD_GROW)
 const NO_RUN := ["photographer_kneel", "feed_helper"]   # busy: they stay put
 const MedHeli := preload("res://scripts/med_heli.gd")
+const NewsHeli := preload("res://scripts/news_heli.gd")
+const NEWS_ALT := 165.0       # px the news helicopter hovers over the riders
+const NEWS_SWITCH := [20.0, 40.0]   # seconds on one rider before it goes to film the other (you / the leader)
+const DRONE_SPOTS := 3        # drone pilots along a course
+const DRONE_ALT := 46.0       # px up while it follows you
+const DRONE_FOLLOW := [12.0, 18.0]   # seconds it keeps up with you
+const DRONE_SPEED := 9.0      # tiles a second, flying back
 const FLYOVER_EVERY := [90.0, 240.0]   # seconds between the air ambulance flying over
 const FLYOVER_SPEED := 9.0    # tiles a second
 const FLYOVER_ALT := 190.0    # px up
@@ -35,6 +44,10 @@ var rail_y0 := 0.0
 var rail_y1 := 0.0
 var crossings: Array = []      # {s, y}: where the railway crosses the road
 var devil := {}                # {s0, s1, side}
+var news                       # the news helicopter (NewsHeli)
+var news_on := 0               # who it's filming: 0 you, 1 the leader
+var news_t := 0.0              # seconds until it switches
+var pilots: Array = []         # drone pilots: {s, lat, pos, drone: {state, pos, alt, dir, t, turn}}
 var flyover := {}              # the air ambulance on its way over: {pos, dir, left}
 var flyover_t := 0.0           # seconds until the next one
 var run_fans: Array = []       # the fans (their statics' data) who'll run with you; "run" in one says where they're at
@@ -58,6 +71,11 @@ func build(rng: RandomNumberGenerator) -> void:
 	run_fans.clear()
 	flyover = {}
 	flyover_t = rng.randf_range(30.0, FLYOVER_EVERY[1])
+	news = NewsHeli.new()
+	news.place(race._pose(0.0, -(race.ROAD_HW + 6.0))["pos"], Vector2(1, 1))
+	news_on = 0
+	news_t = rng.randf_range(NEWS_SWITCH[0], NEWS_SWITCH[1])
+	_build_pilots(rng, length)
 	_build_start_finish(rng, length)
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
@@ -485,6 +503,108 @@ func update(delta: float) -> void:
 	t_ += delta
 	_step_runners(delta)
 	_step_flyover(delta)
+	_step_news(delta)
+	_step_pilots(delta)
+
+
+func _build_pilots(rng: RandomNumberGenerator, length: float) -> void:
+	pilots.clear()
+	if Sprites.sheet("drone") == null:
+		return
+	for k in DRONE_SPOTS:
+		var s := length * (0.2 + 0.6 * (k + rng.randf_range(0.2, 0.8)) / DRONE_SPOTS)
+		if race._in_tunnel(s, 20.0):
+			continue
+		var lat: float = (1.0 if rng.randf() < 0.5 else -1.0) * (race.ROAD_HW + 1.1)
+		var p: Vector2 = race._pose(s, lat)["pos"]
+		pilots.append({"s": s, "lat": lat, "pos": p, "drone": {"state": "parked", "pos": p + Vector2(0.4, 0.4), "alt": 0.0,
+			"dir": Vector2(1, 0), "t": 0.0, "turn": {}}})
+
+
+## The news helicopter films the race: hovering off to the side of you or the leader, a little ahead, and now and then
+## heading over to the other one.
+func _step_news(delta: float) -> void:
+	if race.riders.is_empty():
+		return
+	news_t -= delta
+	if news_t <= 0.0:
+		news_t = randf_range(NEWS_SWITCH[0], NEWS_SWITCH[1])
+		news_on = 1 - news_on
+	var who: Dictionary = race.riders[0]
+	if news_on == 1:
+		for r in race.riders:
+			if float(r["s"]) > float(who["s"]) and not r["done"]:
+				who = r
+	var s := minf(float(who["s"]) + 5.0, float(race.course["length"]))
+	news.update(delta, race._pose(s, -(race.ROAD_HW + 3.0))["pos"])
+
+
+## Drone pilots: as you go by, the drone lifts off and follows you, beside you and a little ahead, for a while; then
+## it flies back and lands at the pilot's feet. Once a race each.
+func _step_pilots(delta: float) -> void:
+	if race.riders.is_empty() or race.countdown > 0.0:
+		return
+	var me: Dictionary = race.riders[0]
+	var ms: float = me["s"]
+	for pl in pilots:
+		var d: Dictionary = pl["drone"]
+		d["t"] = float(d["t"]) - delta
+		match d["state"]:
+			"parked":
+				if not pl.get("flown", false) and ms > float(pl["s"]) - 3.0 and ms < float(pl["s"]) + 1.0:
+					pl["flown"] = true
+					d["state"] = "up"
+					d["t"] = 1.2
+			"up":
+				d["alt"] = DRONE_ALT * (1.0 - maxf(0.0, float(d["t"])) / 1.2)
+				if float(d["t"]) <= 0.0:
+					d["state"] = "follow"
+					d["t"] = randf_range(DRONE_FOLLOW[0], DRONE_FOLLOW[1])
+			"follow":
+				var side := signf(float(pl["lat"]))
+				var goal: Vector2 = race._pose(ms + 1.6, side * (race.ROAD_HW + 0.2))["pos"]
+				var step := (goal - (d["pos"] as Vector2))
+				var v := maxf(float(me["v"]) * 1.4, 3.0)
+				d["pos"] = (d["pos"] as Vector2) + step.limit_length(v * delta * 1.6)
+				if step.length() > 0.05:
+					d["dir"] = (d["dir"] as Vector2).lerp(step.normalized(), minf(1.0, delta * 4.0)).normalized()
+				if float(d["t"]) <= 0.0 or me["done"]:
+					d["state"] = "home"
+			"home":
+				var to: Vector2 = (pl["pos"] as Vector2) + Vector2(0.4, 0.4) - d["pos"]
+				if to.length() <= DRONE_SPEED * delta:
+					d["pos"] = (pl["pos"] as Vector2) + Vector2(0.4, 0.4)
+					d["state"] = "down"
+					d["t"] = 1.2
+				else:
+					d["pos"] = (d["pos"] as Vector2) + to.normalized() * DRONE_SPEED * delta
+					d["dir"] = to.normalized()
+			"down":
+				d["alt"] = DRONE_ALT * maxf(0.0, float(d["t"])) / 1.2
+				if float(d["t"]) <= 0.0:
+					d["state"] = "parked"
+					d["alt"] = 0.0
+
+
+func _draw_pilot(pl: Dictionary) -> void:
+	var p: Vector2 = pl["pos"]
+	var at := Iso.to_screen(p, race._tz(p))
+	race.draw_colored_polygon(PackedVector2Array([at + Vector2(-5, 0), at + Vector2(0, -2.5), at + Vector2(5, 0), at + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2))
+	var flying: bool = pl["drone"]["state"] != "parked"
+	if not (flying and Sprites.draw_strip(race, "ped_drone_operator_fly", at, t_, 8.0)):
+		Sprites.draw_person(race, "ped_drone_operator_walk", at, Vector2(1, 1), 0.0, 0.0)
+
+
+func _draw_drone(d: Dictionary) -> void:
+	var p: Vector2 = d["pos"]
+	var ground := Iso.to_screen(p, race._tz(p))
+	var alt := float(d["alt"])
+	if alt > 2.0:
+		race.draw_colored_polygon(PackedVector2Array([ground + Vector2(-7, 0), ground + Vector2(0, -2.5), ground + Vector2(7, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.18))
+	var at := ground + Vector2(0.0, -alt - 6.0 + (sin(t_ * 6.0) * 1.0 if alt > 2.0 else 0.0))
+	var tex := Sprites.sheet("drone")
+	var per := maxi(1, tex.get_width() / (tex.get_height() / Sprites.DIRS))
+	Sprites.draw_vehicle(race, "drone", at, d["dir"], Color.WHITE, int(t_ * 24.0) % per if alt > 0.5 else 0, d["turn"])
 
 
 ## Now and then the air ambulance flies over: across the course near you, from well off one side to well off the other.
@@ -513,8 +633,7 @@ func _draw_flyover(ci: CanvasItem) -> void:
 	var ground := Iso.to_screen(p, race._tz(p))
 	ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-16, 0), ground + Vector2(0, -5), ground + Vector2(16, 0), ground + Vector2(0, 5)]), Color(0, 0, 0, 0.16))
 	var at := Iso.to_screen(p, race._tz(race._pose(race.riders[0]["s"], 0.0)["pos"]) + FLYOVER_ALT) + Vector2(0.0, MedHeli.SKIDS + sin(t_ * 2.3) * 2.0)
-	Sprites.draw_vehicle(ci, "heli_medical", at, flyover["dir"], Color.WHITE, MedHeli.TILT["nose_down"], flyover["turn"])   # cruising, nose down
-	MedHeli.draw_rotor(ci, at, t_, 1.0)
+	MedHeli.draw_heli(ci, "heli_medical", at, flyover["dir"], MedHeli.TILT["nose_down"], t_, 1.0, flyover["turn"])   # cruising, nose down
 
 
 ## Fans running with you: as you reach one they set off from their spot and sprint along the roadside beside you
@@ -609,6 +728,12 @@ func movers() -> Array:
 		if e.get("run", "") != "":
 			var pz: Dictionary = race._pose(e["rs"], e["rlat"])
 			out.append([pz["pos"], _draw_runner.bind(e, pz)])
+	# drone pilots and their drones
+	for pl in pilots:
+		if absf(float(pl["s"]) - float(me["s"])) < 120.0 or pl["drone"]["state"] != "parked":
+			out.append([pl["pos"], _draw_pilot.bind(pl)])
+			var d: Dictionary = pl["drone"]
+			out.append([(d["pos"] as Vector2) + Vector2(0.01, 0.01), _draw_drone.bind(d)])
 	# the devil
 	if not devil.is_empty():
 		var s: float = me["s"]
@@ -719,19 +844,15 @@ func draw_crossing(ci: CanvasItem, e: Dictionary) -> void:
 ## A TV helicopter hanging over the leader, rotor flickering.
 func draw_helicopter(ci: CanvasItem) -> void:
 	_draw_flyover(ci)
-	if race.riders.is_empty() or Sprites.sheet("race_helicopter_tv") == null:
+	if race.riders.is_empty():
 		return
-	var lead: Dictionary = race.riders[0]
-	for r in race.riders:
-		if float(r["s"]) > float(lead["s"]):
-			lead = r
-	if float(lead["s"]) > float(race.course["length"]):
-		return
-	var pz: Dictionary = race._pose(float(lead["s"]) + 6.0, -3.0)
-	var at := Iso.to_screen(pz["pos"], pz["z"]) + Vector2(sin(t_ * 0.7) * 20.0, -170.0 + sin(t_ * 1.3) * 6.0)
-	Sprites.draw_image(ci, "race_helicopter_tv", at, false, 1.0, 0.8)
-	var w := 34.0 if int(t_ * 20.0) % 2 == 0 else 26.0
-	ci.draw_line(at + Vector2(-w, -44), at + Vector2(w, -44), Color(0.15, 0.15, 0.2, 0.6), 1.0)
+	if Sprites.sheet("heli_news") != null:
+		var p: Vector2 = news.pos
+		var me_z: float = race._tz(race._pose(race.riders[0]["s"], 0.0)["pos"])
+		news.draw(ci, Iso.to_screen(p, race._tz(p)), NEWS_ALT + me_z - race._tz(p))
+	elif Sprites.sheet("race_helicopter_tv") != null:   # (the old TV helicopter picture, until the news one's art is in)
+		var pz: Dictionary = race._pose(float(race.riders[0]["s"]) + 6.0, -3.0)
+		Sprites.draw_image(ci, "race_helicopter_tv", Iso.to_screen(pz["pos"], pz["z"]) + Vector2(0.0, -170.0), false, 1.0, 0.8)
 
 
 func _shout(at: Vector2, text: String, col: Color) -> void:

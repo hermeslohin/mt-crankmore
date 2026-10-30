@@ -7,7 +7,8 @@ extends RefCounted
 ##   * a feed zone with helpers holding out bottles, camper vans and portaloos where the fans camp;
 ##   * a devil superfan who runs alongside you up one of the climbs, and roadside fans who chase after you for a few
 ##     seconds as you go by, then stop, cheer and walk back to their spot;
-##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, a TV helicopter overhead;
+##   * a TV moto and a marshal moto ahead of the leader, a team car behind the last rider, a TV helicopter overhead,
+##     and now and then St. Pedro's air ambulance flying over;
 ##   * a mountain cog railway straight down the hillside, with level crossings and a train that comes by now and then;
 ##   * up in the snow, a ski area: skiers and snowboarders carving down, a ski school snake, ski patrol, chairlifts with
 ##     its chairs going round, the lodge, a cocoa stand, racks, slalom gates, a snowcat grooming and a snowmobile.
@@ -19,6 +20,11 @@ const RUN_CHANCE := 0.35      # share of the roadside fans who run along with yo
 const RUN_MAX := 6.8          # m/s: a fan flat out
 const RUN_LAT := 1.7          # m from the middle of the road they run at, just off the gravel
 const NO_RUN := ["photographer_kneel", "feed_helper"]   # busy: they stay put
+const MedHeli := preload("res://scripts/med_heli.gd")
+const FLYOVER_EVERY := [90.0, 240.0]   # seconds between the air ambulance flying over
+const FLYOVER_SPEED := 9.0    # tiles a second
+const FLYOVER_ALT := 190.0    # px up
+const FLYOVER_HALF := 34.0    # tiles: it comes in from this far off to one side of you and goes as far off the other
 const TRAIN_SPEED := 4.5      # tiles per second
 const TRAIN_GAP := 2.6        # tiles between the cars
 const TRAIN_CYCLE := 75.0     # seconds between trains
@@ -29,6 +35,8 @@ var rail_y0 := 0.0
 var rail_y1 := 0.0
 var crossings: Array = []      # {s, y}: where the railway crosses the road
 var devil := {}                # {s0, s1, side}
+var flyover := {}              # the air ambulance on its way over: {pos, dir, left}
+var flyover_t := 0.0           # seconds until the next one
 var run_fans: Array = []       # the fans (their statics' data) who'll run with you; "run" in one says where they're at
 var skiers: Array = []         # {design, p0, len, amp, speed, ph}: each carves down its own run and starts again
 var lift := {}                 # {x, y0, y1, towers: [y...]}: the main chairlift (bottom y0 is the lower end, nearer the camera)
@@ -48,6 +56,8 @@ func _init(r) -> void:
 func build(rng: RandomNumberGenerator) -> void:
 	var length: float = race.course["length"]
 	run_fans.clear()
+	flyover = {}
+	flyover_t = rng.randf_range(30.0, FLYOVER_EVERY[1])
 	_build_start_finish(rng, length)
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
@@ -472,6 +482,37 @@ func draw_lift_cables(ci: CanvasItem) -> void:
 func update(delta: float) -> void:
 	t_ += delta
 	_step_runners(delta)
+	_step_flyover(delta)
+
+
+## Now and then the air ambulance flies over: across the course near you, from well off one side to well off the other.
+func _step_flyover(delta: float) -> void:
+	if race.riders.is_empty() or Sprites.sheet("heli_medical") == null:
+		return
+	var me_p: Vector2 = race._pose(race.riders[0]["s"], 0.0)["pos"]
+	if flyover.is_empty():
+		flyover_t -= delta
+		if flyover_t <= 0.0:
+			flyover_t = randf_range(FLYOVER_EVERY[0], FLYOVER_EVERY[1])
+			var dir := Vector2.from_angle(randf() * TAU)
+			flyover = {"pos": me_p - dir * FLYOVER_HALF + dir.orthogonal() * randf_range(-6.0, 6.0), "dir": dir, "left": FLYOVER_HALF * 2.0, "turn": {}}
+		return
+	var step := FLYOVER_SPEED * delta
+	flyover["pos"] = (flyover["pos"] as Vector2) + (flyover["dir"] as Vector2) * step
+	flyover["left"] = float(flyover["left"]) - step
+	if float(flyover["left"]) <= 0.0:
+		flyover = {}
+
+
+func _draw_flyover(ci: CanvasItem) -> void:
+	if flyover.is_empty():
+		return
+	var p: Vector2 = flyover["pos"]
+	var ground := Iso.to_screen(p, race._tz(p))
+	ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-16, 0), ground + Vector2(0, -5), ground + Vector2(16, 0), ground + Vector2(0, 5)]), Color(0, 0, 0, 0.16))
+	var at := Iso.to_screen(p, race._tz(race._pose(race.riders[0]["s"], 0.0)["pos"]) + FLYOVER_ALT) + Vector2(0.0, MedHeli.SKIDS + sin(t_ * 2.3) * 2.0)
+	Sprites.draw_vehicle(ci, "heli_medical", at, flyover["dir"], Color.WHITE, 0, flyover["turn"])
+	MedHeli.draw_rotor(ci, at, t_, 1.0)
 
 
 ## Fans running with you: as you reach one they set off from their spot and sprint along the roadside beside you
@@ -675,6 +716,7 @@ func draw_crossing(ci: CanvasItem, e: Dictionary) -> void:
 
 ## A TV helicopter hanging over the leader, rotor flickering.
 func draw_helicopter(ci: CanvasItem) -> void:
+	_draw_flyover(ci)
 	if race.riders.is_empty() or Sprites.sheet("race_helicopter_tv") == null:
 		return
 	var lead: Dictionary = race.riders[0]

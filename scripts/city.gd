@@ -133,6 +133,8 @@ var peds: Array = []
 var road_doors: Dictionary = {}   # road index -> [[s, side, building index], ...]: the doors people can pop into
 var pops = load("res://tools/pop_watch.gd").new(self) if OS.has_environment("PIZZA_POPS") else null   # dev helper: see tools/pop_watch.gd
 var events: TownEvents          # random happenings around the player (see TownEvents)
+const MedHeli := preload("res://scripts/med_heli.gd")
+var heli                        # the air ambulance on the hospital roof (MedHeli)
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
@@ -216,6 +218,8 @@ func _ready() -> void:
 	_spawn_rivals()
 	_spawn_life()
 	events = TownHappenings.new(self)
+	heli = MedHeli.new(self)
+	heli.setup()
 	Game.rival_say.connect(_on_rival_say)
 	rival_score.resize(Talk.rivals.size())
 	rival_score.fill(0)
@@ -1698,6 +1702,7 @@ func _process(delta: float) -> void:
 		events.update(delta)
 		events.settle()
 	_update_mascots(delta)
+	heli.update(delta)
 	_update_frisbees(delta)
 	_update_squash()
 	if active:
@@ -4563,6 +4568,7 @@ func _draw_junction_arrows() -> void:
 
 
 func _draw_overlays() -> void:
+	heli.draw(self)
 	for i in bubbles:
 		var r: Dictionary = rival_state[i]
 		_bubble(Iso.to_screen(r["pos"]) + Vector2(0, -54), bubbles[i]["text"], Talk.rivals[i]["color"])

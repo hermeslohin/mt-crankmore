@@ -674,7 +674,7 @@ func _champion_menu() -> Dictionary:
 		var c: Dictionary = race.COURSES[i]
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
-			"detail": "%s\n%s and your rivals line up with you." % [c["blurb"], Game.CHAMPION["name"]]})
+			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
 	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
 	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
 

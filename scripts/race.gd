@@ -1409,14 +1409,16 @@ func _build_riders() -> void:
 		"bike": b, "player": true, "phase": 0.0, "done": false, "time": 0.0, "mass": Game.weight_kg, "power": 0.0,
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
-	var n := Talk.rivals.size()
+	# a race with the champion brings out the whole roster, not just your usual rivals
+	var field: Array = Talk.roster if not guest.is_empty() and not rescue else Talk.rivals
+	var n := field.size()
 	for i in n:
-		var info: Dictionary = Talk.rivals[i]
+		var info: Dictionary = field[i]
 		var mass := Game.rival_mass(i)
 		var lane := ((i - (n - 1) * 0.5) * 0.1 + 0.05) * ROAD_W   # spread across the road
 		riders.append({"name": info["name"], "short": info["short"], "color": info["color"], "frame": Color(info["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
-			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i,
+			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i if i < Talk.rivals.size() else -1, "sig": info["sig"],
 			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
@@ -1437,12 +1439,13 @@ func _build_riders() -> void:
 		Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
 
 
-## A rider says something: a rival through Talk, the guest champion one of his own lines over his head.
+## A rider says something: one of your usual rivals through Talk; the guest champion, or a rival who only came out for
+## his race, one of their own lines over their head.
 func _say(r: Dictionary, cat: String, force := false) -> void:
 	if int(r["idx"]) >= 0:
 		Talk.say(int(r["idx"]), cat, force)
-	elif r.get("guest", false) and (force or randf() < 0.5):
-		_pop(riders.find(r), guest["sig"].pick_random(), guest["color"])
+	elif force or randf() < 0.5:
+		_pop(riders.find(r), (guest["sig"] if r.get("guest", false) else r["sig"]).pick_random(), r["color"])
 
 
 # ---------------------------------------------------------------------

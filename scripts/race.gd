@@ -122,6 +122,13 @@ var life: RaceLife                    # the race-day crowds, motos, helicopter a
 ## none going on. Nobody waits: the race clock and the rivals carry on, so the whole scene costs you BEAR_DOWN seconds.
 var patrol: Dictionary = {}
 const BEAR_DOWN := 15.0       # seconds down after the bear catches you
+const BEAR_FTP := 1.1         # the bear runs as fast as you'd ride at this share of your FTP: hold it to get away
+const BEAR_CHASE := 19.5      # seconds it keeps after you
+const BEAR_ROUSE := 0.7       # seconds it rears up and roars where it stood before it sets off
+const BEAR_ACCEL := 5.0       # m/s per second as it gets going
+const BEAR_REACH := 1.6       # m behind you when it swipes
+const BEAR_SWIPE := 0.75      # seconds of the swipe; the paw lands at BEAR_HIT through it
+const BEAR_HIT := 0.4
 const SP_LIE := 1.3           # the wipe-out animation is over (13 frames at Sprites.FALL_FPS): lying there now
 const SP_IN := 1.4            # the patroller sets off from off screen
 const SP_WALK := 3.2          # seconds for each walk between off screen and your bike
@@ -1934,7 +1941,7 @@ func _step_animals(delta: float) -> void:
 	var ms: float = me["s"]
 	for a in animals:
 		var ds: float = float(a["s"]) - ms
-		if absf(ds) > 120.0 and a["state"] != "chase":
+		if absf(ds) > 120.0 and not a["state"] in ["rouse", "chase", "swipe"]:
 			continue
 		a["t"] = float(a["t"]) - delta
 		a["phase"] = float(a["phase"]) + delta
@@ -1948,10 +1955,17 @@ func _step_animals(delta: float) -> void:
 							_animal_cross(a)
 						elif ds < (5.0 if kind in SMALL_FLEERS else 9.0) and ds > -3.0:
 							_animal_flee(a, 1.4)
-					elif kind == "bear" and ds < 4.0 and ds > -4.0 and not me["done"]:
-						a["state"] = "chase"
-						a["cs"] = ms - 10.0
-						a["t"] = 6.5
+					elif kind == "bear" and ds <= 0.0 and ds > -3.0 and not me["done"]:
+						# you've just gone by: it rears up and roars where it stands, then comes after you from there
+						var at := _pose(a["s"], 0.0)
+						a["state"] = "rouse"
+						a["lat0"] = ((a["pos"] as Vector2) - (at["pos"] as Vector2)).dot(at["n"])
+						a["cs"] = float(a["s"])
+						a["bv"] = 0.0
+						a["run_t"] = 0.0
+						a["t"] = BEAR_ROUSE
+						a["vel"] = Vector2.ZERO
+						_face(a, (_pose(ms, 0.0)["pos"] as Vector2) - a["pos"])
 						a["done"] = true
 						_pop_at(a["pos"], "ROAR!", Color(1.0, 0.4, 0.3))
 						Game.toast.emit("BEAR! PEDAL!!", Color(1.0, 0.45, 0.3))
@@ -1981,21 +1995,47 @@ func _step_animals(delta: float) -> void:
 					a["whoa"] = true
 					me["v"] = float(me["v"]) * 0.85
 					_pop(0, "WHOA!", Color(1.0, 0.6, 0.3))
-			"chase":
-				a["run"] = true
-				var cs: float = a["cs"]
-				var vb := clampf(float(me["v"]) * 1.04 + 0.35, 2.5, 10.0)
-				cs += vb * delta
+			"rouse":
+				a["run"] = false
+				if float(a["t"]) <= 0.0:
+					a["state"] = "chase"
+					a["t"] = BEAR_CHASE
+			"chase", "swipe":
+				# as fast as you'd go at BEAR_FTP of your FTP here, on your bike: below that it gains on you
+				var bk: Dictionary = me["bike"]
+				var top := Game.speed_from_power(Game.ftp * BEAR_FTP, bk["mass"], bk["cda"], _crr(bk), _grade_at(a["cs"]))
+				a["bv"] = move_toward(float(a["bv"]), top * (0.35 if a["state"] == "swipe" else 1.0), BEAR_ACCEL * delta)
+				var cs: float = float(a["cs"]) + float(a["bv"]) * delta
 				a["cs"] = cs
 				a["s"] = cs
-				var pz := _pose(cs, float(a["side"]) * 0.3)
-				var np: Vector2 = pz["pos"]
-				_face(a, np - a["pos"])
+				# off its spot by the trail and onto the course over the first couple of seconds
+				a["run_t"] = float(a["run_t"]) + delta
+				var lat := lerpf(float(a["lat0"]), float(a["side"]) * 0.3, smoothstep(0.0, 2.0, float(a["run_t"])))
+				var np: Vector2 = _pose(cs, lat)["pos"]
+				if a["state"] == "chase":
+					_face(a, np - a["pos"])
 				a["pos"] = np
 				a["vel"] = Vector2.ZERO
-				if ms - cs < 1.6 and not me["done"] and float(me["down"]) <= 0.0:
-					_bear_wipeout()
-					a["t"] = 0.0
+				var gap := ms - cs
+				if a["state"] == "chase":
+					a["run"] = true
+					if gap < BEAR_REACH and gap > -1.0 and not me["done"] and float(me["down"]) <= 0.0:
+						a["state"] = "swipe"
+						a["sw"] = 0.0
+						a["hit"] = false
+						a["phase"] = 0.0   # the swipe plays from its first frame
+				else:
+					a["run"] = false
+					a["sw"] = float(a["sw"]) + delta
+					if not a["hit"] and float(a["sw"]) >= BEAR_HIT:
+						a["hit"] = true
+						if gap < BEAR_REACH + 0.6 and gap > -1.0 and not me["done"] and float(me["down"]) <= 0.0:
+							_bear_wipeout()
+							a["t"] = 0.0
+						else:
+							_pop_at(a["pos"], "WHIFF!", Color(1.0, 0.85, 0.5))
+					if float(a["sw"]) >= BEAR_SWIPE:
+						a["state"] = "chase"
 				if float(a["t"]) <= 0.0 or me["done"]:
 					a["state"] = "roar"
 					a["t"] = 1.8
@@ -2703,11 +2743,21 @@ func _draw_animal(a: Dictionary) -> void:
 	var base := Iso.to_screen(p, _tz(p) + 1.5).round()
 	var kind: String = a["kind"]
 	var look := "run" if a["run"] else "idle"
-	if kind == "bear" and a["state"] == "roar":
+	if kind == "bear" and a["state"] in ["roar", "rouse"]:
 		look = "roar"
+	elif kind == "bear" and a["state"] == "swipe" and Sprites.sheet("animal_bear_swipe") != null:
+		look = "swipe"
 	var tint := Color(0.5, 0.46, 0.46) if kind == "bear" and a["dark"] else Color.WHITE
 	_shadow(base, ANIMAL_SHADOW.get(kind, 14.0))
-	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t_ + float(a["phase"]), 14.0 if look == "run" else 8.0, true, float(a["face"]) < 0.0, tint)
+	var t := float(a["sw"]) if look == "swipe" else t_ + float(a["phase"])   # the swipe plays once, from the start
+	var fps := 14.0 if look == "run" else (_swipe_fps() if look == "swipe" else 8.0)
+	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t, fps, true, float(a["face"]) < 0.0, tint)
+
+
+## Frames a second for the bear's swipe, so the whole strip plays once in BEAR_SWIPE.
+func _swipe_fps() -> float:
+	var tex := Sprites.sheet("animal_bear_swipe")
+	return float(tex.get_width() / tex.get_height()) / BEAR_SWIPE * 0.999
 
 
 ## A pair of eagles circling high over the course (art/animal_eagle_fly.png).

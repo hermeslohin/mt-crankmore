@@ -142,8 +142,15 @@ func give_bike(i: int) -> bool:
 	return true
 
 
+const REPAIR_MIN := 200    # the bike shop's charge for the smallest repair
+const REPAIR_MAX := 1500   # ...rising with the share of HP missing, to this for a wreck
+
+## What the bike shop charges to put the bike back to full HP (0 when it's perfect).
 func repair_cost() -> int:
-	return int(ceilf((float(bike()["hp"]) - bike_hp()) * 1.5))
+	var missing := 1.0 - bike_hp() / float(bike()["hp"])
+	if missing <= 0.001:
+		return 0
+	return int(roundf(lerpf(REPAIR_MIN, REPAIR_MAX, clampf(missing, 0.0, 1.0)) / 5.0) * 5.0)
 
 
 func repair() -> bool:

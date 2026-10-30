@@ -615,6 +615,7 @@ func _begin(kind: String, e: Dictionary, sp: Array) -> bool:
 			var kid := {"type": "rider", "who": "kid" if Sprites.sheet("bike_kid") != null else "", "design": "", "looks": KIDS,
 				"k": 0, "pos": at[0], "face": at[1], "phase": 0.0, "pedal": 0.0, "label_t": 0.0}
 			e["actors"].append(kid)
+			_give_face(kid, "kid", "Kid", Color(1.0, 0.35, 0.3))
 			_say(kid, ["Race you to that line! Loser's a slowpoke!", "Bet I can beat you! First to the line!", "Hey! Race me!"].pick_random(), 3.0)
 		"seagulls":
 			if not city.start_challenge("gulls"):
@@ -1014,13 +1015,13 @@ func _step(e: Dictionary, delta: float) -> void:
 				e["route_d"] = float(c["them_m"]) * city.TILES_PER_MS * city.PACE
 			if c["state"] == "count":
 				if kid["label_t"] <= 0.0 and u > 0.6:
-					_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9)
+					_say(kid, str(int(ceil(float(c["count"])))) + "...", 0.9, "")
 			elif c["state"] == "won" and not e.get("said", false):
 				e["said"] = true
-				_say(kid, ["No fair! You've got gears!", "Aww... here's your $20.", "Rematch tomorrow!"].pick_random(), 3.0)
+				_say(kid, ["No fair! You've got gears!", "Aww... here's your $20.", "Rematch tomorrow!"].pick_random(), 3.0, "annoyed")
 			elif c["state"] == "lost" and not e.get("said", false):
 				e["said"] = true
-				_say(kid, ["HA! Beat you!", "Too slow, pizza person!", "Woo-hoo! I win!"].pick_random(), 3.0)
+				_say(kid, ["HA! Beat you!", "Too slow, pizza person!", "Woo-hoo! I win!"].pick_random(), 3.0, "happy")
 		"santa":
 			e["x"] = float(e["x"]) + 190.0 * delta
 			if float(e["fall"]) < 0.0 and float(e["x"]) >= float(e["drop_x"]):

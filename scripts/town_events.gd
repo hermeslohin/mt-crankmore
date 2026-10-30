@@ -1209,9 +1209,21 @@ func _building_near(kinds: Array) -> Dictionary:
 	return {} if cands.is_empty() else cands.pick_random()
 
 
-func _say(a: Dictionary, text: String, t := 2.2) -> void:
+## `a` says `text` over their head for `t` seconds. Someone with a face (_give_face) says it in the message box too,
+## looking `mood` (one of Game.FACE_MOODS; "" keeps it over their head only, for counting down and the like).
+func _say(a: Dictionary, text: String, t := 2.2, mood := "smug") -> void:
 	a["label"] = text
 	a["label_t"] = t
+	if a.has("portrait") and mood != "":
+		Game.racer_says.emit(a["portrait"], a["speaker"], text, mood, a["speaker_col"])
+
+
+## Gives `a` a face for the message box: art/face_<portrait>.png, with their name as `who`.
+func _give_face(a: Dictionary, portrait: String, who: String, col: Color) -> void:
+	if Sprites.sheet("face_" + portrait) != null:
+		a["portrait"] = portrait
+		a["speaker"] = who
+		a["speaker_col"] = col
 
 
 func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
@@ -1327,7 +1339,8 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			robber["moving"] = true
 			robber["to"] = _kerb(b["road"], float(b["s"]), _door_side(b))[0]
 			robber["speed"] = 2.0
-			_say(robber, ["Ha ha!", "So long, suckers!", "Five-finger discount!"].pick_random(), 2.0)
+			_give_face(robber, "thief", "Robber", Color(1.0, 0.45, 0.45))
+			_say(robber, ["Ha ha!", "So long, suckers!", "Five-finger discount!"].pick_random(), 2.0, "happy")
 			e["actors"].append(robber)
 			Game.toast.emit("Robbery at %s!" % str(b.get("name", "the shop")), Color(1.0, 0.45, 0.45))
 		"bike_theft":
@@ -1349,7 +1362,8 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			thief["moving"] = true
 			thief["to"] = _kerb(b["road"], float(b["s"]) + 0.8, _door_side(b))[0]
 			thief["speed"] = 1.6
-			_say(thief, ["Sweet ride! Mine now!", "Five-finger test ride!", "Thanks for the bike!"].pick_random(), 2.2)
+			_give_face(thief, "bikethief", "Bike Thief", Color(1.0, 0.45, 0.45))
+			_say(thief, ["Sweet ride! Mine now!", "Five-finger test ride!", "Thanks for the bike!"].pick_random(), 2.2, "happy")
 			e["actors"].append(thief)
 			Game.toast.emit("BIKE THIEF at %s! Catch him (average 130%% of your FTP): $300 reward" % str(b.get("name", "the bike shop")), Color(1.0, 0.45, 0.45))
 		"runaway_dog":
@@ -1381,6 +1395,7 @@ func _start_special(kind: String, e: Dictionary, sp: Array) -> bool:
 			e["clock"] = 0.0
 			var behind: Array = city._rail_ahead(-16.0, city.CAR_LANE)   # (rolls up from out of sight behind you)
 			var rod := {"type": "vehicle", "name": cars[0], "pos": behind[0], "face": behind[1], "phase": 0.0, "label_t": 0.0}
+			_give_face(rod, "hotrod", "Hot Rod", Color(1.0, 0.6, 0.2))
 			e["actors"].append(rod)
 	return true
 
@@ -1743,7 +1758,7 @@ func _step_crime(e: Dictionary, delta: float) -> void:
 				robber["type"] = "person"
 				robber["anim"] = "idle"
 				robber["moving"] = false
-				_say(robber, ["Okay, okay! I give up!", "Foiled by a pizza courier!", "Curses!"].pick_random(), 3.0)
+				_say(robber, ["Okay, okay! I give up!", "Foiled by a pizza courier!", "Curses!"].pick_random(), 3.0, "annoyed")
 				# the cop catches up on foot and the police car comes for him
 				if e["actors"].size() > 1:
 					var cop: Dictionary = e["actors"][1]
@@ -1834,7 +1849,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				e["stage"] = "mount"
 				e["clock"] = 0.0
 				thief["anim"] = "idle"
-				_say(thief, ["Later, losers!", "See ya!", "Wheee!"].pick_random(), 1.5)
+				_say(thief, ["Later, losers!", "See ya!", "Wheee!"].pick_random(), 1.5, "happy")
 		"mount":
 			if e["clock"] > 0.6:
 				# swings a leg over and he's off: the chase is on
@@ -1861,7 +1876,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 				e["stage"] = "caught"
 				e["clock"] = 0.0
 				thief["fall_t"] = 0.0
-				_say(thief, ["WHOA!", "Aaargh!", "Oof!"].pick_random(), 1.5)
+				_say(thief, ["WHOA!", "Aaargh!", "Oof!"].pick_random(), 1.5, "shocked")
 				if not owner.is_empty():
 					# running up after you (from out of sight behind, unless they're in sight already)
 					if not _seen(owner):
@@ -1888,7 +1903,7 @@ func _step_bike_theft(e: Dictionary, delta: float) -> void:
 					thief["type"] = "person"
 					thief["design"] = "bikethief" if _has("ped_bikethief_walk") else "robber"
 					thief["anim"] = "caught"
-					_say(thief, ["Okay, okay! I give up!", "It was a test ride!", "Nice bike though, right?"].pick_random(), 3.0)
+					_say(thief, ["Okay, okay! I give up!", "It was a test ride!", "Nice bike though, right?"].pick_random(), 3.0, "annoyed")
 			if not owner.is_empty() and not owner.get("moving", false) and owner["anim"] != "cheer":
 				owner["anim"] = "cheer"
 				_say(owner, ["My bike! Thank you!", "You're a hero!", "Free tune-up for life!"].pick_random(), 3.0)
@@ -1997,9 +2012,9 @@ func _step_hotrod(e: Dictionary, delta: float) -> void:
 				e["route"] = c["route"]
 				e["route_d"] = float(c["them_m"]) * city.TILES_PER_MS * city.PACE + 0.4
 			if c["state"] == "count" and rod["label_t"] <= 0.0:
-				_say(rod, str(int(ceil(float(c["count"])))) + "...", 0.9)
+				_say(rod, str(int(ceil(float(c["count"])))) + "...", 0.9, "")
 			if c["state"] == "won":
-				_say(rod, ["No way! Fine. Here's your $300.", "What?! On a BIKE?", "Rematch next time!"].pick_random(), 3.0)
+				_say(rod, ["No way! Fine. Here's your $300.", "What?! On a BIKE?", "Rematch next time!"].pick_random(), 3.0, "shocked")
 				e["stage"] = "off"
 				e["clock"] = 0.0
 			elif c["state"] == "lost":

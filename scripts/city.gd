@@ -195,6 +195,10 @@ var invuln := 0.0
 var carry: Dictionary = {}
 var handoff := 0.0
 var handoff_shop := -1
+var handoff_live := false       # you're stopped at the window and the baker's throwing (not backing off)
+const HANDOFF_TIME := 1.1       # seconds for the baker to wind up and throw you the pizza
+const THROW_END := 0.75         # the baker's throw plays over this much of the handoff, then holds
+const THROW_RELEASE := 0.56     # where in the handoff the pizza leaves their hands (about frame 7 of the throw), spinning, and flies to you
 var prompt := ""
 var er_timer := 0.0
 const ER_LIE_TIME := 3.0      # seconds the rider lies in the road, after a car hit, before they vanish into the ER
@@ -1700,6 +1704,9 @@ func _process(delta: float) -> void:
 		if bubbles[k]["t"] <= 0.0:
 			bubbles.erase(k)
 	player_bubble["t"] = maxf(0.0, player_bubble["t"] - delta)
+	if player_bubble["t"] > 0.0 and player_bubble.get("boxed", false) == false:   # in the message box too, with your face
+		player_bubble["boxed"] = true
+		Game.racer_says.emit("rookie_" + Game.rider, Game.player_name, player_bubble["text"], "happy", Color(0.4, 0.75, 1.0))
 	_update_cars(delta)
 	_update_rivals(delta)
 	_update_life(delta)
@@ -2181,6 +2188,7 @@ func _hit_by_car(c: Dictionary) -> void:
 	p_down = 0.0
 	if not carry.is_empty():
 		Game.toast.emit("The pizza went flying. Order #%d is lost." % carry["id"], Color.ORANGE)
+		chef_says(int(carry["shop"]), "flying")
 		carry = {}
 	Game.toast.emit("HIT BY A CAR!  Medical bill: $%d" % er_bill, Color(1.0, 0.3, 0.3))
 	Talk.say_random("er", true)
@@ -2603,7 +2611,7 @@ func _update_rivals(delta: float) -> void:
 					r["idle"] = 1.0
 				elif _follow(r, delta):
 					r["state"] = "handoff"
-					r["wait"] = 0.8
+					r["wait"] = HANDOFF_TIME
 			"handoff":
 				r["wait"] -= delta
 				if r["wait"] <= 0.0:
@@ -2748,6 +2756,7 @@ func _update_orders(delta: float) -> void:
 		carry["t_left"] -= delta
 		if carry["t_left"] <= 0.0:
 			Game.toast.emit("Too slow! The pizza went cold and the customer won't pay. Order #%d lost." % carry["id"], Color(1.0, 0.45, 0.35))
+			chef_says(int(carry["shop"]), "cold")
 			Talk.say_random("late", true)
 			carry["state"] = "done"
 			carry = {}
@@ -2794,6 +2803,7 @@ func _post_order() -> void:
 			next_order_id += 1
 			orders.append(o)
 			Game.toast.emit("RING RING!  PIZZA RUSH! %s: %d pizzas for a party, %d stops!" % [shops[s]["name"], stops.size(), stops.size()], Color(1.0, 0.6, 0.2))
+			chef_says(s, "rush")
 			return
 	# now and then it's the construction crew's lunch break
 	var crew := site_spot >= 0 and randf() < SITE_ORDER_CHANCE and not orders.any(func(q): return q["dest"] == site_spot and q["state"] != "done")
@@ -2807,8 +2817,10 @@ func _post_order() -> void:
 	if crew:
 		o["pay"] += 10   # a big order: pizzas for the whole crew
 		Game.toast.emit("RING RING!  Hungry builders! %s: $%d to the %s site!" % [shops[s]["name"], o["pay"], spots[d]["name"]], Color(1.0, 0.85, 0.3))
+		chef_says(s, "crew")
 	else:
 		Game.toast.emit("RING RING!  %s: $%d to %s!" % [shops[s]["name"], o["pay"], spots[d]["name"]], Color(1.0, 0.85, 0.3))
+		chef_says(s, "ring")
 	var hunters := 0
 	var idx := range(Talk.rivals.size())
 	idx.shuffle()
@@ -2832,15 +2844,37 @@ func _update_pickups(delta: float) -> void:
 			if p_pos.distance_to(shops[o["shop"]]["window"]) < 2.7 and p_speed < 2.0:
 				picking = true
 				handoff_shop = o["shop"]
-				handoff += delta / 0.8
+				handoff += delta / HANDOFF_TIME
 				if handoff >= 1.0:
 					_take_order(o)
 					handoff = 0.0
 				break
+	handoff_live = picking
 	if not picking:
 		handoff = maxf(0.0, handoff - delta * 2.0)
 	if not carry.is_empty() and p_pos.distance_to(spots[carry["dest"]]["pos"]) < 2.7 and p_speed < 2.0:
 		_deliver()
+
+
+## What the pizza shops' bakers say (in the message box, with their faces: art/face_chef_<shop>.png).
+const CHEF_LINES := {
+	"ring": ["Order up! Who's riding?", "Ring ring! Hot one going out!", "Pizza's in the oven, I need a rider!", "Fresh order! Don't let the others grab it!"],
+	"rush": ["A PARTY ORDER! Five pizzas! Hurry!", "Big one! Party pizzas, all over town!", "Mamma mia, look at this order!"],
+	"crew": ["The builders are hungry! Extra cheese for the crew!", "Lunch for the whole site! Don't drop it!"],
+	"pickup": ["Hot and fresh! Go go go!", "Mind the potholes!", "Don't you dare let it go cold!", "Fastest rider in town, eh? Prove it!"],
+	"cold": ["You let it go COLD?!", "Cold pizza! In MY town?!", "That was a beautiful pie. Was."],
+	"flying": ["My pizza! On the ROAD!", "Was that... my pizza flying?!", "Noooo! The pizza!"],
+}
+const CHEF_MOODS := {"ring": "happy", "rush": "shocked", "crew": "happy", "pickup": "smug", "cold": "annoyed", "flying": "shocked"}
+
+
+## Shop `si`'s baker says one of their CHEF_LINES[kind].
+func chef_says(si: int, kind: String) -> void:
+	if si < 0 or si >= shops.size():
+		return
+	var sh: Dictionary = shops[si]
+	var key := "chef_" + String(sh["name"]).to_lower().replace("'", "").replace(" ", "_")
+	Game.racer_says.emit(key, sh["name"], CHEF_LINES[kind].pick_random(), CHEF_MOODS[kind], sh["color"])
 
 
 func _take_order(o: Dictionary) -> void:
@@ -2851,6 +2885,7 @@ func _take_order(o: Dictionary) -> void:
 	o["t_left"] = o["t_total"]
 	carry = o
 	Game.toast.emit("Got it! Deliver to %s in %ds or no pay!" % [spots[o["dest"]]["name"], int(o["t_total"])], Color(0.5, 1.0, 0.5))
+	chef_says(int(o["shop"]), "pickup")
 	if o.has("rush"):
 		start_challenge("rush", {"stops": o["rush"].size()})
 	var best := -1
@@ -4438,7 +4473,8 @@ func _draw_chef(si: int) -> void:
 	for o in orders:
 		if o["state"] == "open" and o["shop"] == si:
 			waiting = true
-	var giving := handoff > 0.0 and handoff_shop == si
+	var throw := _throw_progress(si)
+	var giving := throw >= 0.0 or (handoff > 0.0 and handoff_shop == si)
 	var t := t_ + si * 0.7
 	draw_colored_polygon(PackedVector2Array([ground + Vector2(-6, 0), ground + Vector2(0, -3), ground + Vector2(6, 0), ground + Vector2(0, 3)]), Color(0, 0, 0, 0.22))
 	var slug := _shop_slug(sh["name"])
@@ -4453,8 +4489,13 @@ func _draw_chef(si: int) -> void:
 			draw_circle(np, 1.6, nc)
 			draw_line(np + Vector2(1.4, 0), np + Vector2(1.4, -6), nc, 1.0)
 			draw_line(np + Vector2(1.4, -6), np + Vector2(3.4, -4), nc, 1.0)
+	elif throw >= 0.0 and Sprites.sheet("chef_%s_throw" % slug) != null:
+		# winding up and flinging the pizza (the pizza itself flies off on its own: _draw_thrown_pizza)
+		var tex := Sprites.outfit("chef_%s_throw" % slug)
+		var n := maxi(1, tex.get_width() / tex.get_height())
+		Sprites.draw_strip(self, "chef_%s_throw" % slug, ground, float(mini(n - 1, int(throw / THROW_END * n))) / 10.0, 10.0)
 	else:
-		# standing around; while handing the pizza out they hold still (the box itself is drawn flying to the rider)
+		# standing around (still while handing over, if there's no throw art)
 		Sprites.draw_strip(self, "chef_%s_tap" % slug, ground, 0.0 if giving else t, 8.0)
 
 
@@ -4515,17 +4556,44 @@ func _draw_player() -> void:
 		_draw_bike(p_pos, p_head, p_phase, not carry.is_empty(), "YOU", heat, k)
 	_label(Game.player_name, Iso.to_screen(p_pos) + Vector2(0, -46 * k), 8, Color(1, 1, 1))
 	if handoff > 0.0 and handoff_shop >= 0:
-		# the pizza slides out of the window into your hands
-		var hatch := Iso.to_screen(shops[handoff_shop]["chef"], 22.0)
-		var hands := Iso.to_screen(p_pos, 18.0)
-		var bp := hatch.lerp(hands, clampf(handoff, 0.0, 1.0))
-		Iso.poly(self, PackedVector2Array([bp + Vector2(-7, -2), bp + Vector2(0, -5), bp + Vector2(7, -2), bp + Vector2(0, 1)]), Color(0.97, 0.95, 0.88))
-		draw_rect(Rect2(bp + Vector2(-2, -3), Vector2(4, 1)), Color(0.9, 0.2, 0.2))
-		draw_arc(hands + Vector2(0, -26), 8.0, -PI * 0.5, -PI * 0.5 + TAU * handoff, 16, Color(0.4, 1.0, 0.5), 2.0)
+		if handoff_live:   # the baker flings the pizza and it spins through the air into your hands
+			_draw_thrown_pizza(handoff_shop, p_pos, handoff)
+		draw_arc(Iso.to_screen(p_pos, 18.0) + Vector2(0, -26), 8.0, -PI * 0.5, -PI * 0.5 + TAU * handoff, 16, Color(0.4, 1.0, 0.5), 2.0)
+
+
+## A pizza in flight from shop `si`'s baker to `to` (a world point), `u` into the handoff: nothing until the baker lets
+## go at THROW_RELEASE, then a spinning pizza (art/pizza_spin.png) on a high arc into the catcher's hands.
+func _draw_thrown_pizza(si: int, to: Vector2, u: float) -> void:
+	if u < THROW_RELEASE:
+		return
+	var f := clampf((u - THROW_RELEASE) / (1.0 - THROW_RELEASE), 0.0, 1.0)
+	var from := Iso.to_screen(shops[si]["chef"]) + Vector2(0, -36)   # (chest height, where the throw lets go)
+	var hands := Iso.to_screen(to, 18.0)
+	var at := from.lerp(hands, f) + Vector2(0, -sin(f * PI) * 34.0)
+	var sh := Iso.to_screen(shops[si]["chef"]).lerp(Iso.to_screen(to), f)   # its shadow on the ground
+	draw_colored_polygon(PackedVector2Array([sh + Vector2(-5, 0), sh + Vector2(0, -2), sh + Vector2(5, 0), sh + Vector2(0, 2)]), Color(0, 0, 0, 0.18))
+	if not Sprites.draw_strip(self, "pizza_spin", at, t_, 24.0, false):
+		draw_circle(at, 6.0, Color(0.95, 0.75, 0.3))
+
+
+## How far shop `si`'s baker is into throwing a pizza (0-1 of the handoff, to you or a rival), or -1 when not.
+func _throw_progress(si: int) -> float:
+	if handoff > 0.0 and handoff_shop == si and handoff_live:
+		return handoff
+	for r in rival_state:
+		if r["state"] == "handoff":
+			var o := _order_by_id(r["order"])
+			if not o.is_empty() and int(o["shop"]) == si:
+				return 1.0 - float(r["wait"]) / HANDOFF_TIME
+	return -1.0
 
 
 func _draw_rival(i: int) -> void:
 	var r: Dictionary = rival_state[i]
+	if r["state"] == "handoff":   # the baker throws them the pizza too
+		var o := _order_by_id(r["order"])
+		if not o.is_empty():
+			_draw_thrown_pizza(int(o["shop"]), r["pos"], 1.0 - float(r["wait"]) / HANDOFF_TIME)
 	var info: Dictionary = Talk.rivals[i]
 	var k := _bread_k(r["bread"])
 	if r["socks"] > 0.0 and r["stun"] <= 0.0:

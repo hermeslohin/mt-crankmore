@@ -603,10 +603,18 @@ func _on_interact(kind: String) -> void:
 	match kind:
 		"bike":
 			hud.open_menu(_bike_shop_menu)
+			_mechanic_says(["Welcome to Spokes & Stuff! Mind the grease.", "Back again? What did you break this time?",
+				"Looking for something faster? Or something that still has two wheels?", "Ah, my favourite customer. Kind of."].pick_random(),
+				"annoyed" if Game.hp_ratio() < 0.5 else "happy")
 		"race":
 			hud.open_menu(_race_menu)
 		"rescue":
 			_start_rescue()
+
+
+## The mechanic at Spokes & Stuff says something, in the message box with his face (art/face_mechanic.png).
+func _mechanic_says(text: String, mood := "happy") -> void:
+	Game.racer_says.emit("mechanic", "Mechanic", text, mood, Color(0.6, 0.9, 1.0))
 
 
 func _bike_shop_menu() -> Dictionary:
@@ -636,6 +644,8 @@ func _bike_shop_menu() -> Dictionary:
 			fn = func():
 				if Game.buy_bike(i):
 					Game.toast.emit("New ride: %s!" % b["name"], Color(0.5, 1.0, 0.6))
+					_mechanic_says(["She's a beauty. Try not to get her hit by a car.", "Good choice! Tyres are pumped, chain's oiled.",
+						"Ooh, the %s. Ride it like you stole it. But you didn't. You paid." % b["name"]].pick_random(), "happy")
 					Talk.say_random("new_bike", true)
 		var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
 		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
@@ -645,8 +655,11 @@ func _bike_shop_menu() -> Dictionary:
 	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
 	items.append({"label": ("Repair bike   FREE" if pity else "Repair bike   $%d" % rc) if hurt else "Repair bike   (already perfect)",
 		"fn": func():
-			if Game.repair() and pity:
-				Game.toast.emit("Mechanic: \"%s\"" % Game.MECHANIC_PITY.pick_random(), Color(0.6, 0.9, 1.0)),
+			if Game.repair():
+				if pity:
+					_mechanic_says(Game.MECHANIC_PITY.pick_random(), "shocked")
+				else:
+					_mechanic_says(["Good as new. Well, nearly.", "Trued the wheels, bled the brakes. You're welcome.", "There. Now please stop hitting cars."].pick_random(), "smug"),
 		"enabled": hurt and Game.money >= rc,
 		"detail": ("The mechanic looks at you, then at the Rusty Trash Bike, and winces. \"You look like you need help. Let me fix that for you, no charge.\"\nBike HP %d / %d." if pity
 			else "Fresh tape, fresh grease. Bike HP %d / %d.") % [int(Game.bike_hp()), int(Game.bike()["hp"])]})

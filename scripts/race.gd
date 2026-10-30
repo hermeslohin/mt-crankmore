@@ -1445,7 +1445,9 @@ func _say(r: Dictionary, cat: String, force := false) -> void:
 	if int(r["idx"]) >= 0:
 		Talk.say(int(r["idx"]), cat, force)
 	elif force or randf() < 0.5:
-		_pop(riders.find(r), (guest["sig"] if r.get("guest", false) else r["sig"]).pick_random(), r["color"])
+		var text: String = (guest["sig"] if r.get("guest", false) else r["sig"]).pick_random()
+		_pop(riders.find(r), text, r["color"])
+		Game.racer_says.emit(String(r["short"]).to_lower(), r["name"], text, Talk.MOODS.get(cat, "smug"), r["color"])
 
 
 # ---------------------------------------------------------------------
@@ -2101,6 +2103,8 @@ func _face(a: Dictionary, dir: Vector2) -> void:
 	var sx := dir.x - dir.y
 	if absf(sx) > 0.001:
 		a["face"] = signf(sx)
+	if dir.length() > 0.001:
+		a["wdir"] = dir.normalized()   # the way it's heading, for the 8-direction art (Sprites.draw_animal)
 
 
 func _animal_cross(a: Dictionary) -> void:
@@ -2829,7 +2833,11 @@ func _draw_animal(a: Dictionary) -> void:
 	_shadow(base, ANIMAL_SHADOW.get(kind, 14.0))
 	var t := float(a["sw"]) if look == "swipe" else t_ + float(a["phase"])   # the swipe plays once, from the start
 	var fps := 14.0 if look == "run" else (_swipe_fps() if look == "swipe" else 8.0)
-	Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t, fps, true, float(a["face"]) < 0.0, tint)
+	if look in ["roar", "swipe"]:   # (side-on only)
+		Sprites.draw_strip(self, "animal_%s_%s" % [kind, look], base, t, fps, true, float(a["face"]) < 0.0, tint)
+	else:
+		var w: Vector2 = a.get("wdir", Vector2(float(a["face"]), -float(a["face"])).normalized())
+		Sprites.draw_animal(self, kind, look, base, w, t, fps, tint, a)
 
 
 ## Frames a second for the bear's swipe, so the whole strip plays once in BEAR_SWIPE.

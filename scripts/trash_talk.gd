@@ -230,6 +230,16 @@ var _lines := {
 	],
 }
 
+## How a rival looks saying each kind of line (their face in the message box; see Game.racer_says). Anything not
+## listed is said with a smug look.
+const MOODS := {"banter": "smug", "trash_bike": "smug", "order_stolen": "smug", "race_pass_player": "smug", "race_win_rival": "smug",
+	"rival_delivered": "smug", "pu_hit_player": "smug", "crash_player": "smug", "late": "smug", "er": "smug", "bike_destroyed": "smug",
+	"race_leading": "smug",
+	"race_player_pass": "annoyed", "race_win_player": "annoyed", "race_lose_player": "annoyed", "order_won": "annoyed", "delivered": "annoyed",
+	"race_bear": "shocked", "race_wildlife": "shocked", "race_log": "shocked", "pu_ouch": "shocked", "rival_crash": "shocked", "new_bike": "shocked",
+	"idle": "happy", "idle_spring": "happy", "idle_summer": "happy", "idle_fall": "happy", "idle_winter": "happy", "race_start": "happy",
+	"race_air": "happy", "race_splash": "happy"}
+
 var rivals: Array = []
 var _cooldown := 0.0
 var _banter_clock := 14.0
@@ -269,7 +279,10 @@ func say(rival: int, cat: String, force: bool = false) -> bool:
 	if _cooldown > 0.0 and not force:
 		return false
 	_cooldown = 2.5
-	Game.rival_say.emit(rival, line(cat, rival))
+	var text := line(cat, rival)
+	Game.rival_say.emit(rival, text)
+	var who: Dictionary = rivals[rival]
+	Game.racer_says.emit(String(who["short"]).to_lower(), who["name"], text, MOODS.get(cat, "smug"), who["color"])
 	return true
 
 

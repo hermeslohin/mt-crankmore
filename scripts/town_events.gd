@@ -1005,13 +1005,11 @@ func draw_actor(ci: CanvasItem, a: Dictionary) -> void:
 					ci.draw_colored_polygon(PackedVector2Array([c.call(-0.4, -0.18, 11.0), c.call(0.25, -0.18, 11.0), c.call(0.25, 0.18, 11.0), c.call(-0.4, 0.18, 11.0)]), Color(0.85, 0.2, 0.2))
 					ci.draw_circle(c.call(0.38, 0.0, 11.0), 2.5, Color(0.96, 0.8, 0.65))
 		"animal":
-			var flip := Iso.to_screen(a["face"]).x < 0.0
 			var lift: float = a.get("lift", 0.0)
 			if lift <= 0.0:
 				ci.draw_colored_polygon(PackedVector2Array([ground + Vector2(-6, 0), ground + Vector2(0, -2.5), ground + Vector2(6, 0), ground + Vector2(0, 2.5)]), Color(0, 0, 0, 0.2 * Sprites.fade))
-			var name := "animal_%s_%s" % [a["name"], a["anim"]]
-			if not Sprites.draw_strip(ci, name, ground + Vector2(0, -lift), ph, 12.0 if a["anim"] == "run" else 8.0, true, flip):
-				Sprites.draw_strip(ci, "animal_%s_idle" % a["name"], ground + Vector2(0, -lift), ph, 8.0, true, flip)
+			if not Sprites.draw_animal(ci, a["name"], a["anim"], ground + Vector2(0, -lift), a["face"], ph, 12.0 if a["anim"] == "run" else 8.0, Color.WHITE, a):
+				Sprites.draw_animal(ci, a["name"], "idle", ground + Vector2(0, -lift), a["face"], ph, 8.0, Color.WHITE, a)
 		"vehicle":
 			Sprites.draw_vehicle(ci, a["name"], ground, a["face"], Color.WHITE, int(ph * 6.0), a)
 		"ball":

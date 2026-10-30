@@ -461,6 +461,16 @@ const PASS_MOVES := {
 const PASS_FPS := 8.0
 
 
+## An animal standing on `at`, heading `w` (a world direction): from art/animal_<kind>_<anim>8.png when there is one
+## (8 directions, rows as for people; made by tools/import_sprite.gd people), else the side-on strip
+## art/animal_<kind>_<anim>.png, facing right and mirrored to face left. `state`: its own dictionary, for smooth turning.
+static func draw_animal(ci: CanvasItem, kind: String, anim: String, at: Vector2, w: Vector2, t: float, fps: float, tint := Color.WHITE, state: Dictionary = {}) -> bool:
+	var dirs := "animal_%s_%s8" % [kind, anim]
+	if sheet(dirs) != null and w.length() > 0.001:
+		return draw_person(ci, dirs, at, w, t, fps, tint, state)
+	return draw_strip(ci, "animal_%s_%s" % [kind, anim], at, t, fps, true, w.x - w.y < 0.0, tint)
+
+
 ## One of a bystander's other cheers (move `k` of PASS_MOVES). False when there is no art for it.
 static func draw_pass(ci: CanvasItem, design: String, at: Vector2, t: float, k := 0) -> bool:
 	return draw_strip(ci, pass_sheet(design, k), at, t, PASS_FPS)

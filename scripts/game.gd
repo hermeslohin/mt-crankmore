@@ -4,6 +4,11 @@ extends Node
 signal toast(text: String, color: Color)
 signal feed(text: String, color: Color)
 signal rival_say(rival: int, text: String)
+## A racer speaking, for the message box with their face (Hud): `face` names their art/face_<face>.png, `mood` one of
+## FACE_MOODS.
+signal racer_says(face: String, who: String, text: String, mood: String, color: Color)
+## The expressions on a face sheet, in order; each is two frames, mouth shut then open (talking).
+const FACE_MOODS := ["happy", "smug", "annoyed", "shocked"]
 signal money_changed
 
 const RIDER_MASS := 75.0

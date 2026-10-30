@@ -8,6 +8,11 @@ var main: Node
 var font: Font
 var toasts: Array = []
 var feed: Array = []
+var speech: Array = []          # racers' lines waiting for (and in) the message box: {face, who, text, mood, color, t}
+const SPEECH_QUEUE := 3
+const SPEECH_CPS := 45.0        # letters a second as a line types out
+const SPEECH_HOLD := 2.2        # seconds a line stays up once it's all out
+const FACE := 64                # px, a face frame (art/face_<who>.png: 8 frames, two per mood in Game.FACE_MOODS order)
 var panel_sb := StyleBoxFlat.new()
 var weehoo_sb := StyleBoxFlat.new()
 var weehoo_shadow := StyleBoxFlat.new()
@@ -41,6 +46,7 @@ func setup(m: Node) -> void:
 	weehoo_shadow.bg_color = INK
 	Game.toast.connect(func(text: String, color: Color): toasts.append({"text": text, "color": color, "t": 4.5}))
 	Game.rival_say.connect(_on_rival_say)
+	Game.racer_says.connect(_on_racer_says)
 	Game.feed.connect(func(text: String, color: Color): _push_feed("", text, color))
 
 	menu_panel = PanelContainer.new()
@@ -69,7 +75,19 @@ func _style(sb: StyleBoxFlat, bg: Color, border: Color, margin: int) -> void:
 
 
 func _on_rival_say(rival: int, text: String) -> void:
-	_push_feed(Talk.rivals[rival]["short"], text, Talk.rivals[rival]["color"])
+	if Sprites.sheet("face_" + String(Talk.rivals[rival]["short"]).to_lower()) == null:   # no face art: the old chat line
+		_push_feed(Talk.rivals[rival]["short"], text, Talk.rivals[rival]["color"])
+
+
+## A racer's line for the message box (Game.racer_says): shown in turn, a few at a time, see _draw_speech.
+func _on_racer_says(face: String, who: String, text: String, mood: String, color: Color) -> void:
+	if Sprites.sheet("face_" + face) == null:
+		return
+	if not speech.is_empty() and speech[-1]["text"] == text:
+		return
+	speech.append({"face": face, "who": who, "text": text, "mood": maxi(0, Game.FACE_MOODS.find(mood)), "color": color, "t": 0.0})
+	while speech.size() > SPEECH_QUEUE:
+		speech.pop_front()
 
 
 func _push_feed(who: String, text: String, col: Color) -> void:
@@ -181,6 +199,10 @@ func _process(delta: float) -> void:
 	toasts = toasts.filter(func(t): return t["t"] > 0.0)
 	if toasts.size() > 3:
 		toasts = toasts.slice(toasts.size() - 3)
+	if not speech.is_empty():
+		speech[0]["t"] = float(speech[0]["t"]) + delta * (1.6 if speech.size() > 1 else 1.0)   # hurry along when others wait
+		if float(speech[0]["t"]) > String(speech[0]["text"]).length() / SPEECH_CPS + SPEECH_HOLD:
+			speech.pop_front()
 	for f in feed:
 		f["t"] -= delta
 	feed = feed.filter(func(f): return f["t"] > 0.0)
@@ -344,6 +366,8 @@ func _draw() -> void:
 			_draw_race_hud(w, h)
 	_draw_toasts(w)
 	_draw_feed(h)
+	if main.mode != 0:
+		_draw_speech(w, h)
 	if not main.viewer.is_empty():   # the event viewer's banner
 		var vt: String = "EVENT VIEWER   [ / ] or P / N to step, R again:   " + (str(main.viewer["status"]) if main.viewer["status"] != "" else "press ] to start")
 		var tw := font.get_string_size(vt, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
@@ -761,8 +785,40 @@ func _draw_toasts(w: float) -> void:
 		y += 17.0
 
 
+## The message box along the bottom, between the WEEHOO and the leaderboard / standings: the speaker's face on the
+## left (their mouth moving while the line types out), their name, and the line.
+func _draw_speech(w: float, h: float) -> void:
+	if speech.is_empty():
+		return
+	var s: Dictionary = speech[0]
+	var tex := Sprites.sheet("face_" + str(s["face"]))
+	if tex == null:
+		speech.pop_front()
+		return
+	var x0 := weehoo_rect().end.x + 6.0
+	var r := Rect2(x0, h - FACE - 14.0, minf(w - x0 - 124.0, 380.0), FACE + 10.0)
+	draw_rect(r.grow(2.0), INK)
+	draw_rect(r, Color(0.07, 0.08, 0.16, 0.92))
+	draw_rect(r.grow(1.0), Color(0.85, 0.88, 1.0, 0.9), false, 1.0)
+	var text: String = s["text"]
+	var shown := mini(text.length(), int(float(s["t"]) * SPEECH_CPS))
+	var talking := shown < text.length() and int(float(s["t"]) * 8.0) % 2 == 0
+	var frame := int(s["mood"]) * 2 + (1 if talking else 0)
+	var face := Rect2(r.position + Vector2(5, 5), Vector2(FACE, FACE))
+	draw_rect(face, Color(0.18, 0.2, 0.32))
+	draw_texture_rect_region(tex, face, Rect2(frame * FACE, 0, FACE, FACE))
+	draw_rect(face, s["color"], false, 1.0)
+	var tx := face.end.x + 8.0
+	var tw := r.end.x - tx - 6.0
+	_text(str(s["who"]), Vector2(tx, r.position.y + 14), 9, s["color"])
+	draw_multiline_string(font, Vector2(tx, r.position.y + 28), text.substr(0, shown), HORIZONTAL_ALIGNMENT_LEFT, tw, 9, 4, Color.WHITE)
+	if shown >= text.length() and int(Time.get_ticks_msec() / 400) % 2 == 0:   # the little "more" arrow
+		var a := Vector2(r.end.x - 10, r.end.y - 7)
+		draw_colored_polygon(PackedVector2Array([a + Vector2(-3, -2), a + Vector2(3, -2), a + Vector2(0, 2)]), Color.WHITE)
+
+
 func _draw_feed(h: float) -> void:
-	var base := h - 44.0
+	var base := h - 44.0 if speech.is_empty() else h - FACE - 22.0   # (above the message box while someone's talking)
 	var n := feed.size()
 	for i in n:
 		var f: Dictionary = feed[n - 1 - i]

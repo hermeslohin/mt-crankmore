@@ -2211,8 +2211,13 @@ func _end_race() -> void:
 	for k in order.size():
 		if order[k].get("guest", false):
 			champ = k + 1
+	var new_bike := false
+	if champ > 0 and place < champ:   # you beat the champion: his bonus, and his bike
+		Game.add_money(Game.CHAMPION_BONUS)
+		new_bike = Game.give_bike(Game.CHAMPION_BIKE)
+		Game.save_game()
 	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
-		"beat_champion": champ > 0 and place < champ, "champion": champ > 0})
+		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike})
 
 
 # ---------------------------------------------------------------------

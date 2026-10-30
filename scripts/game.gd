@@ -32,6 +32,7 @@ const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.
 const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
+const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
 const MAX_RIVALS := 8
 
 var bikes: Array = [
@@ -51,8 +52,12 @@ var bikes: Array = [
 	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
 	{"name": "Hoofy Bike", "price": 0, "gift": true, "mass": 16.5, "cda": 0.49, "crr": 0.0115, "hp": 70.0, "gravel": 0.95, "turn": 0.9,
 		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
+	# "gift": not for sale; yours for beating the Tour de Crankmore champion (see Race._end_race)
+	{"name": "Champion's Bike", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
+		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube."},
 ]
 const HOOFY := 6   # the Hoofy Bike's place in `bikes`
+const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014

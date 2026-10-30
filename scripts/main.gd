@@ -722,12 +722,16 @@ func _on_race_finished(result: Dictionary) -> void:
 			lines += "%d. %s\n" % [i + 1, result["order"][i]]
 		var t: float = result["time"]
 		var title := "%s: you placed #%d!" % [result["course"], result["place"]]
+		var reward := ""
 		if result.get("beat_champion", false):
 			title = "You beat %s, the Tour de Crankmore champion! #%d on %s" % [Game.CHAMPION["name"], result["place"], result["course"]]
+			reward = "\nChampion's bonus: $%d" % Game.CHAMPION_BONUS
+			reward += ("\nHe hands you his bike: the CHAMPION'S BIKE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
+				else "\n(You've already got his bike.)")
 		elif result.get("champion", false):
 			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
 		return {"title": title,
-			"sub": "Time %d:%04.1f     Prize: $%d\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], lines],
+			"sub": "Time %d:%04.1f     Prize: $%d%s\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 
 

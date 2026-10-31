@@ -47,6 +47,7 @@ const IDLE_END := 15.0        # seconds stopped past the finish before the resul
 const FORD_HALF := 2.5        # metres of water either side of a ford's centre
 const FORD_CRR := 0.05        # extra rolling resistance while wading
 const WATER := Color(0.3, 0.62, 0.92)
+const BALLOON_ARCH_H := 52.0  # px: how high the crit's balloon arch stands over the road
 ## Speed (km/h) -> share of the watts saved riding in a slipstream; linear in between, flat above the last point.
 const DRAFT_CURVE := [[0.0, 0.0], [13.0, 0.18], [17.0, 0.24], [40.0, 0.30]]
 # How rivals race each other: they tire in the wind, so they ride in a group, take turns on the front and now and
@@ -1028,7 +1029,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	if lap > 0.0:   # a crit: no obstacles, one arch over the line (its crowds: RaceLife._build_crit_crowd)
 		fords = PackedFloat32Array()
 		statics.clear()
-		_put_static(2, {"kind": "arch", "s": 0.0, "label": "CRUSTY CRIT"}, [])
+		_put_static(2, {"kind": "balloons", "s": 0.0}, [])
 		return
 	for st in streams:
 		for i in M - 1:
@@ -2584,6 +2585,8 @@ func time_gap(r: Dictionary) -> float:
 
 ## Dev helper: race positions worth a screenshot (just before the first of each obstacle, a bear, the finish).
 func debug_spots() -> Array:
+	if lap > 0.0:   # a crit: coming up to the line, just past it and halfway round
+		return [lap - 9.0, 25.0, lap * 0.5]
 	var out: Array = [40.0]
 	for kind in ["jump", "log", "ford"]:
 		for ob in obstacles:
@@ -2991,6 +2994,52 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(pz["pos"], pz["z"])
 			_wide(b, pz, ROAD_W, func(): Sprites.draw_vehicle(self, "obj_race_arch", b + Vector2(0, -34), along))
 			draw_string(font, b + Vector2(-60, -88), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 120.0, 12, Color(0.15, 0.15, 0.2) if e["label"] == "START" else Color.WHITE)
+		"balloons":   # a crit's start/finish: an arch of balloons over the road, bobbing a little
+			var pz: Dictionary = e["pz"]
+			var n: Vector2 = pz["n"]
+			var w := ROAD_HW + 0.35
+			var a := Iso.to_screen(pz["pos"] - n * w, pz["z"])
+			var c := Iso.to_screen(pz["pos"] + n * w, pz["z"])
+			for foot in [a, c]:
+				draw_rect(Rect2(foot - Vector2(4, 3), Vector2(8, 5)), Iso.OUTLINE)
+				draw_rect(Rect2(foot - Vector2(3, 2), Vector2(6, 3)), Color(0.45, 0.45, 0.5))
+			# a thick garland of rings of three balloons, the colours spiralling along it: up from each kerb and across the
+			# top with rounded corners (an arch reads best as a gantry in this view)
+			var cols := [Color(0.95, 0.2, 0.2), Color(0.97, 0.97, 0.97), Color(0.25, 0.5, 0.95), Color(1.0, 0.85, 0.2)]
+			var up := Vector2(0.0, -BALLOON_ARCH_H)
+			var path := PackedVector2Array()
+			var corners := [a, a + up, c + up, c]
+			for k in 3:
+				var p0: Vector2 = corners[k]
+				var p1: Vector2 = corners[k + 1]
+				for q in 12:
+					path.append(p0.lerp(p1, q / 12.0))
+			path.append(c)
+			for pass_ in 3:   # round the corners off
+				var soft := PackedVector2Array([path[0]])
+				for i in range(1, path.size() - 1):
+					soft.append((path[i - 1] + path[i] * 2.0 + path[i + 1]) * 0.25)
+				soft.append(path[path.size() - 1])
+				path = soft
+			var cum := PackedFloat32Array([0.0])
+			for i in range(1, path.size()):
+				cum.append(cum[i - 1] + path[i].distance_to(path[i - 1]))
+			var rings := maxi(8, int(cum[path.size() - 1] / 5.0))
+			var j := 0
+			for q in rings + 1:
+				var d := cum[path.size() - 1] * q / float(rings)
+				while j < path.size() - 2 and cum[j + 1] < d:
+					j += 1
+				var p := path[j].lerp(path[j + 1], clampf(inverse_lerp(cum[j], cum[j + 1], d), 0.0, 1.0))
+				var tng := (path[j + 1] - path[j]).normalized()
+				var across := Vector2(-tng.y, tng.x)
+				var bob := sin(t_ * 2.2 + q * 0.7) * 0.6
+				for k in 3:
+					var bp: Vector2 = (p + across * (k - 1) * 3.6 + Vector2(0.0, bob)).round()
+					var col: Color = cols[(q + k) % cols.size()]
+					draw_circle(bp, 4.0, Iso.OUTLINE)
+					draw_circle(bp, 3.2, col)
+					draw_rect(Rect2(bp + Vector2(-2, -2), Vector2(1, 1)), col.lightened(0.6))
 		"sign":
 			var pz: Dictionary = e["pz"]
 			var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (1.1 + ROAD_GROW), pz["z"])

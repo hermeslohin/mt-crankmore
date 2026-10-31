@@ -136,7 +136,7 @@ func _build_start_finish(rng: RandomNumberGenerator, length: float) -> void:
 
 
 ## The Crusty Crit's crowd: barriers along both sides of the whole loop (bar the start/finish, which has its own),
-## townsfolk packed two or three deep outside them and a thinner crowd in the infield.
+## townsfolk standing along them, now and then two or three deep, and a thinner crowd in the infield.
 ## Nothing is put down where the circuit doubles back close by (`clear`: tiles it needs from any road).
 func _build_crit_crowd(rng: RandomNumberGenerator, length: float) -> void:
 	var g: float = race.ROAD_GROW
@@ -152,11 +152,11 @@ func _build_crit_crowd(rng: RandomNumberGenerator, length: float) -> void:
 		put.call(s, 1.45 + g, 1.3, true)
 		put.call(s, -1.45 - g, 1.3, true)
 		for row in 2:
-			if rng.randf() < 0.85:
+			if rng.randf() < 0.42:
 				put.call(s + rng.randf_range(-1.5, 1.5), 2.1 + g + row * 0.9 + rng.randf_range(0.0, 0.3), 1.9)
-		if rng.randf() < 0.3:
+		if rng.randf() < 0.15:
 			put.call(s + rng.randf_range(-1.5, 1.5), 3.9 + g + rng.randf_range(0.0, 0.4), 1.9)
-		if rng.randf() < 0.55:
+		if rng.randf() < 0.27:
 			put.call(s + rng.randf_range(-1.5, 1.5), -2.1 - g - rng.randf_range(0.0, 0.6), 1.9)
 		s += 4.0
 

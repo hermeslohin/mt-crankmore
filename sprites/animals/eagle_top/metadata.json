@@ -1,0 +1,89 @@
+{
+  "group_id": "3307f102-a59d-418f-b9c9-224f6028298a",
+  "states": [
+    {
+      "character": {
+        "id": "228cdc55-e765-4a30-8c50-f5addef285b9",
+        "name": "Idle",
+        "prompt": "a bald eagle soaring in flight seen from above, wings spread wide and flat, we see its back and the tops of its dark brown wings, white head and white fan tail, yellow hooked beak, no belly or talons visible, cartoon 16-bit style",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "custom",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-10-31T02:01:18.909890+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "fly": {
+            "north-east": [
+              "Idle/animations/fly/north-east/frame_000.png",
+              "Idle/animations/fly/north-east/frame_001.png",
+              "Idle/animations/fly/north-east/frame_002.png",
+              "Idle/animations/fly/north-east/frame_003.png",
+              "Idle/animations/fly/north-east/frame_004.png",
+              "Idle/animations/fly/north-east/frame_005.png",
+              "Idle/animations/fly/north-east/frame_006.png",
+              "Idle/animations/fly/north-east/frame_007.png"
+            ],
+            "south": [
+              "Idle/animations/fly/south/frame_000.png",
+              "Idle/animations/fly/south/frame_001.png",
+              "Idle/animations/fly/south/frame_002.png",
+              "Idle/animations/fly/south/frame_003.png",
+              "Idle/animations/fly/south/frame_004.png",
+              "Idle/animations/fly/south/frame_005.png",
+              "Idle/animations/fly/south/frame_006.png",
+              "Idle/animations/fly/south/frame_007.png"
+            ],
+            "east": [
+              "Idle/animations/fly/east/frame_000.png",
+              "Idle/animations/fly/east/frame_001.png",
+              "Idle/animations/fly/east/frame_002.png",
+              "Idle/animations/fly/east/frame_003.png",
+              "Idle/animations/fly/east/frame_004.png",
+              "Idle/animations/fly/east/frame_005.png",
+              "Idle/animations/fly/east/frame_006.png",
+              "Idle/animations/fly/east/frame_007.png"
+            ],
+            "south-east": [
+              "Idle/animations/fly/south-east/frame_000.png",
+              "Idle/animations/fly/south-east/frame_001.png",
+              "Idle/animations/fly/south-east/frame_002.png",
+              "Idle/animations/fly/south-east/frame_003.png",
+              "Idle/animations/fly/south-east/frame_004.png",
+              "Idle/animations/fly/south-east/frame_005.png",
+              "Idle/animations/fly/south-east/frame_006.png",
+              "Idle/animations/fly/south-east/frame_007.png"
+            ],
+            "north": [
+              "Idle/animations/fly/north/frame_000.png",
+              "Idle/animations/fly/north/frame_001.png",
+              "Idle/animations/fly/north/frame_002.png",
+              "Idle/animations/fly/north/frame_003.png",
+              "Idle/animations/fly/north/frame_004.png",
+              "Idle/animations/fly/north/frame_005.png",
+              "Idle/animations/fly/north/frame_006.png",
+              "Idle/animations/fly/north/frame_007.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-10-31T02:06:16.724576"
+}

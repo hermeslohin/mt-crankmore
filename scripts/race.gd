@@ -2888,13 +2888,17 @@ func _swipe_fps() -> float:
 	return float(tex.get_width() / tex.get_height()) / BEAR_SWIPE * 0.999
 
 
-## A pair of eagles circling high over the course (art/animal_eagle_fly.png).
+## A pair of eagles circling high over the course, seen from above and facing the way they fly
+## (art/animal_eagle_fly8.png; the old side-on art/animal_eagle_fly.png if that's missing).
+var _eagle_turns: Array = [{}, {}]
+
 func _draw_birds(me_pos: Vector2) -> void:
 	for q in 2:
 		var ang := t_ * (0.35 + q * 0.12) + q * PI
 		var p := me_pos + Vector2(4.0 + q * 3.0, -5.0) + Vector2(cos(ang), sin(ang)) * (3.5 + q)
 		var c := Iso.to_screen(p, _tz(me_pos) + 150.0 + q * 30.0)
-		Sprites.draw_strip(self, "animal_eagle_fly", c, t_ + q * 0.37, 8.0 + q, false)
+		var at := c + Vector2(0.0, 40.0)   # the 8-direction sheet is placed by its bottom; keep the bird where it circled before
+		Sprites.draw_animal(self, "eagle", "fly", at, Vector2(-sin(ang), cos(ang)), t_ + q * 0.37, 8.0 + q, Color.WHITE, _eagle_turns[q])
 
 
 func _crowded(k: int) -> bool:

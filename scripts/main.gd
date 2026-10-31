@@ -462,7 +462,7 @@ func _open_setup(done: Callable) -> void:
 func _setup_menu(finish: Callable) -> Dictionary:
 	var lbs := Game.units == "lbs"
 	var diff: Dictionary = Game.DIFFICULTIES[Game.difficulty]
-	var names: Array = Talk.roster.slice(0, Game.rival_count).map(func(r): return r["short"])
+	var names: Array = Talk.rivals.map(func(r): return r["short"])
 	var items: Array = [
 		{"label": "Rider: %s" % Game.RIDERS[Game.rider]["label"], "fn": func(): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
 			"adjust": func(_d: int): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
@@ -481,7 +481,7 @@ func _setup_menu(finish: Callable) -> Dictionary:
 			"detail": diff["blurb"]},
 		{"label": "Rival bikers: %d" % Game.rival_count, "fn": func(): pass,
 			"adjust": func(d: int): Game.set_rival_count(Game.rival_count + d),
-			"detail": "Riding against you: %s." % ", ".join(names)},
+			"detail": "Riding against you in town: %s. Every race has all %d racers." % [", ".join(names), Talk.roster.size()]},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
 	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}
@@ -754,7 +754,7 @@ func _race_menu() -> Dictionary:
 			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
-	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
+	return {"title": "Mt. Crankmore Race HQ", "sub": "All %d racers in town are warming up. You can hear them talking about you." % Talk.roster.size(), "items": items}
 
 
 func _champion_menu() -> Dictionary:

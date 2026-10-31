@@ -64,7 +64,7 @@ The first time you start delivering (and any time from the title screen or the p
 * **Rider**: **Rookie Boy** or **Rookie Girl**, the character you ride as.
 * **FTP** (watts) and **weight**, shown in **kg or lbs**. Your weight is used in the physics, so climbs feel like they do outside.
 * **Difficulty**: rivals ride at a share of *your* W/kg (the FTP divided by the weight set in the menu, times each rival's own weight of 68-74 kg, with each rival 5% above or below it at most: Gus strongest, Tony weakest), the same in town and in a race: about 50% on *Easy*, 65% on *Medium*, 80% on *Hard* and 100% on *Ludicrous*, with better bikes on the harder levels.
-* **Rival bikers**: how many ride against you, 1 to 8 (default 3).
+* **Rival bikers**: how many chase orders against you in town, 1 to 8 (default 3). Every race has all 8 racers on the start line, whatever this is set to (and Maillot Max, the champion, only in his own race).
 
 In a race the rivals ride like a bunch: they lose 3% of their watts for every km they ride in the wind (none while drafting, and you never tire this way), so they sit on each other's wheels (or yours), take turns on the front and swing off to let the next one through. Every so often one breaks away with a taunt (Wheelie Wanda and Karate Kim love to, Tubeless Tony and Cadence Carla hardly ever), and in the last 2 km they attack far more often, harder and for longer.
 

@@ -1601,7 +1601,9 @@ func _build_riders() -> void:
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 	# a race with the champion brings out the whole roster, not just your usual rivals
-	var field: Array = Talk.roster if (not guest.is_empty() or course.get("crit", false)) and not rescue else Talk.rivals
+	# every racer in town rides every race: your town rivals first (so rider k + 1 is Talk.rivals[k], for their lines),
+	# then the rest of the roster; the champion only joins his own race (below)
+	var field: Array = Talk.rivals if rescue else Talk.rivals + Talk.roster.filter(func(o): return not Talk.rivals.has(o))
 	var n := field.size()
 	for i in n:
 		var info: Dictionary = field[i]

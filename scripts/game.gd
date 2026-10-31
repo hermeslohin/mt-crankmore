@@ -18,13 +18,13 @@ const SAVE_PATH := "user://pizza_city_save.json"
 const SLOGAN := "Pizza pays the bills, cycling is life"
 const LB_PER_KG := 2.20462
 
-## The share of YOUR FTP (as W/kg, at their own weight) rivals ride at, in town and in races alike ("share"), and how
+## The share of YOUR W/kg (FTP / weight from the menu, at their own weight) rivals ride at, in town and in races alike ("share"), and how
 ## good their bikes are (offset on their usual bike tier).
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "share": 0.5, "tier": -1, "blurb": "Rivals ride at about 50% of your FTP. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "share": 0.65, "tier": 0, "blurb": "Rivals ride at about 65% of your FTP. Push a bit and you'll win."},
-	"hard": {"label": "Hard", "share": 0.8, "tier": 1, "blurb": "Rivals ride at about 80% of your FTP on better bikes. Good luck."},
-	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your FTP on their best bikes. Bring snacks."},
+	"easy": {"label": "Easy", "share": 0.5, "tier": -1, "blurb": "Rivals ride at about 50% of your W/kg. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "share": 0.65, "tier": 0, "blurb": "Rivals ride at about 65% of your W/kg. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "share": 0.8, "tier": 1, "blurb": "Rivals ride at about 80% of your W/kg on better bikes. Good luck."},
+	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your W/kg on their best bikes. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 
@@ -201,12 +201,12 @@ func weight_text() -> String:
 
 const RIVAL_SPREAD := 0.05   # the strongest / weakest rival is 5% above / below the base
 
-## A rival's FTP in watts: the player's FTP from the menu (not W/kg), spread 5% either way per rival. They ride at
-## rival_share() of it, by difficulty.
+## A rival's FTP in watts: the player's W/kg from the menu (FTP / weight), spread 5% either way per rival, times the
+## rival's own weight `rider_mass`, so they climb like you would. They ride at rival_share() of it, by difficulty.
 func rival_ftp(info: Dictionary, rider_mass: float) -> float:
-	# the roster ftp (215-275) maps onto a personal spread of -5% .. +5% around the menu FTP
+	# the roster ftp (215-275) maps onto a personal spread of -5% .. +5% around the menu W/kg
 	var spread := clampf((float(info["ftp"]) - 245.0) / 30.0, -1.0, 1.0) * RIVAL_SPREAD
-	return ftp * (1.0 + spread) * float(info.get("ftp_pct", 1.0))   # "ftp_pct" trims a rival further
+	return wkg() * rider_mass * (1.0 + spread) * float(info.get("ftp_pct", 1.0))   # "ftp_pct" trims a rival further
 
 
 ## The share of their FTP rivals ride at, by difficulty: the same in town and in a race.

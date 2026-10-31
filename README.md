@@ -63,7 +63,7 @@ The first time you start delivering (and any time from the title screen or the p
 
 * **Rider**: **Rookie Boy** or **Rookie Girl**, the character you ride as.
 * **FTP** (watts) and **weight**, shown in **kg or lbs**. Your weight is used in the physics, so climbs feel like they do outside.
-* **Difficulty**: rivals ride at a share of *your* FTP (the FTP set in the menu, with each rival 5% above or below it at most: Gus strongest, Tony weakest), the same in town and in a race: about 50% on *Easy*, 65% on *Medium*, 80% on *Hard* and 100% on *Ludicrous* (plus the odd surge in a race), with better bikes on the harder levels.
+* **Difficulty**: rivals ride at a share of *your* W/kg (the FTP divided by the weight set in the menu, times each rival's own weight of 68-74 kg, with each rival 5% above or below it at most: Gus strongest, Tony weakest), the same in town and in a race: about 50% on *Easy*, 65% on *Medium*, 80% on *Hard* and 100% on *Ludicrous* (plus the odd surge in a race), with better bikes on the harder levels.
 * **Rival bikers**: how many ride against you, 1 to 8 (default 3).
 
 Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the handlebar D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.

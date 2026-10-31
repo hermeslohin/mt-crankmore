@@ -2806,8 +2806,9 @@ func _draw_obstacle(ob: Dictionary) -> void:
 			var pb := _pose(s, (1.55 + ROAD_GROW) * flip)
 			var mid := _pose(s, 0.1 * flip)
 			var at := _sp(mid, 6.0)
+			var along: Vector2 = (pb["pos"] as Vector2) - (pa["pos"] as Vector2)
 			_wide(Iso.to_screen(mid["pos"], mid["z"]), mid, (2.9 + 2.0 * ROAD_GROW) / 2.9,
-				func(): Sprites.draw_vehicle(self, "obj_fallen_log", at, (pb["pos"] as Vector2) - (pa["pos"] as Vector2)))
+				func(): Sprites.draw_vehicle(self, "obj_fallen_log", at, along), _thin(at, along, LOG_THICK))
 		"ford":
 			var left := PackedVector2Array()
 			var right := PackedVector2Array()
@@ -2834,16 +2835,31 @@ func _draw_obstacle(ob: Dictionary) -> void:
 
 ## Draws `fn` (something standing on the road at screen point `at`, across the road at `pz`) `k` times as wide: stretched
 ## sideways on screen and sheared so it still lines up across the road, uprights kept upright and as tall.
-func _wide(at: Vector2, pz: Dictionary, k: float, fn: Callable) -> void:
+## `inner` is applied to the drawing first (see _thin).
+func _wide(at: Vector2, pz: Dictionary, k: float, fn: Callable, inner := Transform2D.IDENTITY) -> void:
 	var n: Vector2 = pz["n"]
 	var ns := Vector2((n.x - n.y) * Iso.TW * 0.5, (n.x + n.y) * Iso.TH * 0.5)   # the road's normal on screen
 	if absf(ns.x) < 0.3 * ns.length():   # the road runs across the screen: nothing sideways to stretch
+		draw_set_transform_matrix(inner)
 		fn.call()
+		draw_set_transform_matrix(Transform2D.IDENTITY)
 		return
 	var m := Transform2D(Vector2(k, ns.y / ns.x * (k - 1.0)), Vector2(0, 1), Vector2.ZERO)
-	draw_set_transform_matrix(Transform2D(0.0, at) * m * Transform2D(0.0, -at))
+	draw_set_transform_matrix(Transform2D(0.0, at) * m * Transform2D(0.0, -at) * inner)
 	fn.call()
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+const LOG_THICK := 0.5   # the fallen log's thickness against its art (it still reaches right across the road)
+
+## Squashes a sprite drawn in the 8 views (Sprites.draw_vehicle) by `k` across its length, through `at`: across the
+## screen line of the view it is drawn in for world direction `along`, so it isn't skewed.
+func _thin(at: Vector2, along: Vector2, k: float) -> Transform2D:
+	var d := Vector2.from_angle(Sprites.dir_row(along) * PI / 4.0)
+	var u := Vector2((d.x - d.y) * Iso.TW * 0.5, (d.x + d.y) * Iso.TH * 0.5).normalized()
+	var p := Vector2(-u.y, u.x)
+	var sq := Transform2D(Vector2(1, 0) - (1.0 - k) * p.x * p, Vector2(0, 1) - (1.0 - k) * p.y * p, Vector2.ZERO)   # I - (1-k) p p^T
+	return Transform2D(0.0, at) * sq * Transform2D(0.0, -at)
 
 
 ## A soft oval shadow on the ground.

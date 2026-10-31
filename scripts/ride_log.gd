@@ -11,7 +11,7 @@ const MAX_SHOTS := 4
 const MIN_SECONDS := 60          # shorter rides aren't worth posting
 const START_ALT := 1250.0        # metres: Crankmore Village sits up in the mountains
 const SCENIC_EVERY := 300.0      # seconds of riding between scenery screenshots (the first one at 90 s)
-const SHOT_PRIO := {"scenic": 0, "delivery": 1, "race": 2, "race_win": 3}
+const SHOT_PRIO := {"scenic": 0, "delivery": 1, "race": 2, "race_win": 3, "session": 99}   # (the session chart is never pushed out)
 
 var samples: Array = []          # [unix time, distance m, altitude m, speed m/s, watts or -1, rpm or -1]
 var distance := 0.0
@@ -176,6 +176,14 @@ func snap(kind: String, wait := 0.0) -> void:
 			return
 		shots.remove_at(drop)
 	shots.append({"image": get_viewport().get_texture().get_image(), "kind": kind, "t": int(Time.get_unix_time_from_system())})
+
+
+## The end-of-session chart (see main._session_image): kept on top of the MAX_SHOTS, replacing an earlier one.
+func add_session_shot(image: Image) -> void:
+	if Game.no_save:
+		return
+	shots = shots.filter(func(s): return s["kind"] != "session")
+	shots.append({"image": image, "kind": "session", "t": int(Time.get_unix_time_from_system())})
 
 
 ## Writes the screenshots to `dir` as PNGs.

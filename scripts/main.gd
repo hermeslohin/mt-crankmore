@@ -524,6 +524,25 @@ func _end_session() -> void:
 	mode = Mode.TITLE
 	city.active = false
 	hud.open_menu(_session_menu, true)
+	Ride.add_session_shot(await _session_image())
+
+
+## A picture of the Session over screen from its title down to the chart's legend (no buttons), at full screen
+## resolution, for the ride's screenshots.
+func _session_image() -> Image:
+	for i in 3:   # let the menu lay out and centre itself
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	var chart: Control = null
+	for c in hud.menu_box.get_children():
+		if c.get_script() == preload("res://scripts/session_chart.gd"):
+			chart = c
+	var top: Rect2 = hud.menu_panel.get_global_rect()
+	var bottom: float = chart.get_global_rect().end.y + 6.0 if chart != null else top.end.y
+	var k := Vector2(img.get_size()) / get_viewport().get_visible_rect().size
+	var r := Rect2i(Rect2(top.position * k, Vector2(top.size.x, bottom - top.position.y) * k).grow(2.0 * k.x))
+	return img.get_region(r.intersection(Rect2i(Vector2i.ZERO, img.get_size())))
 
 
 var session := {}   # the Ride.snapshot() of the session just ended, kept for its screen after the ride is posted
@@ -885,6 +904,7 @@ func _debug_session() -> void:
 	await get_tree().create_timer(0.8).timeout
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(out.path_join("session.png"))
+	(await _session_image()).save_png(out.path_join("session_chart.png"))
 	print("SESSION: ", ProjectSettings.globalize_path(out.path_join("session.png")), "  notes:\n", Ride.description())
 	Ride.reset()
 	get_tree().quit()

@@ -102,7 +102,7 @@ func _push_feed(who: String, text: String, col: Color) -> void:
 # Menus
 # ======================================================================
 
-## builder() -> {"title": String, "sub": String, "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "adjust": Callable}]}
+## builder() -> {"title": String, "sub": String, "chart": Ride.snapshot() (optional), "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "adjust": Callable}]}
 ## An item with "adjust" is a setting: LEFT / RIGHT call adjust(-1 / +1), and holding the button repeats, faster over time.
 func open_menu(builder: Callable, is_title: bool = false) -> void:
 	menu_builder = builder
@@ -134,6 +134,10 @@ func _rebuild_menu() -> void:
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.custom_minimum_size = Vector2(330, 0)
 		menu_box.add_child(sub)
+	if menu_cache.has("chart"):   # the end-of-session timeline: built from a Ride.snapshot()
+		var chart := preload("res://scripts/session_chart.gd").new()
+		chart.setup(menu_cache["chart"])
+		menu_box.add_child(chart)
 	menu_box.add_child(_rule())
 	for i in items.size():
 		var it: Dictionary = items[i]

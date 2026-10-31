@@ -3266,6 +3266,8 @@ func _update_challenge(delta: float) -> void:
 
 func _end_challenge(won: bool) -> void:
 	challenge["state"] = "won" if won else "lost"
+	var what := str(challenge["title"]).capitalize().replace("!", "")
+	Ride.mark("won" if won else "lost", "%s: %s" % [what, challenge["name"]] if challenge.has("name") else what)
 	challenge["end"] = 3.0
 	match challenge["kind"]:
 		"rush":

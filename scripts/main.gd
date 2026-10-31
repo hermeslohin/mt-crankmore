@@ -105,6 +105,8 @@ func _ready() -> void:
 			_debug_gears()
 		"ride":
 			_debug_ride()
+		"session":
+			_debug_session()
 		"events":
 			_debug_events()
 		"eventviewer":
@@ -254,7 +256,7 @@ func _show_title() -> void:
 				_season_item(),
 				{"label": "Controls", "fn": _open_controls.bind(_show_title), "detail": "Change the keyboard keys and the handlebar controller buttons."},
 				{"label": "Connect Trainer", "fn": _open_trainer_menu, "detail": Trainer.status_text()},
-				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  this ride: %s" % [Strava.status_text(), Ride.summary()]},
+				{"label": "Strava", "fn": _open_strava_menu.bind(_show_title), "detail": "%s  |  last session: %s" % [Strava.status_text(), Ride.summary()]},
 				{"label": "Quit", "fn": _quit, "detail": "Saves the game. A ride you haven't posted to Strava is thrown away." if Ride.seconds() > 0 else "Saves the game."},
 			], "live": true}, true)
 	if not Game.has_save():
@@ -482,7 +484,9 @@ func _setup_menu(finish: Callable) -> Dictionary:
 	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}
 
 
+## Starts a session (New game or Continue game): the ride for Strava starts over with it.
 func _start_game() -> void:
+	Ride.reset()
 	hud.close_menu()
 	mode = Mode.CITY
 	city.reset_player()
@@ -501,9 +505,53 @@ func _open_pause() -> void:
 				{"label": "Rider setup", "fn": _open_setup.bind(_open_pause)},
 				_season_item(),
 				{"label": "Controls", "fn": _open_controls.bind(_open_pause), "detail": "Change the keyboard keys and the handlebar controller buttons."},
-				{"label": "Post ride to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
-				{"label": "Quit to title", "fn": func(): Game.save_game(); _show_title()},
+				{"label": "Post session to Strava", "fn": _open_strava_menu.bind(_open_pause), "detail": Ride.summary()},
+				{"label": "Quit to title", "fn": _end_session, "detail": "Saves the game and shows this session's ride, ready to post to Strava."},
 			]})
+
+
+## Quitting to the title ends the session: save, then show what you rode (power, cadence and speed over time, with
+## the pizzas, challenges and race placings on it) with the option to post just this session to Strava.
+func _end_session() -> void:
+	Game.save_game()
+	if Ride.samples.size() < 2:
+		_show_title()
+		return
+	session = Ride.snapshot()
+	if Strava.state in ["done", "error"]:
+		Strava.state = "idle"
+		Strava.msg = ""
+	mode = Mode.TITLE
+	city.active = false
+	hud.open_menu(_session_menu, true)
+
+
+var session := {}   # the Ride.snapshot() of the session just ended, kept for its screen after the ride is posted
+
+func _session_menu() -> Dictionary:
+	var s: int = session["seconds"]
+	var bits: Array = ["%.1f km in %s" % [float(session["distance"]) / 1000.0, "%d:%02d:%02d" % [s / 3600, s / 60 % 60, s % 60] if s >= 3600 else "%d:%02d" % [s / 60, s % 60]],
+		"%d pizza%s" % [session["pizzas"], "" if session["pizzas"] == 1 else "s"],
+		"challenges %d won, %d lost" % [session["won"], session["lost"]]]
+	if not session["races"].is_empty():
+		bits.append("races: " + ", ".join(session["races"]))
+	var lines: Array = ["  |  ".join(bits)]
+	var items: Array = []
+	if Strava.state == "done":
+		items.append({"label": "Posted! Open it on Strava", "fn": Strava.open_last_activity,
+			"detail": "Opens the activity, and the folder with its screenshots to drag onto it." if Strava.last_activity.get("shots_dir", "") != "" else "Opens the activity in your browser."})
+	elif Strava.linked():
+		items.append({"label": "Uploading..." if Strava.busy() else "Post this session to Strava", "fn": Strava.post_ride,
+			"enabled": not Strava.busy() and Ride.can_post(),
+			"detail": "Posts just this session (since you hit New game / Continue game) as a Virtual Ride with its distance, speed, power and cadence." if Ride.can_post() else "Ride for at least a minute to post a session."})
+	else:
+		items.append({"label": "Set up Strava to post this session", "fn": _open_strava_menu.bind(func(): hud.open_menu(_session_menu, true)),
+			"detail": "Link your Strava account, then post this session. It's kept until you start the next one."})
+	items.append({"label": "Back to title", "fn": _show_title,
+		"detail": "This session stays postable from Strava on the title screen until you start a new one." if Ride.can_post() and Strava.state != "done" else ""})
+	if Strava.msg != "":
+		lines.append(("! " if Strava.state == "error" else "") + Strava.msg)
+	return {"title": "Session over", "sub": "\n".join(lines), "chart": session, "items": items, "live": true}
 
 
 ## The garage: every bike you own, the one you're riding marked; pick one to ride it.
@@ -738,6 +786,10 @@ func _exit_finished_race() -> void:
 
 
 func _on_race_finished(result: Dictionary) -> void:
+	if result.get("rescue", false):
+		Ride.mark("won", "Mountain rescue")
+	else:
+		Ride.on_race_finished(result["place"], result["course"])
 	if skip_results:
 		Game.toast.emit("Placed #%d. Prize: $%d" % [result["place"], result["prize"]], Color(1.0, 0.9, 0.3))
 		return
@@ -748,7 +800,6 @@ func _on_race_finished(result: Dictionary) -> void:
 				"sub": "The ski patrol take it from here.\nUp the mountain in %d:%04.1f.     Reward: $%d" % [int(t) / 60, fmod(t, 60.0), result["prize"]],
 				"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 		return
-	Ride.on_race_finished(result["place"])
 	hud.open_menu(func():
 		var lines := ""
 		for i in result["order"].size():
@@ -804,6 +855,37 @@ func _debug_ride() -> void:
 	for s in Ride.shots:
 		print("RIDE shot: ", s["kind"])
 	Game.deliveries -= 2
+	Ride.reset()
+	get_tree().quit()
+
+
+## Dev helper: PIZZA_DEBUG=session [PIZZA_TRAINER=0] [PIZZA_OUT=dir] fakes a 40-minute session (with or without
+## trainer power and cadence, plus pizzas, challenges and race placings), quits to the title and saves the
+## end-of-session screen as session.png.
+func _debug_session() -> void:
+	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
+	DirAccess.make_dir_recursive_absolute(out)
+	_start_game()
+	city.active = false
+	var trainer := OS.get_environment("PIZZA_TRAINER") != "0"
+	var t := int(Time.get_unix_time_from_system()) - 2400
+	for i in 2400:
+		if i > 900 and i < 1020:
+			continue   # a pause in the menus
+		var w := 180.0 + 60.0 * sin(i / 90.0) + (140.0 if i > 1500 and i < 1800 else 0.0) + randf_range(-25.0, 25.0)
+		var v := 6.0 + w / 40.0 + randf_range(-0.5, 0.5)
+		Ride.distance += v
+		Ride._riding += 1.0
+		Ride.samples.append([t + i, Ride.distance, 1250.0, v, roundi(w) if trainer else -1, roundi(85.0 + 10.0 * sin(i / 60.0)) if trainer else -1])
+	for e in [[200, "pizza", "Pizza delivered", 0], [520, "won", "Catch The Thief", 0], [700, "pizza", "Pizza delivered", 0], [710, "pizza", "Pizza delivered", 0],
+			[1300, "lost", "Beat The Hot Rod", 0], [1800, "race", "Flour Run: #2", 2], [2100, "won", "Hill Sprint: Bakers Hill", 0], [2300, "race", "Mt. Crankmore: #1", 1]]:
+		Ride.events.append({"t": t + e[0], "kind": e[1], "text": e[2], "place": e[3]})
+	Ride.pizzas = 3
+	_end_session()
+	await get_tree().create_timer(0.8).timeout
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(out.path_join("session.png"))
+	print("SESSION: ", ProjectSettings.globalize_path(out.path_join("session.png")), "  notes:\n", Ride.description())
 	Ride.reset()
 	get_tree().quit()
 

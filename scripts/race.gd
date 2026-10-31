@@ -44,6 +44,21 @@ const FORD_CRR := 0.05        # extra rolling resistance while wading
 const WATER := Color(0.3, 0.62, 0.92)
 ## Speed (km/h) -> share of the watts saved riding in a slipstream; linear in between, flat above the last point.
 const DRAFT_CURVE := [[0.0, 0.0], [13.0, 0.18], [17.0, 0.24], [40.0, 0.30]]
+# How rivals race each other: they tire in the wind, so they ride in a group, take turns on the front and now and
+# then attack (more often for the attackers in the roster, "attack" 0-1, and much more in the last FINALE m).
+const FATIGUE_PER_KM := 0.03   # watts lost per km a rival rides without a draft (none while drafting)
+const FATIGUE_FLOOR := 0.7     # ...down to at most this share of their watts
+const WHEEL_GAP := 2.5         # m a rival sits behind the wheel they follow
+const BRIDGE_RANGE := 40.0     # m: a group this close up the road is worth chasing (+BRIDGE_BOOST)
+const BRIDGE_BOOST := 1.08
+const PULL_TIME := [12.0, 25.0]   # s a rival takes on the front of a group before swinging off
+const SWING_TIME := 6.0        # s they ease off (SWING_EASE) out to the side to let the next one through
+const SWING_EASE := 0.85
+const ATTACK_BOOST := 1.25
+const ATTACK_TIME := [12.0, 22.0]
+const ATTACK_EVERY := [220.0, 60.0]   # s between attacks, for a rival with attack 0 .. 1
+const FINALE := 2000.0         # m from the line where they go crazy: attacks this much more often, longer and harder,
+const FINALE_ATTACK := {"every": 0.3, "time": [25.0, 45.0], "boost": 1.35, "pull": 0.5}   # and shorter turns on the front
 
 var active := false
 var course: Dictionary = {}
@@ -103,6 +118,7 @@ var givers: Array = []                # power-up people along the course {s, lat
 var frisbees: Array = []              # pizzas in flight {"from", "to", "u"} (rider indices)
 var stamina := 1.0
 var kick_t := 0.0
+var attack_talk := 0.0   # s before another attack taunt
 var bubbles: Dictionary = {}
 var font: Font
 var player_finish_time := 0.0
@@ -1419,7 +1435,7 @@ func _build_riders() -> void:
 		riders.append({"name": info["name"], "short": info["short"], "color": info["color"], "frame": Color(info["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i if i < Talk.rivals.size() else -1, "sig": info["sig"],
-			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
+			"trait": float(info.get("attack", 0.4)), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 	if not guest.is_empty() and not rescue:
@@ -1433,10 +1449,16 @@ func _build_riders() -> void:
 		riders.append({"name": guest["name"], "short": guest["short"], "color": guest["color"], "frame": Color(guest["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(guest), "player": false, "guest": true,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": maxf(top, Game.wkg()) * Game.CHAMPION_EDGE * mass, "idx": -1,
-			"surge": 0.0, "surge_in": randf_range(25.0, 50.0), "power": 0.0, "wiggle": randf() * TAU,
+			"trait": float(guest.get("attack", 0.6)), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 		Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
+	for r in riders:   # the group riding (see _step_riders)
+		if not r["player"]:
+			r.merge({"home": r["lane"], "tired_m": 0.0, "attack": 0.0, "pull_t": 0.0, "pull_len": randf_range(PULL_TIME[0], PULL_TIME[1]),
+				"swing": 0.0, "swing_to": 0.0})
+			r["attack_in"] = maxf(20.0, _attack_gap(r, false) * randf_range(0.4, 1.0))
+	attack_talk = 0.0
 
 
 ## A rider says something: one of your usual rivals through Talk; the guest champion, or a rival who only came out for
@@ -1622,32 +1644,63 @@ func _step_riders(delta: float) -> void:
 			r["s"] = minf(r["s"] + r["v"] * delta, road_len)
 			r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 			continue
-		r["surge_in"] -= delta
-		if r["surge_in"] <= 0.0:
-			r["surge"] = 6.0
-			r["surge_in"] = randf_range(30.0, 60.0)
+		var finale: bool = length - float(r["s"]) < FINALE
+		r["draft"] = _draft(k)
+		var wheel: int = r["wheel"]
+		# attacks: off the front now and then (see _attack)
+		r["attack_in"] = float(r["attack_in"]) - delta
+		if float(r["attack"]) <= 0.0 and float(r["attack_in"]) <= 0.0 and float(r["down"]) <= 0.0:
+			_attack(k, finale)
+		var attacking := float(r["attack"]) > 0.0
+		r["attack"] = maxf(0.0, float(r["attack"]) - delta)
 		var pw: float = r["ftp"] * (Game.rival_share() + 0.04 * sin(clock * 0.21 + r["wiggle"]))
-		pw *= 1.0 - 0.00001 * r["s"]  # slow fade
-		if r["surge"] > 0.0:
-			r["surge"] -= delta
-			pw *= 1.15
+		var ahead := -1
+		if attacking:
+			pw *= float(FINALE_ATTACK["boost"]) if finale else ATTACK_BOOST
+		elif float(r["swing"]) > 0.0:   # done a turn on the front: ease off out to the side and let the group come through
+			r["swing"] = float(r["swing"]) - delta
+			pw *= SWING_EASE
+		elif wheel < 0:
+			ahead = _ahead(k, BRIDGE_RANGE)
+			if ahead >= 0:   # a group up the road: chase onto it
+				pw *= BRIDGE_BOOST
+			elif riders.any(func(o): return o.get("wheel", -1) == k):   # on the front with riders on the wheel: take a turn
+				r["pull_t"] = float(r["pull_t"]) + delta
+				if float(r["pull_t"]) > float(r["pull_len"]) * (float(FINALE_ATTACK["pull"]) if finale else 1.0):
+					r["pull_t"] = 0.0
+					r["pull_len"] = randf_range(PULL_TIME[0], PULL_TIME[1])
+					r["swing"] = SWING_TIME
+					var side := -1.0 if float(r["lat"]) > 0.0 else 1.0
+					r["swing_to"] = clampf(float(r["lat"]) + side * 0.4 * ROAD_W, -0.5 * ROAD_W, 0.5 * ROAD_W)
 		var gap: float = r["s"] - me["s"]
 		if gap > 300.0:
 			pw *= 0.95
 		elif gap < -300.0:
 			pw *= 1.05
-		# out in front without a wheel to hide behind: -1% watts for every 1/4 km spent there
-		if gap > 0.0 and float(r["draft"]) <= 0.0:
-			r["lead_m"] = float(r.get("lead_m", 0.0)) + float(r["v"]) * delta
-		elif gap <= 0.0:
-			r["lead_m"] = 0.0
-		pw *= 1.0 - 0.01 * floorf(float(r.get("lead_m", 0.0)) / 250.0)
+		# tired from riding in the wind: FATIGUE_PER_KM for every km without a draft, none while drafting
+		if float(r["draft"]) <= 0.0:
+			r["tired_m"] = float(r["tired_m"]) + float(r["v"]) * delta
+		pw *= maxf(FATIGUE_FLOOR, 1.0 - FATIGUE_PER_KM * float(r["tired_m"]) / 1000.0)
 		r["power"] = pw
 		var bk: Dictionary = r["bike"]
 		_tick_powerups(k, delta)
-		r["draft"] = _draft(k)
-		var vt := Game.speed_from_power(pw / (1.0 - float(r["draft"])), bk["mass"], bk["cda"], _crr(bk) + (FORD_CRR if r["wet"] else 0.0),
-			PowerUps.felt_grade(_grade_at(r["s"]), r["roller"]), r["mass"])
+		var rg := PowerUps.felt_grade(_grade_at(r["s"]), r["roller"])
+		var crr := _crr(bk) + (FORD_CRR if r["wet"] else 0.0)
+		var vt := Game.speed_from_power(pw / (1.0 - float(r["draft"])), bk["mass"], bk["cda"], crr, rg, r["mass"])
+		if wheel >= 0 and not attacking and float(r["swing"]) <= 0.0:
+			# sit on the wheel a WHEEL_GAP back, unless it's much slower than riding alone: then go round
+			var w: Dictionary = riders[wheel]
+			if float(w["v"]) >= 0.9 * Game.speed_from_power(pw, bk["mass"], bk["cda"], crr, rg, r["mass"]):
+				vt = minf(vt, maxf(0.0, float(w["v"]) + (float(w["s"]) - float(r["s"]) - WHEEL_GAP) * 0.8))
+		# steer: onto the wheel or the group ahead, out to the side when swinging off, else back to their own line
+		var to: float = r["home"]
+		if float(r["swing"]) > 0.0:
+			to = r["swing_to"]
+		elif not attacking and wheel >= 0:
+			to = riders[wheel]["lat"]
+		elif not attacking and ahead >= 0:
+			to = riders[ahead]["lat"]
+		r["lane"] = move_toward(float(r["lane"]), to, 0.3 * ROAD_W * delta)
 		if r["pu"] != "" and _rival_wants(k):
 			_use_powerup(k)
 		if float(r["socks"]) > 0.0:
@@ -1658,13 +1711,22 @@ func _step_riders(delta: float) -> void:
 		if float(r["air"]) <= 0.0:
 			r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
 		r["s"] += r["v"] * delta
-		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.08 * ROAD_W
+		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.03 * ROAD_W
 		r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 		_terrain_events(k, delta)
 		if r["s"] >= length:
 			_finish(k)
 	_step_frisbees(delta)
 	_squash()
+	if OS.has_environment("PIZZA_PELOTON") and int(clock / 20.0) != int((clock - delta) / 20.0):   # dev helper: how the group rides
+		var line := "PELOTON %4ds" % int(clock)
+		for k in range(1, riders.size()):
+			var r: Dictionary = riders[k]
+			line += " | %s %4dm %4.1fkm/h %3dW%s%s%s tired %.0f%%" % [r["short"], int(r["s"]), float(r["v"]) * 3.6, int(r["power"]),
+				" on " + str(riders[r["wheel"]].get("short", "YOU")) if int(r.get("wheel", -1)) >= 0 else "",
+				" ATTACK" if float(r["attack"]) > 0.0 else "", " swing" if float(r["swing"]) > 0.0 else "",
+				100.0 * minf(1.0 - FATIGUE_FLOOR, FATIGUE_PER_KM * float(r["tired_m"]) / 1000.0)]
+		print(line, " | YOU %dm" % int(riders[0]["s"]))
 	if finish_count > 0 and not over:
 		over_clock += delta
 	# results once you reach the end of the run-out (or stop on it); a 7 minute cut-off if you never finish
@@ -1729,8 +1791,11 @@ func _crr(b: Dictionary) -> float:
 
 ## Share of the watts rider `i` saves in the slipstream of someone 1-9 m ahead in the same line (0 if none).
 ## Everyone drafts: you, and the rivals off you and each other.
+## The watts saved in a slipstream for rider `i`; the rider whose wheel it is goes in riders[i]["wheel"] (-1: none).
 func _draft(i: int) -> float:
 	var me: Dictionary = riders[i]
+	me["wheel"] = -1
+	var best := 9.0
 	for k in riders.size():
 		if k == i:
 			continue
@@ -1738,9 +1803,42 @@ func _draft(i: int) -> float:
 		if o["done"] or float(o["down"]) > 0.0:   # nobody to hide behind
 			continue
 		var d: float = o["s"] - me["s"]
-		if d > 1.0 and d < 9.0 and absf(o["lat"] - me["lat"]) < 0.35 * ROAD_W:   # the same line, on the wider road's wider lanes
-			return draft_saving(float(me["v"]) * 3.6)
-	return 0.0
+		if d > 1.0 and d < best and absf(o["lat"] - me["lat"]) < 0.35 * ROAD_W:   # the same line, on the wider road's wider lanes
+			best = d
+			me["wheel"] = k
+	return draft_saving(float(me["v"]) * 3.6) if int(me["wheel"]) >= 0 else 0.0
+
+
+## The nearest rider up the road within `range` m of rider `i` (any line), or -1.
+func _ahead(i: int, range: float) -> int:
+	var out := -1
+	for k in riders.size():
+		var o: Dictionary = riders[k]
+		var d: float = o["s"] - riders[i]["s"]
+		if k != i and not o["done"] and float(o["down"]) <= 0.0 and d > 1.0 and d < range:
+			range = d
+			out = k
+	return out
+
+
+## Seconds until rival `r` attacks again: often for an attacker (trait near 1), rarely for a wheel-sucker, and
+## much sooner in the finale.
+func _attack_gap(r: Dictionary, finale: bool) -> float:
+	var base := lerpf(ATTACK_EVERY[0], ATTACK_EVERY[1], clampf(float(r["trait"]), 0.0, 1.0))
+	return base * (float(FINALE_ATTACK["every"]) if finale else 1.0) * randf_range(0.7, 1.3)
+
+
+## Rival `k` goes off the front, with a taunt if you're near enough to hear it.
+func _attack(k: int, finale: bool) -> void:
+	var r: Dictionary = riders[k]
+	var t: Array = FINALE_ATTACK["time"] if finale else ATTACK_TIME
+	r["attack"] = randf_range(t[0], t[1])
+	r["attack_in"] = float(r["attack"]) + _attack_gap(r, finale)
+	r["pull_t"] = 0.0
+	r["swing"] = 0.0
+	if attack_talk <= 0.0 and absf(float(r["s"]) - float(riders[0]["s"])) < 150.0:
+		attack_talk = 8.0
+		_say(r, "race_attack", true)
 
 
 static func draft_saving(kmh: float) -> float:

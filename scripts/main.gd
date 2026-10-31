@@ -70,6 +70,7 @@ func _ready() -> void:
 			_start_race(1)
 			Input.action_press("pedal")
 		"race_fast":
+			Trainer._autostart_clock = 0.0   # leave a real trainer alone (it would let go of the held pedal key)
 			_start_game()
 			_start_race(OS.get_environment("PIZZA_COURSE").to_int())
 			Input.action_press("pedal")
@@ -122,6 +123,8 @@ func _ready() -> void:
 				var key := "%s %dx%d" % [b["kind"], int(b["size"].x), int(b["size"].y)]
 				count[key] = int(count.get(key, 0)) + 1
 			print("BUILDINGS total=%d %s" % [city.buildings.size(), count])
+			for kind in ["race", "crit"]:
+				print("  %s entrance at %s" % [kind, city.zone_anchor(kind).get("pos", "?")])
 			get_tree().quit()
 		"seasons":
 			_debug_seasons()
@@ -677,6 +680,8 @@ func _on_interact(kind: String) -> void:
 				"annoyed" if Game.hp_ratio() < 0.5 else "happy")
 		"race":
 			hud.open_menu(_race_menu)
+		"crit":
+			hud.open_menu(_crit_menu)
 		"rescue":
 			_start_rescue()
 
@@ -743,6 +748,8 @@ func _race_menu() -> Dictionary:
 			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
+		if c.get("crit", false):
+			continue   # raced from its own entrance (see _crit_menu)
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
@@ -754,11 +761,27 @@ func _champion_menu() -> Dictionary:
 	var items: Array = []
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
+		if c.get("crit", false):
+			continue
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
 			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
 	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
 	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
+
+
+## The Crusty Crit's entrance on the west edge of town: a flat loop raced for CRIT_TIME and then CRIT_EXTRA more laps,
+## against every racer in town (race.gd, a course with "crit").
+func _crit_menu() -> Dictionary:
+	var i: int = race.COURSES.find_custom(func(c): return c.get("crit", false))
+	var c: Dictionary = race.COURSES[i]
+	return {"title": "Crusty Crit", "sub": "%s\nAll %d racers in town are signing on." % [c["blurb"], Talk.roster.size()],
+		"items": [
+			{"label": "Enter the Crusty Crit    entry $%d   prize pool $%d" % [c["entry"], c["prize"]], "fn": func(): _start_race(i),
+				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+				"detail": "Most laps wins; on the same lap, whoever crosses the line first. Payouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%."},
+			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
+		]}
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
@@ -834,7 +857,8 @@ func _on_race_finished(result: Dictionary) -> void:
 		elif result.get("champion", false):
 			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
 		return {"title": title,
-			"sub": "Time %d:%04.1f     Prize: $%d%s\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
+			"sub": "%sTime %d:%04.1f     Prize: $%d%s\n\n%s" % ["Laps: %d     " % result["laps"] if int(result.get("laps", 0)) > 0 else "",
+				int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 
 
@@ -846,7 +870,7 @@ func _leave_race() -> void:
 	city.visible = true
 	mode = Mode.CITY
 	city.active = true
-	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("race"))
+	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("crit" if race.course.get("crit", false) else "race"))
 	race.rescue = false
 	rescue_from = {}
 	city.invuln = 1.5

@@ -77,6 +77,9 @@ func build(rng: RandomNumberGenerator) -> void:
 	news_t = rng.randf_range(NEWS_SWITCH[0], NEWS_SWITCH[1])
 	_build_pilots(rng, length)
 	_build_start_finish(rng, length)
+	if race.lap > 0.0:   # a crit round town: the whole loop lined with townsfolk, and none of the mountain's extras
+		_build_crit_crowd(rng, length)
+		return
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
 	_build_feed_zone(rng, length)
@@ -130,6 +133,32 @@ func _build_start_finish(rng: RandomNumberGenerator, length: float) -> void:
 				_fan(s + dir * k * 4.0 + 2.0, -2.1 - g, rng)
 	_fan(30.0, 1.2 + race.ROAD_GROW, rng, "fan_highfive_kid")
 	_fan(length - 40.0, -1.2 - race.ROAD_GROW, rng, "fan_highfive_kid")
+
+
+## The Crusty Crit's crowd: barriers along both sides of the whole loop (bar the start/finish, which has its own),
+## townsfolk packed two or three deep outside them and a thinner crowd in the infield.
+## Nothing is put down where the circuit doubles back close by (`clear`: tiles it needs from any road).
+func _build_crit_crowd(rng: RandomNumberGenerator, length: float) -> void:
+	var g: float = race.ROAD_GROW
+	var put := func(s: float, lat: float, clear: float, barrier := false) -> void:
+		if race._rd(race._pose(s, lat)["pos"]) < clear + g:
+			return
+		if barrier:
+			_sprite("race_crowd_barrier", s, lat, lat < 0.0)
+		else:
+			_fan(s, lat, rng)
+	var s := 50.0
+	while s < length - 50.0:
+		put.call(s, 1.45 + g, 1.3, true)
+		put.call(s, -1.45 - g, 1.3, true)
+		for row in 2:
+			if rng.randf() < 0.85:
+				put.call(s + rng.randf_range(-1.5, 1.5), 2.1 + g + row * 0.9 + rng.randf_range(0.0, 0.3), 1.9)
+		if rng.randf() < 0.3:
+			put.call(s + rng.randf_range(-1.5, 1.5), 3.9 + g + rng.randf_range(0.0, 0.4), 1.9)
+		if rng.randf() < 0.55:
+			put.call(s + rng.randf_range(-1.5, 1.5), -2.1 - g - rng.randf_range(0.0, 0.6), 1.9)
+		s += 4.0
 
 
 func _build_hairpins(rng: RandomNumberGenerator) -> void:
@@ -535,7 +564,7 @@ func _step_news(delta: float) -> void:
 		for r in race.riders:
 			if float(r["s"]) > float(who["s"]) and not r["done"]:
 				who = r
-	var s := minf(float(who["s"]) + 5.0, float(race.course["length"]))
+	var s := minf(float(who["s"]) + 5.0, race.goal_s())
 	news.update(delta, race._pose(s, -(race.ROAD_HW + 3.0))["pos"])
 
 
@@ -710,7 +739,6 @@ func movers() -> Array:
 	if race.rescue:   # the injured skier and the patroller waving you in
 		var pz: Dictionary = race._pose(race.rescue_s, 2.2 + race.ROAD_GROW)
 		out.append([pz["pos"], _draw_casualty.bind(pz)])
-	var length: float = race.course["length"]
 	var me: Dictionary = race.riders[0]
 	var lead := 0.0
 	var last := 1e9
@@ -718,10 +746,10 @@ func movers() -> Array:
 		lead = maxf(lead, float(r["s"]))
 		last = minf(last, float(r["s"]))
 	# the motos ahead of the leader, the team car behind the last rider
-	if lead < length - 20.0:
+	if lead < race.goal_s() - 20.0:
 		_add_vehicle(out, "vehicle_tv_moto", lead + 9.0, -0.5 * race.ROAD_W)
 		_add_vehicle(out, "vehicle_marshal_moto", lead + 22.0, 0.45 * race.ROAD_W)
-	if last > 20.0 and last < length:
+	if last > 20.0 and last < race.goal_s():
 		_add_vehicle(out, "vehicle_team_car", last - 13.0, -0.35 * race.ROAD_W)
 	# fans running with you
 	for e in run_fans:

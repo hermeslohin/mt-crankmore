@@ -682,9 +682,57 @@ func _draw_race_hud(w: float, h: float) -> void:
 
 
 ## Race map page: the course elevation profile with every rider on it, distance left and clock.
+## A crit on the WEEHOO: the loop as seen from above with everyone on it, your lap, and the clock counting down
+## (then the laps to go once time's up).
+func _draw_crit_map(mr: Rect2) -> void:
+	var race = main.race
+	var me: Dictionary = race.riders[0]
+	var pr := Rect2(mr.position + Vector2(4, 14), mr.size - Vector2(8, 18))
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	var loop := PackedVector2Array()
+	for i in range(0, race.M, 4):
+		var q := Iso.to_screen(race.pts[i])
+		loop.append(q)
+		lo = lo.min(q)
+		hi = hi.max(q)
+	loop.append(Iso.to_screen(race.pts[0]))
+	var k := minf(pr.size.x / maxf(hi.x - lo.x, 1.0), pr.size.y / maxf(hi.y - lo.y, 1.0))
+	var off := pr.position + (pr.size - (hi - lo) * k) * 0.5
+	var fit := func(q: Vector2) -> Vector2: return off + (q - lo) * k
+	var line := PackedVector2Array()
+	for q in loop:
+		line.append(fit.call(q))
+	draw_polyline(line, Color(0.45, 0.42, 0.4), 3.0)
+	var start: Vector2 = fit.call(Iso.to_screen(race.pts[0]))
+	draw_rect(Rect2(start - Vector2(1, 3), Vector2(2, 6)), Color(0.12, 0.12, 0.15))
+	for j in range(race.riders.size() - 1, -1, -1):
+		var r: Dictionary = race.riders[j]
+		var p: Vector2 = (fit.call(Iso.to_screen(race._pose(r["s"], 0.0)["pos"])) as Vector2).round()
+		var sz := 3.0 if r["player"] else 2.0
+		draw_rect(Rect2(p - Vector2(sz, sz), Vector2(sz * 2, sz * 2)), INK)
+		draw_rect(Rect2(p - Vector2(sz - 1, sz - 1), Vector2(sz * 2 - 2, sz * 2 - 2)), Color(1, 1, 1) if r["player"] else r["color"])
+	var dark := Color(0.12, 0.12, 0.15)
+	var left := "LAP %d" % (race.laps_done(me) + 1)
+	var right := ""
+	if me["done"]:
+		left = "%d LAPS" % int(me.get("laps", race.laps_done(me)))
+		right = "FIN"
+	elif race.crit_end_s > 0.0:
+		var to_go := ceili((race.crit_end_s - float(me["s"])) / race.lap - 0.001)
+		right = "BELL" if to_go <= 1 else "%d TO GO" % to_go
+	else:
+		right = _fmt_time(maxf(0.0, race.crit_left()))
+	draw_string(font, Vector2(mr.position.x + 1, mr.position.y + 8), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, dark)
+	draw_string(font, Vector2(mr.position.x, mr.position.y + 8), right, HORIZONTAL_ALIGNMENT_RIGHT, mr.size.x - 1, 8, dark)
+
+
 func _draw_race_profile(mr: Rect2) -> void:
 	var race = main.race
 	var me: Dictionary = race.riders[0]
+	if race.lap > 0.0:
+		_draw_crit_map(mr)
+		return
 	var length: float = race.course["length"]
 	var pr := Rect2(mr.position + Vector2(0, 12), mr.size - Vector2(0, 12))
 	var pts := PackedVector2Array([pr.position + Vector2(0, pr.size.y)])

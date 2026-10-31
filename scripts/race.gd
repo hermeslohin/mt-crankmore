@@ -23,6 +23,11 @@ const COURSES := [
 		"profile": [[150, 0.0], [400, 0.03], [150, -0.02], [250, 0.0], [200, -0.025], [350, 0.035], [200, 0.0],
 			[300, -0.03], [150, 0.02], [250, 0.0], [450, -0.023], [150, 0.0]],
 		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: gentle climbs, easy dips and flat stretches, finishing back where you started, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
+	# "crit": a flat loop of "length" m (see _build_loop), raced for "minutes" and then "laps_after" more laps; the whole
+	# roster rides it. Entered from its own building in town (main._crit_menu), not Race HQ.
+	{"name": "Crusty Crit", "crit": true, "flowers": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "minutes": 25.0, "laps_after": 2,
+		"entry": 60, "prize": 900, "seed": 51,
+		"blurb": "A flat 750 m criterium round the park on the west edge of town, lined with half the village cheering. Race as many laps as you can in 25 minutes, then everyone gets two more."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -118,6 +123,8 @@ var givers: Array = []                # power-up people along the course {s, lat
 var frisbees: Array = []              # pizzas in flight {"from", "to", "u"} (rider indices)
 var stamina := 1.0
 var kick_t := 0.0
+var lap := 0.0           # a crit's lap (m): the road is a loop and distances along it wrap; 0 on a point-to-point course
+var crit_end_s := 0.0    # a crit's finish: the distance the winner finishes at, set when the clock runs out (0 before)
 var attack_talk := 0.0   # s before another attack taunt
 var bubbles: Dictionary = {}
 var font: Font
@@ -198,6 +205,7 @@ func setup(course_id: int) -> void:
 		riders = [riders[0]]   # no race: just you and the medical kit
 		rescue_s = float(course["length"]) * RESCUE_AT
 	clock = 0.0
+	crit_end_s = 0.0
 	countdown = 2.0 if rescue else 4.0
 	over = false
 	over_clock = 0.0
@@ -231,6 +239,10 @@ func setup(course_id: int) -> void:
 ## Switchbacks: legs run along +x / -x, each one leg_gap tiles further up the mountain (towards -y, away from the
 ## camera, so the slope never hides you), joined by hairpins. Leg 0 is at the bottom.
 func _build_road(rng: RandomNumberGenerator) -> void:
+	lap = 0.0
+	if course.get("crit", false):
+		_build_loop()
+		return
 	var length: float = course["length"]
 	road_len = length + RUNOUT
 	var target := road_len / M_PER_TILE
@@ -402,6 +414,154 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 		leg_elev.append(a)
 
 
+## A crit's circuit (design tiles, in order round the lap): a town-centre loop full of corners, chicanes and kinks.
+## _build_loop rounds each corner off and scales it so a lap comes out at the course length; the lap starts halfway
+## along the first leg, the straight nearest the camera.
+const CRIT_TRACK := [Vector2(28, 46), Vector2(10, 46), Vector2(0, 40), Vector2(0, 22), Vector2(10, 16), Vector2(10, 6),
+	Vector2(24, 0), Vector2(34, 8), Vector2(44, 0), Vector2(60, 0), Vector2(66, 10), Vector2(56, 18), Vector2(66, 28),
+	Vector2(66, 40), Vector2(50, 46), Vector2(40, 38)]
+const CRIT_CORNER := 5.0   # corner radius (design tiles), less where two corners come close together
+
+
+## A crit: one flat lap of course["length"] m round CRIT_TRACK. The last sample is the first again, so the loop closes.
+func _build_loop() -> void:
+	lap = float(course["length"])
+	road_len = lap
+	var n := CRIT_TRACK.size()
+	var poly := PackedVector2Array()
+	for k in n:
+		var a: Vector2 = CRIT_TRACK[(k - 1 + n) % n]
+		var b: Vector2 = CRIT_TRACK[k]
+		var c: Vector2 = CRIT_TRACK[(k + 1) % n]
+		var u1 := (b - a).normalized()
+		var u2 := (c - b).normalized()
+		var turn := absf(u1.angle_to(u2))
+		var t := minf(CRIT_CORNER * tan(turn * 0.5), 0.45 * minf(a.distance_to(b), b.distance_to(c)))
+		for q in 13:   # the corner as a curve from t before it to t after it
+			var f := q / 12.0
+			var p0 := b - u1 * t
+			var p2 := b + u2 * t
+			poly.append(p0.lerp(b, f).lerp(b.lerp(p2, f), f))
+	# start halfway along the first leg (the corner rounding leaves it between the last point and the first)
+	var mid: Vector2 = (CRIT_TRACK[0] + CRIT_TRACK[n - 1]) * 0.5
+	poly.insert(0, mid)
+	poly.append(mid)
+	var cum := PackedFloat32Array()
+	cum.resize(poly.size())
+	for i in range(1, poly.size()):
+		cum[i] = cum[i - 1] + poly[i].distance_to(poly[i - 1])
+	var k := (lap / M_PER_TILE) / cum[poly.size() - 1]   # scale the design to the lap length
+	for i in poly.size():
+		poly[i] *= k
+		cum[i] *= k
+	var total := cum[poly.size() - 1]
+	M = int(total / STEP) + 2
+	pts.resize(M)
+	nrm.resize(M)
+	s_m.resize(M)
+	elev.resize(M)
+	grade_a.resize(M)
+	var j := 0
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	for i in M:
+		var d := total * i / float(M - 1)
+		while j < poly.size() - 2 and cum[j + 1] < d:
+			j += 1
+		pts[i] = poly[j].lerp(poly[j + 1], clampf(inverse_lerp(cum[j], cum[j + 1], d), 0.0, 1.0))
+		lo = lo.min(pts[i])
+		hi = hi.max(pts[i])
+	pts[M - 1] = pts[0]
+	ds_m = lap / float(M - 1)
+	for i in M:
+		var nx := i + 1 if i < M - 1 else 1
+		var pv := i - 1 if i > 0 else M - 2
+		var tng := (pts[nx] - pts[pv]).normalized()
+		nrm[i] = Vector2(-tng.y, tng.x)
+		s_m[i] = i * ds_m
+		elev[i] = 0.0
+		grade_a[i] = 0.0
+	road_leg = PackedInt32Array()
+	road_leg.resize(M)
+	road_leg.fill(0)
+	hairpins.clear()
+	legs_n = 1
+	leg_len = hi.x - lo.x
+	turn_r = CRIT_CORNER
+	leg_span = [Vector2(lo.x, hi.x)]
+	leg_wob = [[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+	leg_elev = []
+	gain = 1.0
+	vz = PX_PER_M
+	ox = floori(lo.x) - 22
+	oy = floori(lo.y) - 22
+	gw = ceili(hi.x - lo.x) + 45
+	gh = ceili(hi.y - lo.y) + 45
+
+
+## A crit's distances wrap round the loop; a point-to-point course's don't.
+func _loop_s(s: float) -> float:
+	return fposmod(s, lap) if lap > 0.0 else s
+
+
+## How far apart two distances are along the road (round the loop either way on a crit).
+func _sdist(a: float, b: float) -> float:
+	if lap <= 0.0:
+		return absf(a - b)
+	var d := fposmod(a - b, lap)
+	return minf(d, lap - d)
+
+
+## Where the race finishes (m): the course length, or on a crit the line the winner crosses once time is up (far off
+## until then).
+func goal_s() -> float:
+	if lap <= 0.0:
+		return float(course["length"])
+	return crit_end_s if crit_end_s > 0.0 else 1.0e9
+
+
+## A crit's racing time left before the extra laps (s).
+func crit_left() -> float:
+	return float(course.get("minutes", 0.0)) * 60.0 - clock
+
+
+func laps_done(r: Dictionary) -> int:
+	return int(floorf(float(r["s"]) / lap)) if lap > 0.0 else 0
+
+
+## Rider `r` (at `s0` a frame ago) is finishing. A crit is won at crit_end_s; after that everyone else finishes the
+## next time they cross the line, however many laps down.
+func _at_finish(r: Dictionary, s0: float) -> bool:
+	if lap <= 0.0:
+		return float(r["s"]) >= float(course["length"])
+	if crit_end_s <= 0.0:
+		return false
+	return float(r["s"]) >= crit_end_s or (finish_count > 0 and floorf(float(r["s"]) / lap) > floorf(s0 / lap))
+
+
+## The crit clock: when it runs out the riders get "laps_after" more laps, counted from when the leader next crosses
+## the line; and the lap cards for you as you cross.
+func _step_crit(me: Dictionary, s0: float) -> void:
+	if crit_end_s <= 0.0 and crit_left() <= 0.0:
+		var lead := 0.0
+		for r in riders:
+			lead = maxf(lead, float(r["s"]))
+		crit_end_s = (floorf(lead / lap) + 1.0 + float(course["laps_after"])) * lap
+		Game.toast.emit("TIME'S UP! %d more laps once the leader crosses the line!" % int(course["laps_after"]), Color(1.0, 0.85, 0.3))
+	if me["done"] or floorf(float(me["s"]) / lap) <= floorf(s0 / lap):
+		return
+	var n := laps_done(me)
+	if crit_end_s > 0.0:
+		var left := roundi((crit_end_s - float(me["s"])) / lap)
+		if left == 1:
+			Game.toast.emit("DING DING! BELL LAP!", Color(1.0, 0.85, 0.3))
+		elif left > 1:
+			Game.toast.emit("%d LAPS TO GO" % left, Color(1.0, 0.9, 0.5))
+	else:
+		var t := maxi(0, int(crit_left()))
+		Game.toast.emit("LAP %d DONE  -  %d:%02d left on the clock" % [n, t / 60, t % 60], Color(0.9, 0.95, 1.0))
+
+
 ## A random [metres, grade] profile for a mountain: climbs, steep ramps, flats, descents and plunges in a random order
 ## and of random lengths, with the climbs scaled so the course gains about `g0` * its length overall.
 func _random_profile(rng: RandomNumberGenerator, length: float, g0: float) -> Array:
@@ -491,6 +651,8 @@ func _leg_e(k: int, ci: int, cf: float) -> float:
 ## Hillside height (m) without the bumps: blends between the legs above and below, falls away under the start
 ## and climbs to the summit above the finish.
 func _base_m(x: float, y: float) -> float:
+	if lap > 0.0:
+		return 0.0   # a crit: flat parkland
 	var xc := clampf(x, 0.0, leg_len)
 	var c := clampf(x - ox, 0.0, gw - 0.001)
 	var ci := int(c)
@@ -512,8 +674,12 @@ func _base_m(x: float, y: float) -> float:
 	return lerpf(_leg_e(k, ci, cf), _leg_e(k + 1, ci, cf), clampf((ya - y) / maxf(ya - yb, 0.1), 0.0, 1.0))
 
 
-## Knolls, hollows and crags (m).
+## Knolls, hollows and crags (m); gentle on a crit.
 func _noise_m(x: float, y: float) -> float:
+	return (0.35 if lap > 0.0 else 1.0) * _bumps(x, y)
+
+
+func _bumps(x: float, y: float) -> float:
 	return 1.6 * sin(x * 0.21 + y * 0.13) * cos(y * 0.24 - x * 0.09) + 0.8 * sin(x * 0.57 + 1.7) * sin(y * 0.49 + 0.3) \
 		+ 0.35 * sin(x * 1.3 + y * 1.1)
 
@@ -526,6 +692,8 @@ func _biome(x: float, y: float) -> float:
 ## Creeks run straight down the mountain (towards the camera) from a spring, crossing every leg below it.
 func _build_streams(rng: RandomNumberGenerator) -> void:
 	streams.clear()
+	if lap > 0.0:
+		return
 	for q in 2:
 		var ks := rng.randi_range(mini(3, legs_n - 1), mini(6, legs_n - 1))
 		streams.append({"x0": leg_len * (rng.randf_range(0.14, 0.42) if q == 0 else rng.randf_range(0.58, 0.86)),
@@ -857,6 +1025,11 @@ func _clear_of(s: float, gap: float, kind: String = "") -> bool:
 func _build_features(rng: RandomNumberGenerator) -> void:
 	var length: float = course["length"]
 	obstacles.clear()
+	if lap > 0.0:   # a crit: no obstacles, one arch over the line (its crowds: RaceLife._build_crit_crowd)
+		fords = PackedFloat32Array()
+		statics.clear()
+		_put_static(2, {"kind": "arch", "s": 0.0, "label": "CRUSTY CRIT"}, [])
+		return
 	for st in streams:
 		for i in M - 1:
 			var a := pts[i]
@@ -1190,7 +1363,7 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var snow := _snow_cover(x, y, f) > 0.5
 			var roll := rng.randf()
 			var sd := _stream_d(x, y)
-			if _rd(p) < 2.0 + ROAD_GROW or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1 and y > life.rail_y0 - 1.0 and y < life.rail_y1 + 1.0):
+			if _rd(p) < (5.0 if lap > 0.0 else 2.0) + ROAD_GROW or sd < 1.0 or (life.rail_x >= 0.0 and absf(x - life.rail_x) < 1.1 and y > life.rail_y0 - 1.0 and y < life.rail_y1 + 1.0):
 				continue
 			var cc := cell_cliff[j * gw + i]
 			if cc == 2:
@@ -1326,6 +1499,8 @@ const CROSS_SPEED := {"deer": 4.5, "fox": 4.0, "squirrel": 3.0, "elk": 4.5, "wol
 ## goats and marmots watch from the rocks, moose wade by the creeks.
 func _build_animals(rng: RandomNumberGenerator) -> void:
 	animals.clear()
+	if lap > 0.0:
+		return   # no wildlife in town
 	var length: float = course["length"]
 	var s := 130.0
 	var last_bear := 0.0
@@ -1426,7 +1601,7 @@ func _build_riders() -> void:
 		"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 		"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 	# a race with the champion brings out the whole roster, not just your usual rivals
-	var field: Array = Talk.roster if not guest.is_empty() and not rescue else Talk.rivals
+	var field: Array = Talk.roster if (not guest.is_empty() or course.get("crit", false)) and not rescue else Talk.rivals
 	var n := field.size()
 	for i in n:
 		var info: Dictionary = field[i]
@@ -1509,11 +1684,11 @@ func _course_notices(delta: float) -> void:
 
 
 func _fi(s: float) -> float:
-	return clampf(s / ds_m, 0.0, M - 1.0)
+	return clampf(_loop_s(s) / ds_m, 0.0, M - 1.0)
 
 
 func _idx(s: float) -> int:
-	return clampi(roundi(s / ds_m), 0, M - 1)
+	return clampi(roundi(_loop_s(s) / ds_m), 0, M - 1)
 
 
 func _t_of_s(s: float) -> float:
@@ -1627,24 +1802,27 @@ func _step_riders(delta: float) -> void:
 	if not patrol.is_empty() and float(me["down"]) > 0.0:
 		steer = 0.0   # lying in the road while the ski patrol sees to you
 	me["lat"] = clampf(me["lat"] + steer * 1.1 * ROAD_W * delta, -0.4 * ROAD_W, 0.4 * ROAD_W)
+	var me_s0: float = me["s"]
 	me["s"] += me["v"] * delta
-	if me["s"] >= road_len:
+	if lap <= 0.0 and me["s"] >= road_len:
 		me["s"] = road_len
 		me["v"] = 0.0
 	me["phase"] += (Trainer.cadence() if Trainer.cadence() > 1.0 else me["v"] * 14.0) / 60.0 * TAU * delta
 	_terrain_events(0, delta)
-	if me["s"] >= length and not me["done"]:
+	if lap > 0.0:
+		_step_crit(me, me_s0)
+	if not me["done"] and _at_finish(me, me_s0):
 		_finish(0)
 	idle_t = idle_t + delta if me["done"] and me["v"] < 0.5 else 0.0
 	# rivals
 	for k in range(1, riders.size()):
 		var r: Dictionary = riders[k]
-		if r["done"]:   # soft-pedal down the run-out, stopping at the end of the road
-			r["v"] = move_toward(r["v"], COOL_SPEED if r["s"] < road_len - 1.0 else 0.0, 2.0 * delta)
-			r["s"] = minf(r["s"] + r["v"] * delta, road_len)
+		if r["done"]:   # soft-pedal down the run-out, stopping at the end of the road (round and round, on a crit)
+			r["v"] = move_toward(r["v"], COOL_SPEED if r["s"] < road_len - 1.0 or lap > 0.0 else 0.0, 2.0 * delta)
+			r["s"] = r["s"] + r["v"] * delta if lap > 0.0 else minf(r["s"] + r["v"] * delta, road_len)
 			r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 			continue
-		var finale: bool = length - float(r["s"]) < FINALE
+		var finale: bool = goal_s() - float(r["s"]) < FINALE or (lap > 0.0 and crit_end_s <= 0.0 and crit_left() < 120.0)
 		r["draft"] = _draft(k)
 		var wheel: int = r["wheel"]
 		# attacks: off the front now and then (see _attack)
@@ -1710,11 +1888,12 @@ func _step_riders(delta: float) -> void:
 			r["v"] = move_toward(r["v"], 0.0, 14.0 * delta)
 		if float(r["air"]) <= 0.0:
 			r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
+		var s0: float = r["s"]
 		r["s"] += r["v"] * delta
 		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.03 * ROAD_W
 		r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 		_terrain_events(k, delta)
-		if r["s"] >= length:
+		if _at_finish(r, s0):
 			_finish(k)
 	_step_frisbees(delta)
 	_squash()
@@ -1726,11 +1905,13 @@ func _step_riders(delta: float) -> void:
 				" on " + str(riders[r["wheel"]].get("short", "YOU")) if int(r.get("wheel", -1)) >= 0 else "",
 				" ATTACK" if float(r["attack"]) > 0.0 else "", " swing" if float(r["swing"]) > 0.0 else "",
 				100.0 * minf(1.0 - FATIGUE_FLOOR, FATIGUE_PER_KM * float(r["tired_m"]) / 1000.0)]
-		print(line, " | YOU %dm" % int(riders[0]["s"]))
+		print(line, " | YOU %dm" % int(riders[0]["s"]), (" | lap %d, %ds left, finish %dm" % [laps_done(riders[0]) + 1, int(crit_left()), int(crit_end_s)]) if lap > 0.0 else "")
 	if finish_count > 0 and not over:
 		over_clock += delta
 	# results once you reach the end of the run-out (or stop on it); a 7 minute cut-off if you never finish
-	if not over and ((me["done"] and (me["s"] >= road_len or idle_t > IDLE_END)) or (not me["done"] and over_clock > 420.0)):
+	# (a crit: once everyone's in, or after a cool-down lap's worth of time)
+	var cooled: bool = me["s"] >= road_len if lap <= 0.0 else (riders.all(func(o): return o["done"]) or clock - player_finish_time > 40.0)
+	if not over and ((me["done"] and (cooled or idle_t > IDLE_END)) or (not me["done"] and over_clock > 420.0)):
 		_end_race()
 
 
@@ -1864,7 +2045,10 @@ func _tick_powerups(k: int, delta: float) -> void:
 	r["down"] = maxf(0.0, float(r["down"]) - delta)
 	if r["pu"] != "":
 		r["pu_hold"] = float(r["pu_hold"]) + delta
-	while int(r["gv"]) < givers.size() and float(r["s"]) >= float(givers[int(r["gv"])]["s"]):
+	if lap > 0.0 and laps_done(r) != int(r.get("lapn", 0)):   # a new lap: the givers hand out again
+		r["lapn"] = laps_done(r)
+		r["gv"] = 0
+	while int(r["gv"]) < givers.size() and _loop_s(float(r["s"])) >= float(givers[int(r["gv"])]["s"]):
 		var g: Dictionary = givers[int(r["gv"])]
 		r["gv"] = int(r["gv"]) + 1
 		if r["pu"] == "" and float(r["down"]) <= 0.0:
@@ -2279,12 +2463,15 @@ func _finish(i: int) -> void:
 		return
 	r["done"] = true
 	r["time"] = clock
+	r["laps"] = laps_done(r)
 	finish_count += 1
 	r["place"] = finish_count
+	if lap > 0.0:   # a crit: ahead of you are those with more laps, and those on your lap who crossed first
+		r["place"] = 1 + riders.filter(func(o): return o != r and o["done"] and int(o["laps"]) >= int(r["laps"])).size()
 	if i == 0:
 		player_finish_time = clock
-		Game.toast.emit("FINISHED!  Place #%d  -  keep rolling to cool down" % finish_count, Color(1.0, 0.9, 0.3))
-		if finish_count == 1:
+		Game.toast.emit("FINISHED!  Place #%d  -  keep rolling to cool down" % int(r["place"]), Color(1.0, 0.9, 0.3))
+		if int(r["place"]) == 1:
 			for k in 2:
 				Talk.say(randi() % Talk.rivals.size(), "race_win_player", true)
 		else:
@@ -2339,11 +2526,16 @@ func _end_race() -> void:
 	var order := riders.duplicate()
 	order.sort_custom(func(a, b):
 		if a["done"] and b["done"]:
+			if lap > 0.0 and int(a["laps"]) != int(b["laps"]):
+				return int(a["laps"]) > int(b["laps"])   # a crit: most laps first, then first across the line
 			return a["time"] < b["time"]
 		if a["done"] != b["done"]:
 			return a["done"]
 		return a["s"] > b["s"])
 	var place := order.find(riders[0]) + 1
+	if OS.has_environment("PIZZA_PELOTON"):
+		print("RESULT ", ", ".join(order.map(func(o): return "%s %s%s" % [o["short"] if o.has("short") else "YOU",
+			("%d laps " % int(o.get("laps", 0))) if lap > 0.0 else "", ("%.0fs" % float(o["time"])) if o["done"] else "DNF"])))
 	var shares := [1.0, 0.5, 0.3, 0.15, 0.0, 0.0, 0.0, 0.0]
 	var prize := int(float(course["prize"]) * shares[place - 1]) if place <= shares.size() else 0
 	var names: Array = []
@@ -2364,7 +2556,8 @@ func _end_race() -> void:
 		new_bike = Game.give_bike(Game.CHAMPION_BIKE)
 		Game.save_game()
 	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
-		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike})
+		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike,
+		"laps": laps_done(riders[0]) if lap > 0.0 else 0})
 
 
 # ---------------------------------------------------------------------
@@ -2479,7 +2672,7 @@ func _draw() -> void:
 			buckets[d] = []
 		buckets[d].append([1, a])
 	for g in givers:
-		if absf(float(g["s"]) - float(riders[0]["s"])) > 140.0:
+		if _sdist(float(g["s"]), float(riders[0]["s"])) > 140.0:
 			continue
 		var gp := _pose(g["s"], g["lat"])
 		var d := _diag(gp["pos"])
@@ -2558,7 +2751,10 @@ func _draw() -> void:
 				var sn: float = maxf(float(seg["snow"]) * 0.6, 0.3 if Season.bare() else 0.0)
 				var snow_tint := Color.WHITE.lerp(Color(1.25, 1.27, 1.32), sn)
 				var textured := Ground.tex("gravel_road") != null
-				if textured:
+				if lap > 0.0:   # a crit: town asphalt, with a pale kerb
+					Ground.fill(self, e, "sidewalk", 0.95, Color(0.7, 0.68, 0.64), snow_tint)
+					Ground.fill(self, seg["gravel"], "asphalt", 1.0, Color(0.33, 0.34, 0.4), snow_tint)
+				elif textured:
 					Ground.fill(self, e, "dirt", float(seg["light"]) * 0.82, Color(0.5, 0.42, 0.33), snow_tint)
 					Ground.fill(self, seg["gravel"], "gravel_road", float(seg["light"]), Color(0.72, 0.64, 0.52), snow_tint)
 					for rut in seg["ruts"]:
@@ -2819,7 +3015,7 @@ func _draw_deco(e: Dictionary) -> void:
 			var design := Sprites.cast(e, e.get("looks", []))
 			if design != "":
 				# right by you, fans switch to one of their other cheers (Sprites.PASS_MOVES), each their own
-				var by_you: bool = absf(float(riders[0]["s"]) - float(e["s"])) < 12.0
+				var by_you: bool = _sdist(float(riders[0]["s"]), float(e["s"])) < 12.0
 				Sprites.draw_any_cheer(self, design, b, t_ + (e["pos"] as Vector2).x * 0.37, int((e["pos"] as Vector2).x * 7.0) + 1 if by_you else 0)
 		"snowman":
 			Season.snowman(self, Iso.to_screen(e["pos"], e["z"]), e["sd"])

@@ -779,7 +779,7 @@ func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color =
 		"er":
 			b["h"] = 62.0
 			b["col"] = Color(0.96, 0.97, 1.0)
-		"race":
+		"race", "crit":
 			b["h"] = 30.0
 			b["col"] = Color(0.2, 0.2, 0.26)
 		"gondola":
@@ -834,6 +834,7 @@ func _place_specials() -> void:
 		["bike", "Gravel Gods Cycles", Vector2(126, 96), Vector2(3, 3)],
 		["er", "St. Pedro's Hospital", Vector2(96, 92), Vector2(3, 3)],
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
+		["crit", "Crusty Crit", Vector2(16, 66), Vector2(3, 3)],   # out on the west edge of town
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
 		["townhall", "Mt. Crankmore Town Hall", Vector2(81, 67), Vector2(3, 3)],
 		["site", "Crankmore Heights", Vector2(46, 66), Vector2(3, 3)],
@@ -882,7 +883,7 @@ func _place_specials() -> void:
 				shops.append({"b": bi, "window": w, "hatch": hatch, "name": sp[1], "color": accent, "road": lot["road"], "s": lot["s"],
 					"chef": w + (hatch - w).normalized() * 0.4})
 				pizza_i += 1
-			"bike", "er", "race":
+			"bike", "er", "race", "crit":
 				zones.append({"pos": lot["door"], "r": 3.0, "kind": kind, "road": lot["road"], "s": lot["s"]})
 			"gondola":
 				gondola_top = b["pos"] + b["size"] * 0.5
@@ -1840,6 +1841,8 @@ func _update_player(delta: float) -> void:
 					prompt = "A / E:  Enter the bike shop"
 				"race":
 					prompt = "A / E:  Enter a Mt. Crankmore race"
+				"crit":
+					prompt = "A / E:  Enter the Crusty Crit"
 				"er":
 					prompt = "St. Pedro's ER. Frequent flyers welcome."
 			if Input.is_action_just_pressed("act_select") and z["kind"] != "er":
@@ -4261,7 +4264,7 @@ func _draw_beacons() -> void:
 				var s: Dictionary = shops[o["shop"]]
 				_beacon(s["window"], Color(1.0, 0.7, 0.15), "$%d  %s" % [o["pay"], s["name"]])
 	for z in zones:
-		var col := Color(0.4, 0.8, 1.0) if z["kind"] == "bike" else (Color(1.0, 0.9, 0.3) if z["kind"] == "race" else Color(1.0, 0.4, 0.4))
+		var col := Color(0.4, 0.8, 1.0) if z["kind"] == "bike" else (Color(1.0, 0.9, 0.3) if z["kind"] in ["race", "crit"] else Color(1.0, 0.4, 0.4))
 		_ring(z["pos"], z["r"] * 0.7, col, 2.0)
 
 
@@ -4291,7 +4294,7 @@ func _draw_building(b: Dictionary) -> void:
 	_draw_building_inner(b)
 	Iso.fade = 1.0
 	var kind: String = b["kind"]
-	var always := kind in ["pizza", "bike", "er", "race", "gondola", "townhall", "site"]
+	var always := kind in ["pizza", "bike", "er", "race", "crit", "gondola", "townhall", "site"]
 	var center: Vector2 = b["pos"] + b["size"] * 0.5
 	if always or (active and p_pos.distance_to(center) < 7.0) or kind == "hotel":
 		var col := Color(1.0, 0.95, 0.5) if always else Color(1, 1, 1)
@@ -4311,6 +4314,8 @@ func _building_art(b: Dictionary) -> String:
 			art = "hospital"
 		"race":
 			art = "building_race_hq"
+		"crit":
+			art = "building_crusty_crit"
 		"gondola":
 			art = "building_gondola_base"
 		"townhall":
@@ -4397,7 +4402,7 @@ func _draw_building_inner(b: Dictionary) -> void:
 		"er":
 			# St. Pedro's hospital, with its helicopter pad on the roof: a picture standing on the lot's near corner
 			Sprites.draw_image(self, "hospital", Iso.to_screen(pos + size))
-		"race":
+		"race", "crit":
 			Iso.box(self, pos, size, h, col, 0.0, Season.roof(Color(0.92, 0.92, 0.92)))
 			for cy in int(size.y + 0.5):
 				for cx in int(size.x + 0.5):
@@ -4901,7 +4906,7 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 			"pizza": col = Color(1.0, 0.3, 0.2)
 			"bike": col = Color(0.3, 0.6, 1.0)
 			"er": col = Color.WHITE
-			"race": col = Color(1.0, 0.9, 0.2)
+			"race", "crit": col = Color(1.0, 0.9, 0.2)
 			"townhall": col = Color(0.75, 0.5, 1.0)
 		if col.a > 0.0:
 			var mp := minimap_point(b["pos"] + b["size"] * 0.5, rect)

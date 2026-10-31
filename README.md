@@ -30,7 +30,7 @@ Pedal a **bicycle trainer** (Bluetooth or Wi-Fi, optionally with handlebar contr
 
 ## Play
 
-Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.9.0**):
+Download the latest build for your system from the [Releases page](https://github.com/hermeslohin/mt-crankmore/releases) (currently **0.9.1**):
 
 | Platform | File | How to run |
 |---|---|---|
@@ -56,14 +56,14 @@ To build the release packages yourself, install the Godot 4.7 export templates a
 `godot --headless --export-release Windows|Linux|macOS` (presets are in `export_presets.cfg`; output goes to `dist/`).
 
 ### Continue / New game
-The title screen has **Continue game** (resumes your save, showing your money and deliveries; greyed out if there is no save) and **New game**, which **deletes your save** and starts you over with **$100**, one Rusty Trash Bike and zero deliveries. Your rider setup (Rookie Boy or Girl, FTP, weight, rivals) is kept.
+The title screen has **Continue game** (resumes your save, showing your money and deliveries; greyed out if there is no save) and **New game**, which **deletes your save** and starts you over with **$100**, one Rusty Trash Bike and zero deliveries. Your rider setup (Rookie Boy or Girl, FTP, weight, how many rivals) is kept, but who the rivals are is drawn at random.
 
 ### Rider setup
 The first time you start delivering (and any time from the title screen or the pause menu) the **Rider setup** screen asks for:
 
 * **Rider**: **Rookie Boy** or **Rookie Girl**, the character you ride as.
 * **FTP** (watts) and **weight**, shown in **kg or lbs**. Your weight is used in the physics, so climbs feel like they do outside.
-* **Difficulty**: rivals ride at a share of *your* FTP (as W/kg, at their own weight), the same in town and in a race: about 50% on *Easy*, 65% on *Medium*, 80% on *Hard* and 100% on *Ludicrous* (plus the odd surge in a race), with better bikes on the harder levels.
+* **Difficulty**: rivals ride at a share of *your* FTP (the FTP set in the menu, with each rival 5% above or below it at most: Gus strongest, Tony weakest), the same in town and in a race: about 50% on *Easy*, 65% on *Medium*, 80% on *Hard* and 100% on *Ludicrous* (plus the odd surge in a race), with better bikes on the harder levels.
 * **Rival bikers**: how many ride against you, 1 to 8 (default 3).
 
 Change values with LEFT / RIGHT (hold to go faster), on the keyboard or the handlebar D-pad. Without a trainer, W rides at 85% of your FTP and Shift sprints.
@@ -171,7 +171,7 @@ https://github.com/hermeslohin/mt-crankmore/releases
 * **Pizza pick-ups**: stop at a shop window and the baker winds up and flings the pizza to you like a frisbee; it spins through the air on an arc into your hands (the rivals get theirs thrown too).
 * **Faces**: when racers talk, their portrait shows in a message box along the bottom (the way RPG message windows do), with their name and the line typing out while their mouth moves; each has happy, smug, annoyed and shocked faces to suit what they're saying. The bakers, the bike-shop mechanic, the hot rod driver, the BMX kid who races you and the robber and bike thief you chase talk there too. Bystanders still just shout over their heads.
 * **Townsfolk**: people stroll the pavements all over the village and cheer you on as you ride past, each in their own ways: a jump, or one of three moves of their own (thumbs up, fist pumps, flexing, flags, cowbells, a bow, a little jig, raise the roof...). Race fans do theirs as you go by, the Channel 9 news helicopter follows the race overhead (switching between you and the leader), drone pilots stand at the roadside and their camera drones take off and follow you for a stretch as you go by, and about a third of the roadside fans set off running beside you for a few seconds (as fast as a person can sprint), then pull up, cheer and walk back to their spot.
-* **Rivals**: up to eight AI bikers (Cryptic Carl, Super Sarah, Cadence Carla, Wheelie Wanda, Gear Grinder Gus, Margherita Maya, Tubeless Tony, Karate Kim; the first three ride by default) chase the same orders and will snag them if they reach the window first. They talk trash constantly (family-friendly).
+* **Rivals**: up to eight AI bikers (Cryptic Carl, Super Sarah, Cadence Carla, Wheelie Wanda, Gear Grinder Gus, Margherita Maya, Tubeless Tony, Karate Kim; three ride by default, and a New game picks who at random) chase the same orders and will snag them if they reach the window first. They talk trash constantly (family-friendly).
 * **Bikes**: you start on a Rusty Trash Bike. **Spokes & Stuff** sells better ones (lighter, more aero, tougher, handle better) and repairs. Bikes have HP; walls and cars damage them, and at 0 HP a bike is destroyed. A repair at Spokes & Stuff costs $200 for a scratch, rising with how much of the bike's HP is gone to $1,500 for a wreck. The Rusty Trash Bike is repaired free: the mechanic takes one look at you, decides you look like you need help, and fixes it on the house.
 * **Cars**: get hit and you wake up at **St. Pedro's Hospital** (its air ambulance sits on the helipad on the roof, and every so often spins up, lifts off and flies out over the town, coming back some minutes later to land; it flies over the races now and then too; every few minutes the Channel 9 news helicopter also comes to film you round town for a minute or so) with a medical bill (money can go negative) and a banged-up bike (it loses 40 HP; at 0 it is destroyed).
 * **The village**: winding roads around a cobbled plaza full of shops and market stalls, a lake with a beach and dock, hotels by the water and the gondola, chalet neighbourhoods in the woods, and only light traffic.
@@ -184,7 +184,7 @@ https://github.com/hermeslohin/mt-crankmore/releases
   * **Wildlife**: deer, foxes and squirrels dash across the road in front of you, rabbits bolt, moose wade near the creeks, goats and marmots watch from the rocks, eagles circle overhead, and bears give chase: one rears up and roars as you ride by, then comes after you from where it stood, as fast as you'd go at 110% of your FTP, for about 20 seconds. Hold 110% or it catches you and swipes you off your bike (pull away as it swings and it misses).
 * **Power-ups**: about 1 in 8 townsfolk hold up a gift box, and spectators along the race course do too. Each holds up the one they'll hand over (its icon floats over their head); ride past with empty hands and they toss it to you, then hold up a different one at random for whoever comes next. You carry one at a time; it shows on the WEEHOO, and **Y** (or Space) uses it. The rivals grab and use them too.
   * *Town only*: **Pepperoni Portal** warps you to the nearest pizza shop with a pizza waiting. **Bike Wrench** fixes your bike to full HP. **Walkie Talkie** summons a pizza mascot that dances in front of the nearest rival and slows them to a crawl for 12 s.
-  * *Town and races*: **Pizza Frisbee** knocks a rival within 10 m off their bike for 5 s (out of range, you keep it). **Oven Mitt** snatches what the nearest rider within 10 m has: in town, the pizza they're delivering (yours to deliver now, on a fresh deadline; not while you've got one of your own, and a pizza rush's stack is too much to grab); in a race, their power-up. The rivals use it on you and each other too. **Fire Socks** make you 30% faster for 15 s. **Breadsticks** make you huge for 12 s, and anyone you ride into falls over. **Dough Roller** rolls the hills flat for 15 s: climbs feel like flat road (on the trainer too), descents still count.
+  * *Town and races*: **Pizza Frisbee** knocks a rival within 15 m off their bike for 5 s (out of range, you keep it). **Oven Mitt** snatches what the nearest rider within 10 m has: in town, the pizza they're delivering (yours to deliver now, on a fresh deadline; not while you've got one of your own, and a pizza rush's stack is too much to grab); in a race, their power-up. The rivals use it on you and each other too. **Fire Socks** make you 30% faster for 15 s. **Breadsticks** make you huge for 12 s, and anyone you ride into falls over. **Dough Roller** rolls the hills flat for 15 s: climbs feel like flat road (on the trainer too), descents still count.
 * **WEEHOO**: your bike computer in the bottom-right corner. It shows the town map (or the course profile in a race), speed, watts, money (race position in a race), grade, cadence, HP and the power-up you are carrying (or how long Fire Socks / Breadsticks have left). The LED strip along the top lights up with your power, coloured by zone relative to your FTP.
 * Progress (money, bikes, HP) is saved automatically. Start over any time with **New game** on the title screen.
 

@@ -84,6 +84,7 @@ var weight_kg := 75.0
 var units := "kg"             # "kg" or "lbs" (display only; weight is stored in kg)
 var difficulty := "medium"
 var rival_count := 3
+var rival_order: Array = []    # roster short names in this game's lineup order; the first rival_count ride (shuffled by New game)
 var setup_done := false       # the rider has seen the setup screen at least once
 
 
@@ -198,11 +199,14 @@ func weight_text() -> String:
 	return "%d lbs" % roundi(weight_kg * LB_PER_KG) if units == "lbs" else "%d kg" % roundi(weight_kg)
 
 
-## A rival's FTP in watts: the player's W/kg, with a small personal spread (the stronger characters stay a little
-## stronger) so the pack doesn't ride as one. They ride at rival_share() of it.
+const RIVAL_SPREAD := 0.05   # the strongest / weakest rival is 5% above / below the base
+
+## A rival's FTP in watts: the player's FTP from the menu (not W/kg), spread 5% either way per rival. They ride at
+## rival_share() of it, by difficulty.
 func rival_ftp(info: Dictionary, rider_mass: float) -> float:
-	var spread := 1.0 + (float(info["ftp"]) / 244.0 - 1.0) * 0.5
-	return wkg() * spread * rider_mass
+	# the roster ftp (215-275) maps onto a personal spread of -5% .. +5% around the menu FTP
+	var spread := clampf((float(info["ftp"]) - 245.0) / 30.0, -1.0, 1.0) * RIVAL_SPREAD
+	return ftp * (1.0 + spread) * float(info.get("ftp_pct", 1.0))   # "ftp_pct" trims a rival further
 
 
 ## The share of their FTP rivals ride at, by difficulty: the same in town and in a race.
@@ -272,6 +276,11 @@ func new_game() -> void:
 	equipped = 0
 	deliveries = 0
 	race_wins = 0
+	rival_order = []
+	for r in Talk.roster:
+		rival_order.append(r["short"])
+	rival_order.shuffle()   # a new game gets a random field
+	Talk.set_count(rival_count)
 	money_changed.emit()
 
 
@@ -289,7 +298,7 @@ func save_game() -> void:
 		hp_out[str(k)] = hp[k]
 	f.store_string(JSON.stringify({"money": money, "owned": owned, "hp": hp_out, "equipped": equipped,
 		"deliveries": deliveries, "race_wins": race_wins,
-		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "setup_done": setup_done, "rider": rider,
+		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "rival_order": rival_order, "setup_done": setup_done, "rider": rider,
 		"season": Season.choice}))
 
 
@@ -322,6 +331,7 @@ func load_game() -> void:
 	units = "lbs" if d.get("units", units) == "lbs" else "kg"
 	difficulty = d.get("difficulty", difficulty) if DIFFICULTIES.has(d.get("difficulty", "")) else "medium"
 	rival_count = clampi(int(d.get("rival_count", rival_count)), 1, MAX_RIVALS)
+	rival_order = Array(d.get("rival_order", []))
 	setup_done = bool(d.get("setup_done", false))
 	set_rider(str(d.get("rider", "boy")))
 	Season.set_choice(str(d.get("season", "auto")))

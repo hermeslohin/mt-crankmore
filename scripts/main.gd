@@ -539,11 +539,13 @@ func _season_item() -> Dictionary:
 func _open_race_pause() -> void:
 	race.active = false
 	hud.open_menu(func():
-		return {"title": "Race paused", "sub": "Forfeiting loses your entry fee.",
+		var done: bool = not race.rescue and race.riders[0]["done"] and not race.over
+		return {"title": "Race paused", "sub": "You've finished: your prize is yours either way." if done else "Forfeiting loses your entry fee.",
 			"items": [
 				{"label": "Back to the climb", "fn": func(): hud.close_menu(); on_menu_closed()},
 				{"label": "Controls", "fn": _open_controls.bind(_open_race_pause), "detail": "Change the keyboard keys and the handlebar controller buttons."},
-				{"label": "Forfeit and return to town", "fn": _leave_race},
+				{"label": "Collect prize and return to town" if done else "Forfeit and return to town",
+					"fn": _exit_finished_race if done else _leave_race},
 			]})
 
 
@@ -695,6 +697,7 @@ func _champion_menu() -> Dictionary:
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
 ## quarter of the way up; afterwards you're back where you were in town.
 var rescue_from := {}
+var skip_results := false    # leaving a finished race early: no results screen
 
 func _start_rescue() -> void:
 	rescue_from = {"road": city.rr, "s": city.rs}
@@ -726,7 +729,18 @@ func _start_race(i: int, champion := false) -> void:
 	cam.position = race.cam_target()
 
 
+## Leaving after you've crossed the line: the race is scored and paid as usual, just without the results screen.
+func _exit_finished_race() -> void:
+	skip_results = true
+	race._end_race()
+	skip_results = false
+	_leave_race()
+
+
 func _on_race_finished(result: Dictionary) -> void:
+	if skip_results:
+		Game.toast.emit("Placed #%d. Prize: $%d" % [result["place"], result["prize"]], Color(1.0, 0.9, 0.3))
+		return
 	if result.get("rescue", false):
 		hud.open_menu(func():
 			var t: float = result["time"]

@@ -1636,6 +1636,12 @@ func _step_riders(delta: float) -> void:
 			pw *= 0.95
 		elif gap < -300.0:
 			pw *= 1.05
+		# out in front without a wheel to hide behind: -1% watts for every 1/4 km spent there
+		if gap > 0.0 and float(r["draft"]) <= 0.0:
+			r["lead_m"] = float(r.get("lead_m", 0.0)) + float(r["v"]) * delta
+		elif gap <= 0.0:
+			r["lead_m"] = 0.0
+		pw *= 1.0 - 0.01 * floorf(float(r.get("lead_m", 0.0)) / 250.0)
 		r["power"] = pw
 		var bk: Dictionary = r["bike"]
 		_tick_powerups(k, delta)

@@ -8,7 +8,7 @@ var roster: Array = [
 		"sig": ["Mothman delivers faster than you. Just saying.", "They don't want you to know this, but I'm winning.", "That was no pothole. That was a cover-up."]},
 	{"name": "Super Sarah", "short": "Sarah", "color": Color(0.9, 0.2, 0.25), "ftp": 222.0, "tier": 1, "speed": 3.6,
 		"sig": ["Have no fear, Super Sarah is here!", "My cape makes me 12% faster. Scientifically.", "I can't be late. I have to save the city. And deliver pizza."]},
-	{"name": "Cadence Carla", "short": "Carla", "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "tier": 3, "speed": 4.1,
+	{"name": "Cadence Carla", "short": "Carla", "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "ftp_pct": 0.9, "tier": 3, "speed": 4.1,
 		"sig": ["My cadence is 92. Yours is... a rumor.", "Statistically, you're losing.", "I've calculated your odds. Rounding error."]},
 	{"name": "Wheelie Wanda", "short": "Wanda", "color": Color(1.0, 0.4, 0.7), "ftp": 246.0, "tier": 2, "speed": 4.0,
 		"sig": ["Watch this wheelie! ...Did you watch? Rewind!", "I'm not showing off. This is just how I ride.", "Smile, I'm in your rearview mirror's highlight reel!"]},
@@ -250,7 +250,16 @@ func _ready() -> void:
 
 
 func set_count(n: int) -> void:
-	rivals = roster.slice(0, clampi(n, 1, roster.size()))
+	# the first n of this game's lineup (a New game shuffles it); a save without one keeps the roster order
+	var pool: Array = []
+	for nm in Game.rival_order:
+		for r in roster:
+			if r["short"] == nm:
+				pool.append(r)
+	for r in roster:
+		if not pool.has(r):
+			pool.append(r)
+	rivals = pool.slice(0, clampi(n, 1, pool.size()))
 
 
 func _process(delta: float) -> void:

@@ -12,7 +12,7 @@ const DEFS := {
 	"walkie": {"name": "Walkie Talkie", "short": "WALKIE", "col": Color(0.25, 0.7, 0.35),
 		"blurb": "summons a dancing pizza mascot to block a rival"},
 	"frisbee": {"name": "Pizza Frisbee", "short": "FRISBEE", "col": Color(1.0, 0.7, 0.2),
-		"blurb": "toss it at a rival within 10 m to knock them down"},
+		"blurb": "toss it at a rival within 15 m to knock them down"},
 	"socks": {"name": "Fire Socks", "short": "FIRE SOCKS", "col": Color(1.0, 0.4, 0.1), "blurb": "30% faster for 15 s"},
 	"breadsticks": {"name": "Breadsticks", "short": "BREADSTICKS", "col": Color(0.9, 0.7, 0.35),
 		"blurb": "grow huge and run over your rivals"},
@@ -24,7 +24,7 @@ const TOWN := ["portal", "wrench", "walkie", "frisbee", "socks", "breadsticks", 
 const RACE := ["frisbee", "socks", "breadsticks", "roller", "mitt"]
 
 const GIVER_ODDS := 8          # 1 in 8 people hand out power-ups
-const FRISBEE_RANGE_M := 10.0
+const FRISBEE_RANGE_M := 15.0
 const MITT_RANGE_M := 10.0     # Oven Mitt: how close you have to be to snatch something
 const DOWN_TIME := 5.0         # seconds on the ground after a frisbee hit
 const SQUASH_TIME := 3.0       # seconds on the ground after being run over

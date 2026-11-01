@@ -312,6 +312,24 @@ func _role_line(label: String, role: String, live_text: String) -> String:
 	return "%s: not connected" % label
 
 
+## What a device is used as, for its line's detail on the Connect Trainer screen.
+func _role_use(role: String, power_meter: bool) -> String:
+	match role:
+		"trainer":
+			return "power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if power_meter else "trainer (power, cadence, climbs)"
+		"hrm":
+			return "heart rate monitor (shown on the WEEHOO, logged and posted to Strava)"
+	return "handlebar controllers (buttons)"
+
+
+## The heart rate status line: a strap of its own, or the one the trainer relays (an ANT+ strap paired to a Wahoo
+## KICKR comes this way, over Bluetooth or Wi-Fi).
+func _hr_line() -> String:
+	if Trainer.hr_live and Trainer.hr_source == "trainer":
+		return "Heart rate: %d bpm, from your trainer" % Trainer.heart_rate
+	return _role_line("Heart rate", "hrm", "(%d bpm)" % Trainer.heart_rate if Trainer.hr_live else "")
+
+
 func _trainer_menu() -> Dictionary:
 	var items: Array = []
 	var lines: Array = []
@@ -334,12 +352,13 @@ func _trainer_menu() -> Dictionary:
 		var pressed := "  buttons: " + " ".join(Trainer.pressed_names) if not Trainer.pressed_names.is_empty() else ""
 		lines.append(_role_line("Trainer", "trainer", trainer_live))
 		lines.append(_role_line("Controls", "controller", pressed))
+		lines.append(_hr_line())
 		var err: String = Trainer.status.get("error", "")
 		if err != "":
 			lines.append("! " + err)
 		var scanning: bool = Trainer.status.get("scanning", false)
 		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Trainer.scan(true),
-			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer."})
+			"detail": "Pedal or press a button so the devices wake up, and put your heart rate strap on. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer. An ANT+ strap: pair it to your Wahoo trainer and its heart rate comes through the trainer."})
 		var shown := {}
 		for d in Trainer.devices():
 			var role: String = d["kind"]
@@ -349,8 +368,8 @@ func _trainer_menu() -> Dictionary:
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
 			var pm: bool = d.get("power_meter", false)   # power and cadence only: no resistance for hills or gears
 			var wifi: bool = d.get("wifi", false)         # Direct Connect over the network: no signal strength to show
-			var tag := ("POWER   " if pm else "TRAINER ") if role == "trainer" else "CONTROLS"
-			var nm := _device_name(d["name"], addr)
+			var tag: String = {"trainer": "POWER   " if pm else "TRAINER ", "hrm": "HEART   "}.get(role, "CONTROLS")
+			var nm := _device_name(d["name"], addr) + (" + heart rate" if role == "trainer" and d.get("heart_rate", false) else "")
 			var signal_bars := "" if wifi else "  " + "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
 			if connected and info.get("state", "") != "connected":
 				# still connecting (it can take 10 s): selecting it again must not cancel it
@@ -362,15 +381,16 @@ func _trainer_menu() -> Dictionary:
 					"fn": _confirm_disconnect.bind(role), "detail": "Select twice to disconnect this device."})
 			else:
 				items.append({"label": "%s  %s%s" % [tag, nm, signal_bars], "fn": Trainer.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")
-						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")})
-		for role in ["trainer", "controller"]:
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % _role_use(role, pm)
+						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")
+						+ (" It also passes on the heart rate strap paired to it (ANT+ or Bluetooth)." if role == "trainer" and d.get("heart_rate", false) else "")})
+		for role in ["trainer", "controller", "hrm"]:
 			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
-				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", _device_name(info.get("name", "device"), info.get("address", ""))],
+				items.append({"label": "%s  %s  [forget]" % [{"trainer": "TRAINER ", "hrm": "HEART   "}.get(role, "CONTROLS"), _device_name(info.get("name", "device"), info.get("address", ""))],
 					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
 		if Trainer.devices().is_empty():
-			lines.append("No trainers, power meters or handlebar controllers found yet.")
+			lines.append("No trainers, power meters, handlebar controllers or heart rate monitors found yet.")
 	items.append({"label": "Back", "fn": func():
 		Trainer.scan(false)
 		_show_title(), "detail": ""})
@@ -408,7 +428,7 @@ func _strava_menu(back: Callable) -> Dictionary:
 		lines.append(Strava.status_text() + ". Post your ride here or from the pause menu before you quit: an unposted ride isn't kept.")
 		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
 		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
-			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
+			"detail": ("Posts a Virtual Ride with your distance, speed, power, cadence and heart rate, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
 		if not Strava.last_activity.is_empty():
 			var shots_dir: String = Strava.last_activity.get("shots_dir", "")
 			items.append({"label": "Add screenshots to the last ride" if shots_dir != "" else "Open the last ride on Strava", "fn": Strava.open_last_activity,
@@ -517,7 +537,7 @@ func _open_pause() -> void:
 			]})
 
 
-## Quitting to the title ends the session: save, then show what you rode (power, cadence and speed over time, with
+## Quitting to the title ends the session: save, then show what you rode (power, cadence, heart rate and speed over time, with
 ## the pizzas, challenges and race placings on it) with the option to post just this session to Strava.
 func _end_session() -> void:
 	Game.save_game()
@@ -569,7 +589,7 @@ func _session_menu() -> Dictionary:
 	elif Strava.linked():
 		items.append({"label": "Uploading..." if Strava.busy() else "Post this session to Strava", "fn": Strava.post_ride,
 			"enabled": not Strava.busy() and Ride.can_post(),
-			"detail": "Posts just this session (since you hit New game / Continue game) as a Virtual Ride with its distance, speed, power and cadence." if Ride.can_post() else "Ride for at least a minute to post a session."})
+			"detail": "Posts just this session (since you hit New game / Continue game) as a Virtual Ride with its distance, speed, power, cadence and heart rate." if Ride.can_post() else "Ride for at least a minute to post a session."})
 	else:
 		items.append({"label": "Set up Strava to post this session", "fn": _open_strava_menu.bind(func(): hud.open_menu(_session_menu, true)),
 			"detail": "Link your Strava account, then post this session. It's kept until you start the next one."})
@@ -928,16 +948,18 @@ func _debug_ride() -> void:
 	get_tree().quit()
 
 
-## Dev helper: PIZZA_DEBUG=session [PIZZA_TRAINER=0] [PIZZA_OUT=dir] fakes a 40-minute session (with or without
-## trainer power and cadence, plus pizzas, challenges and race placings), quits to the title and saves the
-## end-of-session screen as session.png.
+## Dev helper: PIZZA_DEBUG=session [PIZZA_TRAINER=0] [PIZZA_HR=0] [PIZZA_OUT=dir] fakes a 40-minute session (with or
+## without trainer power and cadence and heart rate, plus pizzas, challenges and race placings), quits to the title and
+## saves the end-of-session screen as session.png.
 func _debug_session() -> void:
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	_start_game()
 	city.active = false
 	var trainer := OS.get_environment("PIZZA_TRAINER") != "0"
+	var heart := OS.get_environment("PIZZA_HR") != "0"
 	var t := int(Time.get_unix_time_from_system()) - 2400
+	var bpm := 95.0
 	for i in 2400:
 		if i > 900 and i < 1020:
 			continue   # a pause in the menus
@@ -945,7 +967,9 @@ func _debug_session() -> void:
 		var v := 6.0 + w / 40.0 + randf_range(-0.5, 0.5)
 		Ride.distance += v
 		Ride._riding += 1.0
-		Ride.samples.append([t + i, Ride.distance, 1250.0, v, roundi(w) if trainer else -1, roundi(85.0 + 10.0 * sin(i / 60.0)) if trainer else -1])
+		bpm = move_toward(bpm, 75.0 + w * 0.3, 0.6)   # a heart follows the effort, a little behind
+		Ride.samples.append([t + i, Ride.distance, 1250.0, v, roundi(w) if trainer else -1, roundi(85.0 + 10.0 * sin(i / 60.0)) if trainer else -1,
+			roundi(bpm) if heart else -1])
 	for e in [[200, "pizza", "Pizza delivered", 0], [520, "won", "Catch The Thief", 0], [700, "pizza", "Pizza delivered", 0], [710, "pizza", "Pizza delivered", 0],
 			[1300, "lost", "Beat The Hot Rod", 0], [1800, "race", "Flour Run: #2", 2], [2100, "won", "Hill Sprint: Bakers Hill", 0], [2300, "race", "Mt. Crankmore: #1", 1]]:
 		Ride.events.append({"t": t + e[0], "kind": e[1], "text": e[2], "place": e[3]})

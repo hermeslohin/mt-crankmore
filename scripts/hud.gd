@@ -530,7 +530,8 @@ func _zone_col(frac: float) -> Color:
 
 
 ## The WEEHOO bike computer in the top-left corner: LED power strip, map page on top,
-## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence.
+## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence, and heart rate once a heart rate
+## monitor (a strap, or one relayed by the trainer) has been heard from.
 ## `map_fn` draws into the map window; `cell` is [label, text, colour]; bars are [label, frac, colour].
 ## What the WEEHOO's power-up row shows: the item you're carrying, or a running Fire Socks / Breadsticks / Dough Roller timer.
 func _pu_slot(kind: String, socks: float, bread: float, roller: float) -> Dictionary:
@@ -602,7 +603,8 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	draw_rect(Rect2(x + sc.size.x - 19, y + 4, 9, 2), Color(0.4, 1.0, 0.5))
 	draw_string(font, Vector2(x, y + 8), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
 	# map page: everything the fields and bars below don't need
-	var map_h := sc.size.y - 12.0 - 2.0 - 49.0 - 28.0
+	var hr_row := 12.0 if Trainer.hr_seen else 0.0   # (taken from the map, and kept once it's there so nothing jumps)
+	var map_h := sc.size.y - 12.0 - 2.0 - 49.0 - 28.0 - hr_row
 	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, map_h)
 	map_fn.call(mr)
 	y += map_h + 14.0
@@ -648,6 +650,31 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 		draw_rect(Rect2(br.position, Vector2(floorf(bw * clampf(bar[1], 0.0, 1.0)), 5)), bar[2])
 	draw_string(font, Vector2(x + sc.size.x - 32, y + 10), "%d" % int(Trainer.cadence()), HORIZONTAL_ALIGNMENT_RIGHT, 18, 8, dark)
 	draw_string(font, Vector2(x + sc.size.x - 13, y + 10), "rpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+	if hr_row > 0.0:
+		var hy := y + 34.0
+		draw_rect(Rect2(x, hy - 9, sc.size.x, 1), Color(0.7, 0.72, 0.7))
+		draw_string(font, Vector2(x + 3, hy), "HEART", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.4, 0.42, 0.45))
+		var red := Color(0.85, 0.15, 0.2)
+		if Trainer.hr_live:
+			# beats at your heart rate: a quick swell at the start of every beat
+			var phase := fmod(Time.get_ticks_msec() / 1000.0 * Trainer.heart_rate / 60.0, 1.0)
+			_heart(Vector2(x + 44, hy - 3), 1.0 + 0.35 * maxf(0.0, 1.0 - phase * 5.0), red)
+			draw_string(font, Vector2(x + 52, hy), "%d" % Trainer.heart_rate, HORIZONTAL_ALIGNMENT_RIGHT, 24, 8, dark)
+			draw_string(font, Vector2(x + 78, hy), "bpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+			if Trainer.hr_source == "trainer":   # relayed by the trainer (a strap paired to it, like ANT+ on a KICKR)
+				draw_string(font, Vector2(x, hy), "TRNR", HORIZONTAL_ALIGNMENT_RIGHT, sc.size.x - 3, 6, Color(0.4, 0.42, 0.45))
+		else:
+			_heart(Vector2(x + 44, hy - 3), 1.0, Color(0.6, 0.62, 0.65))
+			draw_string(font, Vector2(x + 52, hy), "--", HORIZONTAL_ALIGNMENT_RIGHT, 24, 8, Color(0.55, 0.57, 0.6))
+			draw_string(font, Vector2(x + 78, hy), "bpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+
+
+## A little pixel heart centred on `p`, `k` times its 7x6 size.
+func _heart(p: Vector2, k: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for v in [Vector2(-3.5, -1.5), Vector2(-2, -3), Vector2(0, -1.5), Vector2(2, -3), Vector2(3.5, -1.5), Vector2(3.5, 0), Vector2(0, 3), Vector2(-3.5, 0)]:
+		pts.append(p + v * k)
+	draw_colored_polygon(pts, col)
 
 
 func _fmt_time(sec: float) -> String:

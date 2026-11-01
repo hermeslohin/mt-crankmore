@@ -38,6 +38,26 @@ const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between h
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
+## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him, and he goes exactly as
+## fast as you would at THUNDER_PACE of your FTP on your own bike, so beating him takes more than that. Art:
+## bike_mcgee.png / bike_mcgee_fall.png, face_mcgee.png. "lines": what he says for each Talk category ("sig" otherwise).
+const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "tier": 3, "attack": 0.0,
+	"sig": ["These quads have their own postcode.", "I don't skip leg day. Leg day skips everything else.", "Do you even squat, bro?",
+		"My thighs have thighs.", "I warm up by leg-pressing the Zamboni."],
+	"lines": {
+		"race_start": ["One lap. One chance. One pair of LEGENDARY THIGHS.", "Hope you ate your pasta, {n}. All of it.",
+			"Feel that rumble? That's my quads warming up.", "750 metres of pain, {n}. Mostly yours."],
+		"race_pass_player": ["THUNDER COMING THROUGH!", "Hear that, {n}? That's thunder. From my THIGHS.", "Out of the sprinter's lane, small legs!",
+			"Was that a breeze? No, that was me."],
+		"race_player_pass": ["WHAT?! Who taught those little legs to do that?", "Impossible! I did 900 squats this morning!",
+			"Enjoy it, {n}. The thunder always comes back.", "Hey! My calves weren't ready!"],
+		"race_win_rival": ["THUNDER THIGHS WINS AGAIN! Flex for the crowd!", "Go home and do some lunges, {n}.",
+			"The Velodoughm belongs to the THIGHS!"],
+		"race_lose_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too.",
+			"My quads... they've never felt this way before."],
+		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
+	}}
+const THUNDER_PACE := 1.75   # the share of YOUR FTP his speed matches
 const MAX_RIVALS := 8
 
 var bikes: Array = [

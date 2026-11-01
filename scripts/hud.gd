@@ -718,6 +718,9 @@ func _draw_crit_map(mr: Rect2) -> void:
 	if me["done"]:
 		left = "%d LAPS" % int(me.get("laps", race.laps_done(me)))
 		right = "FIN"
+	elif race.course.has("laps"):   # the Velodoughm: a set distance, no clock
+		left = "VS " + String(race.guest.get("short", "")).to_upper()
+		right = "%dM" % maxi(0, ceili(race.crit_end_s - float(me["s"])))
 	elif race.crit_end_s > 0.0:
 		var to_go := ceili((race.crit_end_s - float(me["s"])) / race.lap - 0.001)
 		right = "BELL" if to_go <= 1 else "%d TO GO" % to_go

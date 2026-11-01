@@ -11,6 +11,7 @@ var hud: Control
 var title_t := 0.0
 var shot_at := Vector2.INF   # dev helper: camera pinned on a world point for screenshots
 var viewer := {}             # dev helper: the event viewer (PIZZA_DEBUG=eventviewer), see _debug_viewer
+var outdoors: Array = []     # the weather and the night layers
 
 
 func _ready() -> void:
@@ -36,6 +37,7 @@ func _ready() -> void:
 	var dusk := CanvasLayer.new()   # night and rain clouds over the world and the weather, under the HUD
 	dusk.layer = 6
 	add_child(dusk)
+	outdoors = [sky, dusk]   # (hidden under the Velodoughm's roof, see _process)
 	var night := preload("res://scripts/night.gd").new()
 	night.source = func(): return city.night_lights() if mode == Mode.CITY else race.night_lights() if mode == Mode.RACE else []
 	dusk.add_child(night)
@@ -123,7 +125,7 @@ func _ready() -> void:
 				var key := "%s %dx%d" % [b["kind"], int(b["size"].x), int(b["size"].y)]
 				count[key] = int(count.get(key, 0)) + 1
 			print("BUILDINGS total=%d %s" % [city.buildings.size(), count])
-			for kind in ["race", "crit"]:
+			for kind in ["race", "crit", "velo"]:
 				print("  %s entrance at %s" % [kind, city.zone_anchor(kind).get("pos", "?")])
 			get_tree().quit()
 		"seasons":
@@ -208,6 +210,8 @@ func _process(delta: float) -> void:
 		_:
 			target = race.cam_target()
 	cam.position = cam.position.lerp(target, 1.0 - exp(-6.0 * delta))
+	for l in outdoors:
+		l.visible = not (mode == Mode.RACE and race.velo)
 	# flat road on the trainer whenever you're not riding (title, menus, the bike shop, the ER)
 	if mode == Mode.TITLE or (mode == Mode.CITY and (not city.active or city.er_timer > 0.0)):
 		Trainer.send_grade(0.0)
@@ -682,6 +686,9 @@ func _on_interact(kind: String) -> void:
 			hud.open_menu(_race_menu)
 		"crit":
 			hud.open_menu(_crit_menu)
+		"velo":
+			hud.open_menu(_velo_menu)
+			Game.racer_says.emit("mcgee", Game.THUNDER["name"], Game.THUNDER["sig"].pick_random(), "smug", Game.THUNDER["color"])
 		"rescue":
 			_start_rescue()
 
@@ -748,8 +755,8 @@ func _race_menu() -> Dictionary:
 			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
-		if c.get("crit", false):
-			continue   # raced from its own entrance (see _crit_menu)
+		if c.get("crit", false) or c.get("velo", false):
+			continue   # raced from their own entrances (see _crit_menu, _velo_menu)
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
@@ -761,7 +768,7 @@ func _champion_menu() -> Dictionary:
 	var items: Array = []
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
-		if c.get("crit", false):
+		if c.get("crit", false) or c.get("velo", false):
 			continue
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
@@ -780,6 +787,20 @@ func _crit_menu() -> Dictionary:
 			{"label": "Enter the Crusty Crit    entry $%d   prize pool $%d" % [c["entry"], c["prize"]], "fn": func(): _start_race(i),
 				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
 				"detail": "Most laps wins; on the same lap, whoever crosses the line first. Payouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%."},
+			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
+		]}
+
+
+## The Velodoughm's entrance on the east edge of town: one lap of the indoor wooden track against Thunder Thighs McGee,
+## who rides as fast as you would at Game.THUNDER_PACE of your FTP (race.gd, a course with "velo").
+func _velo_menu() -> Dictionary:
+	var i: int = race.COURSES.find_custom(func(c): return c.get("velo", false))
+	var c: Dictionary = race.COURSES[i]
+	return {"title": "The Velodoughm", "sub": "%s\n%s is stretching his quads by the rail. Loudly." % [c["blurb"], Game.THUNDER["name"]],
+		"items": [
+			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": func(): _start_race(i),
+				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+				"detail": "Hold more than %d W (%d%% of your FTP) for the whole lap to beat him. Winner takes it all." % [roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0)]},
 			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
 		]}
 
@@ -804,7 +825,7 @@ func _start_rescue() -> void:
 
 func _start_race(i: int, champion := false) -> void:
 	race.rescue = false
-	race.guest = Game.CHAMPION if champion else {}
+	race.guest = Game.CHAMPION if champion else (Game.THUNDER if race.COURSES[i].get("velo", false) else {})
 	if champion:
 		city.champion_left = 0.0   # he's raced you: off he goes after
 	var c: Dictionary = race.COURSES[i]
@@ -854,10 +875,14 @@ func _on_race_finished(result: Dictionary) -> void:
 			reward = "\nChampion's bonus: $%d" % Game.CHAMPION_BONUS
 			reward += ("\nHe hands you his bike: the CHAMPION'S BIKE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
 				else "\n(You've already got his bike.)")
+		elif result.get("beat_thunder", false):
+			title = "You beat %s at the Velodoughm!" % Game.THUNDER["name"]
+		elif result.get("thunder", false):
+			title = "%s wins at the Velodoughm. Flex for the crowd." % Game.THUNDER["name"]
 		elif result.get("champion", false):
 			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
 		return {"title": title,
-			"sub": "%sTime %d:%04.1f     Prize: $%d%s\n\n%s" % ["Laps: %d     " % result["laps"] if int(result.get("laps", 0)) > 0 else "",
+			"sub": "%sTime %d:%04.1f     Prize: $%d%s\n\n%s" % ["Laps: %d     " % result["laps"] if int(result.get("laps", 0)) > 0 and not result.get("thunder", false) else "",
 				int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 
@@ -870,7 +895,8 @@ func _leave_race() -> void:
 	city.visible = true
 	mode = Mode.CITY
 	city.active = true
-	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("crit" if race.course.get("crit", false) else "race"))
+	var from := "crit" if race.course.get("crit", false) else ("velo" if race.course.get("velo", false) else "race")
+	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor(from))
 	race.rescue = false
 	rescue_from = {}
 	city.invuln = 1.5

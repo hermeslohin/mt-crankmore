@@ -28,6 +28,11 @@ const COURSES := [
 	{"name": "Crusty Crit", "crit": true, "flowers": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "minutes": 25.0, "laps_after": 2,
 		"entry": 60, "prize": 900, "seed": 51,
 		"blurb": "A flat 750 m criterium round the park on the west edge of town, lined with half the village cheering. Race as many laps as you can in 25 minutes, then everyone gets two more."},
+	# "velo": the Velodoughm, an indoor wooden track (VELO_* below) with banked turns round two basketball courts, raced
+	# over "laps" laps against its guest (Game.THUNDER) alone. Entered from its own building in town (main._velo_menu).
+	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],
+		"entry": 50, "prize": 600, "seed": 61,
+		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He rides as fast as you would at 175% of your FTP. No drafting, no power-ups: just legs."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -127,6 +132,16 @@ var kick_t := 0.0
 var lap := 0.0           # a crit's lap (m): the road is a loop and distances along it wrap; 0 on a point-to-point course
 var crit_end_s := 0.0    # a crit's finish: the distance the winner finishes at, set when the clock runs out (0 before)
 var attack_talk := 0.0   # s before another attack taunt
+## The Velodoughm (a course with "velo"): an oval of two straights and two half-circle turns round the segment
+## velo_a..velo_b (world tiles), velo_r from it to the middle of the track. velo_out is which side of the road (the
+## sign of `lat`) is the outside of the turns; bank_a how banked each road sample is (0..1, 1 in the turns).
+var velo := false
+var velo_a := Vector2.ZERO
+var velo_b := Vector2.ZERO
+var velo_r := 1.0
+var velo_out := 1.0
+var bank_a := PackedFloat32Array()
+var stands: Array = []   # where the Velodoughm's stands are: the distance (m) each 4 m piece starts at (RaceLife._build_velo_crowd)
 var bubbles: Dictionary = {}
 var font: Font
 var player_finish_time := 0.0
@@ -206,7 +221,7 @@ func setup(course_id: int) -> void:
 		riders = [riders[0]]   # no race: just you and the medical kit
 		rescue_s = float(course["length"]) * RESCUE_AT
 	clock = 0.0
-	crit_end_s = 0.0
+	crit_end_s = float(course["laps"]) * lap if course.has("laps") else 0.0
 	countdown = 2.0 if rescue else 4.0
 	over = false
 	over_clock = 0.0
@@ -230,6 +245,12 @@ func setup(course_id: int) -> void:
 	if rescue:
 		Game.toast.emit("Get the medical kit up to the injured skier, %d m up the mountain!" % int(rescue_s), Color(1.0, 0.45, 0.45))
 		return
+	if velo:   # just him and you: he does the talking
+		for r in riders:
+			if r.get("guest", false):
+				get_tree().create_timer(1.0).timeout.connect(_say.bind(r, "race_start", true))
+		Game.toast.emit("%s: one lap, %d m. Beat %s!" % [course["name"], int(lap), guest.get("name", "him")], Color(1.0, 0.85, 0.3))
+		return
 	# pre-race jabber
 	var ids := range(Talk.rivals.size())
 	ids.shuffle()
@@ -241,7 +262,8 @@ func setup(course_id: int) -> void:
 ## camera, so the slope never hides you), joined by hairpins. Leg 0 is at the bottom.
 func _build_road(rng: RandomNumberGenerator) -> void:
 	lap = 0.0
-	if course.get("crit", false):
+	velo = course.get("velo", false)
+	if course.get("crit", false) or velo:
 		_build_loop()
 		return
 	var length: float = course["length"]
@@ -422,6 +444,28 @@ const CRIT_TRACK := [Vector2(28, 46), Vector2(10, 46), Vector2(0, 40), Vector2(0
 	Vector2(24, 0), Vector2(34, 8), Vector2(44, 0), Vector2(60, 0), Vector2(66, 10), Vector2(56, 18), Vector2(66, 28),
 	Vector2(66, 40), Vector2(50, 46), Vector2(40, 38)]
 const CRIT_CORNER := 5.0   # corner radius (design tiles), less where two corners come close together
+## The Velodoughm (design tiles, scaled like the crit's): straights VELO_STRAIGHT long joined by half circles of
+## VELO_TURN_R, the straights running across the screen. The outside of the track is banked up BANK_PX in the turns
+## (BANK_FLAT of that on the straights), easing in and out over VELO_EASE tiles either side of where a turn starts.
+const VELO_STRAIGHT := 40.0
+const VELO_TURN_R := 17.0
+const BANK_PX := 34.0
+const BANK_FLAT := 0.2
+const VELO_EASE := Vector2(-9.0, 5.0)
+const VELO_STAND_FACING := 0.2   # stands go where the outside of the track faces the camera less than this (dot)
+const VELO_TIERS := 3       # rows of seats in the stands
+const VELO_TIER := 1.0      # tiles deep each
+const VELO_RISE := 9.0      # px each row stands above the one in front
+const VELO_GAP := 0.35      # tiles of walkway between the rail and the first row
+const VELO_WALL := 46.0     # px the arena wall stands behind the back row
+const VELO_APRON := 1.3     # tiles of blue apron inside the boards
+const COURT := Vector2(17.0, 9.0)   # a basketball court (tiles: about twice real size, so it reads), two side by side
+const COURT_GAP := 3.0
+## The paint on the boards, as how far out across the track (0 inside edge .. 1 outside): the black measuring line,
+## the red sprinters' line and the blue stayers' line.
+const VELO_LINES := [[0.07, Color(0.1, 0.1, 0.12)], [0.24, Color(0.85, 0.15, 0.15)], [0.56, Color(0.2, 0.4, 0.9)]]
+const VELO_U := Vector2(0.70710678, -0.70710678)   # along the straights: across the screen
+const VELO_V := Vector2(0.70710678, 0.70710678)    # across them: towards the camera
 
 
 ## A crit: one flat lap of course["length"] m round CRIT_TRACK. The last sample is the first again, so the loop closes.
@@ -430,6 +474,9 @@ func _build_loop() -> void:
 	road_len = lap
 	var n := CRIT_TRACK.size()
 	var poly := PackedVector2Array()
+	if velo:
+		_velo_oval(poly)
+		n = 0
 	for k in n:
 		var a: Vector2 = CRIT_TRACK[(k - 1 + n) % n]
 		var b: Vector2 = CRIT_TRACK[k]
@@ -444,9 +491,10 @@ func _build_loop() -> void:
 			var p2 := b + u2 * t
 			poly.append(p0.lerp(b, f).lerp(b.lerp(p2, f), f))
 	# start halfway along the first leg (the corner rounding leaves it between the last point and the first)
-	var mid: Vector2 = (CRIT_TRACK[0] + CRIT_TRACK[n - 1]) * 0.5
-	poly.insert(0, mid)
-	poly.append(mid)
+	if not velo:
+		var mid: Vector2 = (CRIT_TRACK[0] + CRIT_TRACK[n - 1]) * 0.5
+		poly.insert(0, mid)
+		poly.append(mid)
 	var cum := PackedFloat32Array()
 	cum.resize(poly.size())
 	for i in range(1, poly.size()):
@@ -482,6 +530,8 @@ func _build_loop() -> void:
 		s_m[i] = i * ds_m
 		elev[i] = 0.0
 		grade_a[i] = 0.0
+	if velo:
+		_velo_banking(k)
 	road_leg = PackedInt32Array()
 	road_leg.resize(M)
 	road_leg.fill(0)
@@ -498,6 +548,49 @@ func _build_loop() -> void:
 	oy = floori(lo.y) - 22
 	gw = ceili(hi.x - lo.x) + 45
 	gh = ceili(hi.y - lo.y) + 45
+
+
+## The Velodoughm's oval (design tiles, round the origin), from halfway down the near straight and back to it.
+func _velo_oval(poly: PackedVector2Array) -> void:
+	var h := VELO_STRAIGHT * 0.5
+	var r := VELO_TURN_R
+	poly.append(VELO_V * r)
+	for q in range(1, 9):   # down the near straight
+		poly.append(VELO_U * lerpf(0.0, h, q / 8.0) + VELO_V * r)
+	for q in range(1, 48):   # round the right-hand turn
+		var a := PI * q / 48.0
+		poly.append(VELO_U * h + (VELO_V * cos(a) + VELO_U * sin(a)) * r)
+	for q in range(0, 17):   # back along the far straight
+		poly.append(VELO_U * lerpf(h, -h, q / 16.0) - VELO_V * r)
+	for q in range(1, 48):   # round the left-hand turn
+		var a := PI * q / 48.0
+		poly.append(-VELO_U * h - (VELO_V * cos(a) + VELO_U * sin(a)) * r)
+	for q in range(0, 9):   # and onto the near straight to the line
+		poly.append(VELO_U * lerpf(-h, 0.0, q / 8.0) + VELO_V * r)
+
+
+## How banked the Velodoughm is along the lap (bank_a), with the design scaled by `k` to world tiles; and which way
+## is out.
+func _velo_banking(k: float) -> void:
+	var h := VELO_STRAIGHT * 0.5 * k
+	velo_a = -VELO_U * h
+	velo_b = VELO_U * h
+	velo_r = VELO_TURN_R * k
+	velo_out = signf(nrm[0].dot(pts[0])) if nrm[0].dot(pts[0]) != 0.0 else 1.0
+	bank_a.resize(M)
+	for i in M:
+		var past := absf(pts[i].dot(VELO_U)) - h   # tiles into the turn (< 0: still on the straight)
+		bank_a[i] = lerpf(BANK_FLAT, 1.0, smoothstep(VELO_EASE.x, VELO_EASE.y, past))
+
+
+## How high the Velodoughm's boards are (px) at road sample `f` (fractional) and `lat` across: flat along the inside
+## edge, rising to BANK_PX at the outside of a turn. 0 anywhere else.
+func _bank_z(f: float, lat: float) -> float:
+	if not velo or bank_a.is_empty():
+		return 0.0
+	var i := mini(int(f), M - 2)
+	var k := lerpf(bank_a[i], bank_a[i + 1], f - i)
+	return BANK_PX * k * clampf((lat * velo_out + ROAD_HW) / (2.0 * ROAD_HW), 0.0, 1.0)
 
 
 ## A crit's distances wrap round the loop; a point-to-point course's don't.
@@ -543,6 +636,8 @@ func _at_finish(r: Dictionary, s0: float) -> bool:
 ## The crit clock: when it runs out the riders get "laps_after" more laps, counted from when the leader next crosses
 ## the line; and the lap cards for you as you cross.
 func _step_crit(me: Dictionary, s0: float) -> void:
+	if course.has("laps"):
+		return   # a set number of laps (crit_end_s from the start, see setup): no clock, no lap cards
 	if crit_end_s <= 0.0 and crit_left() <= 0.0:
 		var lead := 0.0
 		for r in riders:
@@ -677,6 +772,8 @@ func _base_m(x: float, y: float) -> float:
 
 ## Knolls, hollows and crags (m); gentle on a crit.
 func _noise_m(x: float, y: float) -> float:
+	if velo:
+		return 0.0   # an indoor floor
 	return (0.35 if lap > 0.0 else 1.0) * _bumps(x, y)
 
 
@@ -852,6 +949,10 @@ func _build_terrain() -> void:
 				tint = tint * Color(0.9, 1.0, 0.92)
 			cell_tint[j * gw + i] = tint
 			cell_kind[j * gw + i] = kind
+			if velo:   # indoors: a sports floor inside the track, grey concrete round it, a little checker in both
+				var dc := Vector2(x, y).distance_to(Geometry2D.get_closest_point_to_segment(Vector2(x, y), velo_a, velo_b))
+				var chk := 1.0 if (i + j) % 2 == 0 else 0.96
+				cell_col[j * gw + i] = (Color(0.3, 0.46, 0.5) if dc < velo_r - ROAD_HW - 0.5 else Color(0.5, 0.5, 0.53)) * Color(chk, chk, chk)
 
 
 ## How snowy the mountain is at (x, y) at height fraction `f` (0..1): the snow line wanders, so there are patches
@@ -1029,7 +1130,10 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	if lap > 0.0:   # a crit: no obstacles, one arch over the line (its crowds: RaceLife._build_crit_crowd)
 		fords = PackedFloat32Array()
 		statics.clear()
-		_put_static(2, {"kind": "balloons", "s": 0.0}, [])
+		if velo:
+			_build_velo_arena()
+		else:
+			_put_static(2, {"kind": "balloons", "s": 0.0}, [])
 		return
 	for st in streams:
 		for i in M - 1:
@@ -1345,6 +1449,8 @@ func _put_static(type: int, data: Dictionary, shape: Array) -> void:
 
 
 func _build_flora(rng: RandomNumberGenerator) -> void:
+	if velo:
+		return   # indoors
 	for j in gh:
 		for i in gw:
 			var x := ox + i + rng.randf()
@@ -1464,8 +1570,10 @@ func _build_road_geometry() -> void:
 		var snow := _snow_cover(pa.x, pa.y, elev[i] * vz / peak)
 		var seg := {"edge": edge, "gravel": gravel, "ruts": ruts, "pebbles": pebbles, "shade": 0.92 + 0.08 * float(i % 2), "snow": snow,
 			"light": Ground.band(1.0 - clampf(grade_a[i], -0.1, 0.12) * 1.6)}
+		if velo:
+			_velo_segment(seg, i)
 		# a chevron painted on the road every 40 m or so, pointing the way, coloured by how steep it is
-		if i % 24 == 12 and s_m[i] < float(course["length"]):
+		if i % 24 == 12 and s_m[i] < float(course["length"]) and not velo:
 			var t := (pb - pa).normalized()
 			var n := Vector2(-t.y, t.x)
 			var g := grade_a[i]
@@ -1550,6 +1658,8 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 ## People along the course handing out power-ups (frisbee, socks, breadsticks) to every rider who passes.
 func _build_givers(rng: RandomNumberGenerator) -> void:
 	givers.clear()
+	if velo:
+		return   # no power-ups in the Velodoughm: just legs
 	var shirts := [Color(0.95, 0.3, 0.3), Color(0.3, 0.6, 0.95), Color(1.0, 0.85, 0.2), Color(0.4, 0.85, 0.4), Color(0.95, 0.55, 0.85)]
 	var length: float = course["length"]
 	var s := 220.0
@@ -1568,6 +1678,8 @@ func _build_givers(rng: RandomNumberGenerator) -> void:
 ## Seasonal scenery beside the course: snowmen and skiers in winter, pumpkins, leaf piles and hay bales in fall,
 ## tulip beds and butterflies in spring, picnics and kites in summer.
 func _build_season() -> void:
+	if velo:
+		return   # indoors, whatever the season
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(course["seed"]) * 7 + Season.ORDER.find(Season.current)
 	var kinds: Array = {"winter": ["snowman", "snowman", "skier", "skier"], "fall": ["pumpkins", "leafpile", "hay"],
@@ -1605,6 +1717,8 @@ func _build_riders() -> void:
 	# every racer in town rides every race: your town rivals first (so rider k + 1 is Talk.rivals[k], for their lines),
 	# then the rest of the roster; the champion only joins his own race (below)
 	var field: Array = Talk.rivals if rescue else Talk.rivals + Talk.roster.filter(func(o): return not Talk.rivals.has(o))
+	if velo:
+		field = []   # the Velodoughm: you and its guest, nobody else
 	var n := field.size()
 	for i in n:
 		var info: Dictionary = field[i]
@@ -1624,13 +1738,18 @@ func _build_riders() -> void:
 				top = maxf(top, float(r["ftp"]) / float(r["mass"]))
 		var mass := 68.0
 		var lane := -0.45 * ROAD_W
+		if velo:   # Thunder Thighs McGee, down on the sprinter's line on the inside
+			lane = -velo_out * 0.3 * ROAD_W
 		riders.append({"name": guest["name"], "short": guest["short"], "color": guest["color"], "frame": Color(guest["color"]).lerp(Color.WHITE, 0.2),
 			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(guest), "player": false, "guest": true,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": maxf(top, Game.wkg()) * Game.CHAMPION_EDGE * mass, "idx": -1,
 			"trait": float(guest.get("attack", 0.6)), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
-		Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
+		if velo:
+			riders[-1]["pace"] = Game.THUNDER_PACE   # rides at your speed for that share of your FTP (see _step_riders)
+		else:
+			Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
 	for r in riders:   # the group riding (see _step_riders)
 		if not r["player"]:
 			r.merge({"home": r["lane"], "tired_m": 0.0, "attack": 0.0, "pull_t": 0.0, "pull_len": randf_range(PULL_TIME[0], PULL_TIME[1]),
@@ -1645,7 +1764,9 @@ func _say(r: Dictionary, cat: String, force := false) -> void:
 	if int(r["idx"]) >= 0:
 		Talk.say(int(r["idx"]), cat, force)
 	elif force or randf() < 0.5:
-		var text: String = (guest["sig"] if r.get("guest", false) else r["sig"]).pick_random()
+		var own: Dictionary = guest.get("lines", {}) if r.get("guest", false) else {}
+		var pool: Array = own.get(cat, guest["sig"] if r.get("guest", false) else r["sig"])
+		var text: String = String(pool.pick_random()).replace("{n}", Game.player_name)
 		_pop(riders.find(r), text, r["color"])
 		Game.racer_says.emit(String(r["short"]).to_lower(), r["name"], text, Talk.MOODS.get(cat, "smug"), r["color"])
 
@@ -1713,7 +1834,7 @@ func _pose(s: float, lat: float) -> Dictionary:
 	var i := mini(int(f), M - 2)
 	var u := f - i
 	var n := nrm[i].lerp(nrm[i + 1], u).normalized()
-	return {"pos": pts[i].lerp(pts[i + 1], u) + n * lat, "z": lerpf(elev[i], elev[i + 1], u) * vz, "t": f / float(M - 1), "n": n}
+	return {"pos": pts[i].lerp(pts[i + 1], u) + n * lat, "z": lerpf(elev[i], elev[i + 1], u) * vz + _bank_z(f, lat), "t": f / float(M - 1), "n": n}
 
 
 func _near_ford(s: float, within: float) -> bool:
@@ -1825,6 +1946,9 @@ func _step_riders(delta: float) -> void:
 			r["s"] = r["s"] + r["v"] * delta if lap > 0.0 else minf(r["s"] + r["v"] * delta, road_len)
 			r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 			continue
+		if r.has("pace"):   # Thunder Thighs: exactly your speed at "pace" x your FTP on your bike, no matter what
+			_step_pacer(k, delta)
+			continue
 		var finale: bool = goal_s() - float(r["s"]) < FINALE or (lap > 0.0 and crit_end_s <= 0.0 and crit_left() < 120.0)
 		r["draft"] = _draft(k)
 		var wheel: int = r["wheel"]
@@ -1918,6 +2042,27 @@ func _step_riders(delta: float) -> void:
 		_end_race()
 
 
+## A pace rider (Thunder Thighs McGee): goes as fast as you would on your bike at r["pace"] times your FTP, so to beat
+## him you have to hold more than that. No drafting, no fatigue, no attacks.
+func _step_pacer(k: int, delta: float) -> void:
+	var r: Dictionary = riders[k]
+	var b := Game.bike()
+	r["power"] = Game.ftp * float(r["pace"])   # (the watts it takes you to match him)
+	r["draft"] = 0.0
+	r["wheel"] = -1
+	var vt := Game.speed_from_power(Game.ftp * float(r["pace"]), b["mass"], b["cda"], _crr(b), _grade_at(r["s"]))
+	if float(r["down"]) > 0.0:
+		vt = 0.0
+	r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
+	var s0: float = r["s"]
+	r["s"] += r["v"] * delta
+	r["lane"] = move_toward(float(r["lane"]), r["home"], 0.3 * ROAD_W * delta)
+	r["lat"] = r["lane"]
+	r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
+	if _at_finish(r, s0):
+		_finish(k)
+
+
 ## Airtime, landings, creek wading and hitting the jumps / logs as a rider reaches them.
 func _terrain_events(k: int, delta: float) -> void:
 	var r: Dictionary = riders[k]
@@ -1970,6 +2115,8 @@ func _pop_at(p: Vector2, text: String, col: Color) -> void:
 
 
 func _crr(b: Dictionary) -> float:
+	if velo:
+		return float(b["crr"])   # smooth boards: no gravel here
 	return float(b["crr"]) + Game.GRAVEL_EXTRA_CRR * float(b.get("gravel", 1.0))
 
 
@@ -1979,6 +2126,8 @@ func _crr(b: Dictionary) -> float:
 func _draft(i: int) -> float:
 	var me: Dictionary = riders[i]
 	me["wheel"] = -1
+	if velo:
+		return 0.0   # the Velodoughm is a test of legs: no slipstream
 	var best := 9.0
 	for k in riders.size():
 		if k == i:
@@ -2474,7 +2623,11 @@ func _finish(i: int) -> void:
 	if i == 0:
 		player_finish_time = clock
 		Game.toast.emit("FINISHED!  Place #%d  -  keep rolling to cool down" % int(r["place"]), Color(1.0, 0.9, 0.3))
-		if int(r["place"]) == 1:
+		if int(r["place"]) == 1 and velo:
+			for o in riders:
+				if o.get("guest", false):
+					_say(o, "race_win_player", true)
+		elif int(r["place"]) == 1:
 			for k in 2:
 				Talk.say(randi() % Talk.rivals.size(), "race_win_player", true)
 		else:
@@ -2505,7 +2658,7 @@ func _banter() -> void:
 			last_swap[k] = {"ahead": sign_now, "t": clock}
 	if leader:
 		lead_clock += get_process_delta_time()
-		if lead_clock > 12.0:
+		if lead_clock > 12.0 and not velo:   # (nobody from town is riding the Velodoughm)
 			lead_clock = 0.0
 			Talk.say_random("race_leading")
 	else:
@@ -2539,7 +2692,7 @@ func _end_race() -> void:
 	if OS.has_environment("PIZZA_PELOTON"):
 		print("RESULT ", ", ".join(order.map(func(o): return "%s %s%s" % [o["short"] if o.has("short") else "YOU",
 			("%d laps " % int(o.get("laps", 0))) if lap > 0.0 else "", ("%.0fs" % float(o["time"])) if o["done"] else "DNF"])))
-	var shares := [1.0, 0.5, 0.3, 0.15, 0.0, 0.0, 0.0, 0.0]
+	var shares: Array = course.get("shares", [1.0, 0.5, 0.3, 0.15, 0.0, 0.0, 0.0, 0.0])
 	var prize := int(float(course["prize"]) * shares[place - 1]) if place <= shares.size() else 0
 	var names: Array = []
 	for r in order:
@@ -2550,9 +2703,13 @@ func _end_race() -> void:
 	Game.damage_bike(12.0)
 	Game.save_game()
 	var champ := -1   # where the guest champion came, if he raced
+	var thunder := -1   # where Thunder Thighs McGee came, in the Velodoughm
 	for k in order.size():
 		if order[k].get("guest", false):
-			champ = k + 1
+			if velo:
+				thunder = k + 1
+			else:
+				champ = k + 1
 	var new_bike := false
 	if champ > 0 and place < champ:   # you beat the champion: his bonus, and his bike
 		Game.add_money(Game.CHAMPION_BONUS)
@@ -2560,6 +2717,7 @@ func _end_race() -> void:
 		Game.save_game()
 	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
 		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike,
+		"thunder": thunder > 0, "beat_thunder": thunder > 0 and place < thunder,
 		"laps": laps_done(riders[0]) if lap > 0.0 else 0})
 
 
@@ -2585,6 +2743,10 @@ func time_gap(r: Dictionary) -> float:
 
 ## Dev helper: race positions worth a screenshot (just before the first of each obstacle, a bear, the finish).
 func debug_spots() -> Array:
+	if velo:   # coming up to the line, round each turn, and down the back straight
+		var h := VELO_STRAIGHT * 0.5 * (lap / M_PER_TILE) / (2.0 * VELO_STRAIGHT + TAU * VELO_TURN_R) * M_PER_TILE
+		var turn := PI * velo_r * M_PER_TILE
+		return [lap - 9.0, h + turn * 0.5, lap * 0.5, lap - h - turn * 0.5, h + turn * 0.15]
 	if lap > 0.0:   # a crit: coming up to the line, just past it and halfway round
 		return [lap - 9.0, 25.0, lap * 0.5]
 	var out: Array = [40.0]
@@ -2725,7 +2887,9 @@ func _draw() -> void:
 			var gname: String = GROUND_KINDS[cell_tex[ci_]]
 			var quad := PackedVector2Array([Iso.to_screen(Vector2(wx, wy), z00), Iso.to_screen(Vector2(wx + 1, wy), z10),
 				Iso.to_screen(Vector2(wx + 1, wy + 1), z11), Iso.to_screen(Vector2(wx, wy + 1), z01)])
-			if cell_cliff[ci_] == 2:
+			if velo:
+				draw_primitive(quad, PackedColorArray([col]), PackedVector2Array())
+			elif cell_cliff[ci_] == 2:
 				_draw_cliff_face(quad, PackedFloat32Array([z00, z10, z11, z01]), wx, wy)
 			elif Ground.tex(gname) == null:
 				draw_primitive(quad, PackedColorArray([col]), PackedVector2Array())
@@ -2734,6 +2898,8 @@ func _draw() -> void:
 				Ground.quad(self, quad, gname, cell_light[ci_], col, cell_tint[ci_])
 				if cell_kind[ci_] == 1 and not Season.bare():
 					_cell_flowers(i, j, center)
+	if velo:
+		_draw_courts(big)
 	for d in range(d0, d1 + 1):
 		if stream_buckets.has(d):
 			for sg in stream_buckets[d]:
@@ -2756,7 +2922,9 @@ func _draw() -> void:
 				var sn: float = maxf(float(seg["snow"]) * 0.6, 0.3 if Season.bare() else 0.0)
 				var snow_tint := Color.WHITE.lerp(Color(1.25, 1.27, 1.32), sn)
 				var textured := Ground.tex("gravel_road") != null
-				if lap > 0.0:   # a crit: town asphalt, with a pale kerb
+				if velo:
+					_draw_boards(seg)
+				elif lap > 0.0:   # a crit: town asphalt, with a pale kerb
 					Ground.fill(self, e, "sidewalk", 0.95, Color(0.7, 0.68, 0.64), snow_tint)
 					Ground.fill(self, seg["gravel"], "asphalt", 1.0, Color(0.33, 0.34, 0.4), snow_tint)
 				elif textured:
@@ -2773,6 +2941,14 @@ func _draw() -> void:
 					for pb in seg["pebbles"]:
 						draw_rect(Rect2(pb, Vector2(2, 1)), Color(0.5, 0.44, 0.36) if pi_ % 2 == 0 else (Season.SNOW if Season.bare() else Color(0.86, 0.8, 0.68)))
 						pi_ += 1
+	if velo:
+		for d in range(d0, d1 + 1):
+			if road_buckets.has(d):
+				for si in road_buckets[d]:
+					if big.has_point(road_segs[si]["edge"][0]):
+						_draw_rail(road_segs[si])
+		_draw_finish_line()
+		_draw_stands(big)
 	if life != null:
 		life.draw_rails(self, vr)
 	for d in range(d0, d1 + 1):   # the grade chevrons on top of the road
@@ -2847,6 +3023,172 @@ func _draw() -> void:
 		draw_string(font, c + Vector2(-150, -30), txt, HORIZONTAL_ALIGNMENT_CENTER, 300.0, sz, Color(1.0, 0.9, 0.2))
 
 
+# ---------------------------------------------------------------------
+# The Velodoughm
+# ---------------------------------------------------------------------
+
+## Screen point of a spot on the Velodoughm `lat` across the track at road sample `f`, `z` px up.
+func _vp(f: float, lat: float, z: float) -> Vector2:
+	var i := mini(int(f), M - 2)
+	var u := f - i
+	var n := nrm[i].lerp(nrm[i + 1], u).normalized()
+	return Iso.to_screen(pts[i].lerp(pts[i + 1], u) + n * lat, z)
+
+
+## The boards of road piece `i`: strips across the banking in two shades of pine, the blue apron inside, the wall
+## down from the outside edge with a rail on top, and the painted lines.
+func _velo_segment(seg: Dictionary, i: int) -> void:
+	var a := float(i)
+	var b := minf(float(i) + 1.08, M - 1.0)   # a hair over, so no seam shows
+	var hw := ROAD_HW
+	var strips: Array = []
+	var n := 5
+	for q in n:
+		var l0 := -velo_out * hw + velo_out * 2.0 * hw * q / n
+		var l1 := -velo_out * hw + velo_out * 2.0 * hw * (q + 1) / n
+		var poly := PackedVector2Array([_vp(a, l0, _bank_z(a, l0) + 1.0), _vp(b, l0, _bank_z(b, l0) + 1.0),
+			_vp(b, l1, _bank_z(b, l1) + 1.0), _vp(a, l1, _bank_z(a, l1) + 1.0)])
+		var wood := Color(0.86, 0.66, 0.42) if (q + int(i / 6.0)) % 2 == 0 else Color(0.8, 0.59, 0.36)
+		strips.append([poly, Iso.shade(wood, 1.0 - bank_a[i] * 0.1 * float(q) / n)])
+	seg["strips"] = strips
+	var lo := -velo_out * hw
+	var li := -velo_out * (hw + VELO_APRON)
+	seg["apron"] = PackedVector2Array([_vp(a, li, 0.6), _vp(b, li, 0.6), _vp(b, lo, 0.8), _vp(a, lo, 0.8)])
+	var lw := velo_out * hw
+	var za := _bank_z(a, lw) + 1.0
+	var zb := _bank_z(b, lw) + 1.0
+	seg["wall"] = PackedVector2Array([_vp(a, lw, za), _vp(b, lw, zb), _vp(b, lw, 0.0), _vp(a, lw, 0.0)])
+	seg["rail"] = [_vp(a, lw, za + 7.0), _vp(b, lw, zb + 7.0)]
+	seg["post"] = _vp(a, lw, za) if i % 6 == 0 else Vector2.INF
+	var lines: Array = []
+	for ln in VELO_LINES:
+		var lat: float = -velo_out * hw + velo_out * 2.0 * hw * float(ln[0])
+		lines.append([_vp(a, lat, _bank_z(a, lat) + 1.4), _vp(b, lat, _bank_z(b, lat) + 1.4), ln[1]])
+	seg["lines"] = lines
+
+
+func _draw_boards(seg: Dictionary) -> void:
+	var w: PackedVector2Array = seg["wall"]
+	draw_colored_polygon(w, Color(0.42, 0.26, 0.16))
+	draw_colored_polygon(seg["apron"], Color(0.35, 0.62, 0.9))
+	for st in seg["strips"]:
+		draw_colored_polygon(st[0], st[1])
+	for ln in seg["lines"]:
+		draw_line(ln[0], ln[1], ln[2], 1.5)
+
+
+## The rail along the top of the outside wall, over all the boards (so the next piece of track doesn't cut it up).
+func _draw_rail(seg: Dictionary) -> void:
+	var rail: Array = seg["rail"]
+	draw_line(rail[0], rail[1], Color(0.92, 0.92, 0.95), 1.5)
+	var post: Vector2 = seg["post"]
+	if post != Vector2.INF:
+		draw_line(post, (rail[0] as Vector2), Color(0.75, 0.75, 0.8), 1.0)
+
+
+## The finish line across the boards (where the lap starts): a white band with a black line down the middle.
+func _draw_finish_line() -> void:
+	var f0 := 0.0
+	var f1 := 1.3 / ds_m   # (about a metre and a bit)
+	var hw := ROAD_HW
+	for q in 5:
+		var l0 := -velo_out * hw + velo_out * 2.0 * hw * q / 5.0
+		var l1 := -velo_out * hw + velo_out * 2.0 * hw * (q + 1) / 5.0
+		draw_colored_polygon(PackedVector2Array([_vp(f0, l0, _bank_z(f0, l0) + 1.6), _vp(f1, l0, _bank_z(f1, l0) + 1.6),
+			_vp(f1, l1, _bank_z(f1, l1) + 1.6), _vp(f0, l1, _bank_z(f0, l1) + 1.6)]), Color(0.97, 0.97, 0.97))
+	var fm := f1 * 0.5
+	draw_line(_vp(fm, -velo_out * hw, 1.8), _vp(fm, velo_out * hw, _bank_z(fm, velo_out * hw) + 1.8), Color(0.08, 0.08, 0.1), 2.0)
+
+
+## The two basketball courts in the middle: maple boards, painted keys, lines, centre circles and three-point arcs.
+func _draw_courts(big: Rect2) -> void:
+	for side in [-1.0, 1.0]:
+		var c: Vector2 = VELO_U * side * (COURT.x + COURT_GAP) * 0.5
+		if not big.has_point(Iso.to_screen(c)):
+			continue
+		var at := func(x: float, y: float) -> Vector2: return Iso.to_screen(c + VELO_U * x + VELO_V * y, 0.5)
+		var hx := COURT.x * 0.5
+		var hy := COURT.y * 0.5
+		var run := 0.9   # the run-off round the court, in the court's colour
+		draw_colored_polygon(PackedVector2Array([at.call(-hx - run, -hy - run), at.call(hx + run, -hy - run), at.call(hx + run, hy + run),
+			at.call(-hx - run, hy + run)]), Color(0.62, 0.22, 0.2))
+		draw_colored_polygon(PackedVector2Array([at.call(-hx, -hy), at.call(hx, -hy), at.call(hx, hy), at.call(-hx, hy)]), Color(0.9, 0.72, 0.48))
+		for k in range(1, int(COURT.y)):   # the boards
+			var y := -hy + k
+			draw_line(at.call(-hx, y), at.call(hx, y), Color(0.82, 0.63, 0.4), 1.0)
+		var white := Color(0.98, 0.98, 0.96)
+		for e in [-1.0, 1.0]:
+			var key_w := 2.4
+			var key_l := 3.5
+			var x0: float = e * hx
+			var x1: float = e * (hx - key_l)
+			draw_colored_polygon(PackedVector2Array([at.call(x0, -key_w), at.call(x1, -key_w), at.call(x1, key_w), at.call(x0, key_w)]), Color(0.62, 0.22, 0.2))
+			draw_polyline(PackedVector2Array([at.call(x0, -key_w), at.call(x1, -key_w), at.call(x1, key_w), at.call(x0, key_w)]), white, 1.0)
+			var ft := PackedVector2Array()   # the free-throw circle
+			for q in 17:
+				var t := PI * 0.5 + PI * q / 16.0
+				ft.append(at.call(x1 + cos(t) * key_w * 0.75 * e, sin(t) * key_w * 0.75))
+			draw_polyline(ft, white, 1.0)
+			var three := PackedVector2Array()   # the three-point line
+			var r3 := hy - 0.7
+			three.append(at.call(x0, -r3))
+			for q in 25:
+				var t := -PI * 0.5 + PI * q / 24.0
+				three.append(at.call(e * (hx - 1.2) - e * cos(t) * r3 * 0.9, sin(t) * r3))
+			three.append(at.call(x0, r3))
+			draw_polyline(three, white, 1.0)
+		draw_polyline(PackedVector2Array([at.call(-hx, -hy), at.call(hx, -hy), at.call(hx, hy), at.call(-hx, hy), at.call(-hx, -hy)]), white, 1.5)
+		draw_line(at.call(0.0, -hy), at.call(0.0, hy), white, 1.0)
+		var cc := PackedVector2Array()
+		for q in 25:
+			var t := TAU * q / 24.0
+			cc.append(at.call(cos(t) * 1.8, sin(t) * 1.8))
+		draw_polyline(cc, white, 1.0)
+
+
+## The stands round the far side and the ends, 4 m at a time: VELO_TIERS rows of wooden seats stepping up away from the
+## rail, the back row first, and the arena wall behind them with a coloured banner along it.
+func _draw_stands(big: Rect2) -> void:
+	var hw := ROAD_HW
+	var banners := [Color(0.85, 0.2, 0.2), Color(1.0, 0.8, 0.2), Color(0.25, 0.5, 0.9)]
+	for s0 in stands:
+		var f0 := _fi(s0)
+		var f1 := _fi(float(s0) + 4.15)
+		if f1 < f0:
+			f1 = M - 1.0
+		if not big.has_point(_vp(f0, velo_out * hw, 0.0)):
+			continue
+		var b0 := _bank_z(f0, velo_out * hw)
+		var b1 := _bank_z(f1, velo_out * hw)
+		var walk := velo_out * (hw + VELO_GAP)
+		draw_colored_polygon(PackedVector2Array([_vp(f0, velo_out * hw, b0 + 1.0), _vp(f1, velo_out * hw, b1 + 1.0),
+			_vp(f1, walk, b1 + 1.0), _vp(f0, walk, b0 + 1.0)]), Color(0.36, 0.33, 0.36))
+		var back := velo_out * (hw + VELO_GAP + VELO_TIER * VELO_TIERS)
+		var top := VELO_RISE * VELO_TIERS
+		var ban: Color = banners[int(float(s0) / 4.0) % 3]
+		draw_colored_polygon(PackedVector2Array([_vp(f0, back, b0 + top), _vp(f1, back, b1 + top), _vp(f1, back, b1 + top + VELO_WALL),
+			_vp(f0, back, b0 + top + VELO_WALL)]), Color(0.22, 0.2, 0.26))
+		draw_colored_polygon(PackedVector2Array([_vp(f0, back, b0 + top + 18.0), _vp(f1, back, b1 + top + 18.0), _vp(f1, back, b1 + top + 28.0),
+			_vp(f0, back, b0 + top + 28.0)]), ban)
+		for t in range(VELO_TIERS - 1, -1, -1):
+			var l0 := velo_out * (hw + VELO_GAP + VELO_TIER * t)
+			var l1 := l0 + velo_out * VELO_TIER
+			var h := VELO_RISE * (t + 1)
+			draw_colored_polygon(PackedVector2Array([_vp(f0, l0, b0 + h), _vp(f1, l0, b1 + h), _vp(f1, l1, b1 + h), _vp(f0, l1, b0 + h)]),
+				Color(0.74, 0.52, 0.31) if t % 2 == 0 else Color(0.68, 0.47, 0.28))
+			draw_colored_polygon(PackedVector2Array([_vp(f0, l0, b0 + h), _vp(f1, l0, b1 + h), _vp(f1, l0, b1 + h - VELO_RISE),
+				_vp(f0, l0, b0 + h - VELO_RISE)]), Color(0.5, 0.32, 0.19))
+
+
+## The hoops at the ends of the courts (drawn as statics, "hoop").
+func _build_velo_arena() -> void:
+	for side in [-1.0, 1.0]:
+		var c: Vector2 = VELO_U * side * (COURT.x + COURT_GAP) * 0.5
+		for e in [-1.0, 1.0]:
+			var p: Vector2 = c + VELO_U * e * (COURT.x * 0.5 + 0.4)
+			_put_static(2, {"kind": "hoop", "pos": p, "z": 0.0, "face": -e}, [])
+
+
 ## Snowflakes drifting across the screen once you are up in the snow.
 ## A cell of cliff face: bare rock (too steep to hold snow) lit at the top and in shadow at the foot, with bedding
 ## lines and the odd crack so it reads as layered rock.
@@ -2902,6 +3244,12 @@ func _diag(p: Vector2) -> int:
 
 
 func _draw_sky(vr: Rect2) -> void:
+	if velo:   # under the roof: the dim arena, darker up in the rafters
+		var hi := Color(0.12, 0.1, 0.14)
+		var lo := Color(0.3, 0.27, 0.3)
+		draw_polygon(PackedVector2Array([vr.position - Vector2(50, 50), vr.position + Vector2(vr.size.x + 50, -50), vr.end + Vector2(50, 50), vr.position + Vector2(-50, vr.size.y + 50)]),
+			PackedColorArray([hi, hi, lo, lo]))
+		return
 	var c := vr.get_center()
 	var top := Season.sky(Color(0.4, 0.68, 0.95))
 	var bottom := Season.sky(Color(0.8, 0.92, 1.0))
@@ -3056,6 +3404,21 @@ func _draw_deco(e: Dictionary) -> void:
 		"warn":
 			var pz: Dictionary = e["pz"]
 			Sprites.draw_image(self, "scenery_sign_warn", Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (0.95 + ROAD_GROW) * float(e["side"]), pz["z"]))
+		"hoop":   # a basketball hoop on its stand, facing in along the court
+			var b := Iso.to_screen(e["pos"], 0.0)
+			var inward := Iso.to_screen(VELO_U * float(e["face"])) - Iso.to_screen(Vector2.ZERO)
+			inward = inward.normalized()
+			draw_rect(Rect2(b + Vector2(-4, -3), Vector2(8, 4)), Color(0.2, 0.2, 0.24))
+			draw_line(b, b + Vector2(0, -40), Iso.OUTLINE, 3.0)
+			draw_line(b, b + Vector2(0, -40), Color(0.55, 0.55, 0.6), 1.0)
+			var bd := b + Vector2(0, -44) + inward * 3.0
+			draw_rect(Rect2(bd - Vector2(7, 5), Vector2(14, 10)), Iso.OUTLINE)
+			draw_rect(Rect2(bd - Vector2(6, 4), Vector2(12, 8)), Color(0.97, 0.97, 0.97))
+			draw_rect(Rect2(bd - Vector2(3, 0), Vector2(6, 4)), Color(0.9, 0.3, 0.2), false, 1.0)
+			var rim := bd + inward * 5.0 + Vector2(0, 4)
+			draw_arc(rim, 3.5, 0.0, TAU, 12, Color(0.95, 0.45, 0.1), 1.5)
+			draw_line(rim + Vector2(-3, 1), rim + Vector2(-2, 6), Color(1, 1, 1, 0.8), 1.0)
+			draw_line(rim + Vector2(3, 1), rim + Vector2(2, 6), Color(1, 1, 1, 0.8), 1.0)
 		"fan":
 			if e.get("run", "") != "":   # off running with you (RaceLife._step_runners)
 				return

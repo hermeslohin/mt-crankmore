@@ -88,6 +88,7 @@ const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
+const KNOCK_DAMAGE := 5.0   # bike HP you lose when a rival knocks you off (Pizza Frisbee, breadstick power), in town or a race
 
 const START_MONEY := 100
 var money := START_MONEY

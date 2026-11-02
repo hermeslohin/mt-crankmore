@@ -3058,9 +3058,12 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 		p_fall = 0.0
 		p_fall_pizza = not carry.is_empty()
 		p_speed = 0.0
-		Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
-		if by >= 0:
+		if by >= 0:   # a rival knocked you off: your bike takes a knock too
+			Game.toast.emit("%s %s! Down for %d s. Bike -%d HP." % [_rider_name(by), how, int(secs), int(Game.KNOCK_DAMAGE)], Color(1.0, 0.45, 0.35))
+			Game.damage_bike(Game.KNOCK_DAMAGE)
 			Talk.say(by, "pu_hit_player", true)
+		else:
+			Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
 	else:
 		var r: Dictionary = rival_state[who]
 		r["stun"] = secs

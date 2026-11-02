@@ -2311,13 +2311,15 @@ func _rival_wants(k: int) -> bool:
 	return false
 
 
+## Rider `k` knocked off by rider `by` (a power-up): down `secs` seconds. Your bike takes Game.KNOCK_DAMAGE HP (the only way a race hurts it).
 func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 	var r: Dictionary = riders[k]
 	r["down"] = secs
 	r["fall"] = 0.0
 	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
 	if r["player"]:
-		Game.toast.emit("%s %s! Down for %d s." % [riders[by]["short"], how, int(secs)], Color(1.0, 0.45, 0.35))
+		Game.toast.emit("%s %s! Down for %d s. Bike -%d HP." % [riders[by]["short"], how, int(secs), int(Game.KNOCK_DAMAGE)], Color(1.0, 0.45, 0.35))
+		Game.damage_bike(Game.KNOCK_DAMAGE)
 		_say(riders[by], "pu_hit_player", true)
 	elif riders[by]["player"]:
 		_say(r, "pu_ouch", true)
@@ -2700,8 +2702,7 @@ func _end_race() -> void:
 		names.append(r["name"])
 	if place == 1:
 		Game.race_wins += 1
-	Game.add_money(prize)
-	Game.damage_bike(12.0)
+	Game.add_money(prize)   # (racing itself doesn't wear the bike: only being knocked off does, see _knock_down)
 	Game.save_game()
 	var champ := -1   # where the guest champion came, if he raced
 	var thunder := -1   # where Thunder Thighs McGee came, in the Velodoughm

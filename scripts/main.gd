@@ -779,7 +779,7 @@ func _race_menu() -> Dictionary:
 			continue   # raced from their own entrances (see _crit_menu, _velo_menu)
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
 			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
-			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
+			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Your bike only loses HP if a rival knocks you off (5 HP a time)." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Mt. Crankmore Race HQ", "sub": "All %d racers in town are warming up. You can hear them talking about you." % Talk.roster.size(), "items": items}
 

@@ -87,6 +87,8 @@ func build(rng: RandomNumberGenerator) -> void:
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
 	_build_feed_zone(rng, length)
+	if race.paved():   # the road race: its houses are the scenery (Race._build_houses), no mountain campers, trains or skiers
+		return
 	_build_camps(rng, length)
 	_build_devil(rng, length)
 	_build_railway(rng, length)

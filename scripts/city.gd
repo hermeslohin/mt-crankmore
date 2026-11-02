@@ -147,6 +147,8 @@ var news_state := "off"         # off, on (following you), leaving
 var news_t := randf_range(240.0, NEWS_EVERY[1])
 var champion_t := randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])   # riding in town until the champion next visits
 var champion_left := 0.0        # > 0: he's in town and waiting at Race HQ for that many more seconds
+var yolanda_t := randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])   # riding in town until Yellow Jersey Yolanda next visits
+var yolanda_left := 0.0         # > 0: she's at Race HQ for that many more seconds (see _update_yolanda)
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
@@ -1729,6 +1731,7 @@ func _process(delta: float) -> void:
 	heli.update(delta)
 	_update_news(delta)
 	_update_champion(delta)
+	_update_yolanda(delta)
 	_update_frisbees(delta)
 	_update_squash()
 	if active:
@@ -2755,9 +2758,36 @@ func _update_champion(delta: float) -> void:
 		return
 	champion_t -= delta
 	if champion_t <= 0.0:
+		if yolanda_left > 0.0:
+			champion_t = Game.CHAMPION_WAIT   # one champion at a time
+			return
 		champion_t = randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])
 		champion_left = Game.CHAMPION_WAIT
 		Game.toast.emit("ANNOUNCEMENT: %s, winner of the Tour de Crankmore, is visiting town! Get to Race HQ within 5 minutes to race him!" % Game.CHAMPION["name"], Game.CHAMPION["color"])
+
+
+## Yellow Jersey Yolanda's visits (see Game.YOLANDA): announced about once an hour, then she waits at Race HQ for
+## CHAMPION_WAIT seconds to race the road race. Never while Maillot Max is in town: she turns up a little after he's gone.
+func _update_yolanda(delta: float) -> void:
+	if not active:
+		return
+	var y: Dictionary = Game.YOLANDA
+	if yolanda_left > 0.0:
+		var was := yolanda_left
+		yolanda_left = maxf(0.0, yolanda_left - delta)
+		if yolanda_left <= 0.0:
+			Game.toast.emit("%s has left town. Maybe next time." % y["name"], Color(0.8, 0.85, 1.0))
+		elif int(was / 60.0) != int(yolanda_left / 60.0):
+			Game.toast.emit("%s leaves Race HQ in %d minute%s!" % [y["name"], int(yolanda_left / 60.0) + 1, "" if yolanda_left < 60.0 else "s"], y["color"])
+		return
+	yolanda_t -= delta
+	if yolanda_t <= 0.0:
+		if champion_left > 0.0:
+			yolanda_t = Game.CHAMPION_WAIT   # one champion at a time
+			return
+		yolanda_t = randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])
+		yolanda_left = Game.CHAMPION_WAIT
+		Game.toast.emit("ANNOUNCEMENT: %s, %s, is in town! Get to Race HQ within 5 minutes to race her on %s!" % [y["name"], y["title"], y["course"]], y["color"])
 
 
 ## Moves a rival along its path. Returns true when the path is finished.

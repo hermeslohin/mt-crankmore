@@ -33,6 +33,15 @@ const COURSES := [
 	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],
 		"entry": 50, "prize": 600, "seed": 61,
 		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He puts out 150% of your FTP on his own Club Racer, so the better your bike, the less it takes to beat him. No drafting, no power-ups: just legs."},
+	# "road": a road race on town tarmac, the Flour Run's wide bends lined with houses and gardens (see _build_houses),
+	# with no obstacles, creeks or cliffs and only town wildlife: about 150 m up and as much back down, finishing level
+	# with the start. Yellow Jersey Yolanda (Game.YOLANDA) races it on her visits.
+	{"name": "Baguette Boulevard", "road": true, "length": 5000.0, "grade": 0.0, "roll": 0.0, "bump": 0.003, "entry": 60, "prize": 900, "seed": 77,
+		"hairpins": 5, "bends": true, "gap": 40.0, "stagger": 0.12,
+		"profile": [[200, 0.0], [400, 0.061], [250, -0.076], [350, 0.061], [300, -0.065], [200, 0.0], [400, 0.078], [300, -0.087],
+			[300, 0.056], [250, -0.071], [350, 0.083], [400, -0.082], [250, 0.078], [300, -0.065], [350, 0.067], [300, -0.082],
+			[100, 0.0]],
+		"blurb": "5 km of tarmac through the houses of Lower Crankmore: rolling climbs and fast descents, 150 m up and all of it back down, about 13 minutes for the front of the pack. Front gardens, mailboxes and the whole street out cheering."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -772,11 +781,11 @@ func _base_m(x: float, y: float) -> float:
 	return lerpf(_leg_e(k, ci, cf), _leg_e(k + 1, ci, cf), clampf((ya - y) / maxf(ya - yb, 0.1), 0.0, 1.0))
 
 
-## Knolls, hollows and crags (m); gentle on a crit.
+## Knolls, hollows and crags (m); gentle on the tarmac courses.
 func _noise_m(x: float, y: float) -> float:
 	if velo:
 		return 0.0   # an indoor floor
-	return (0.35 if lap > 0.0 else 1.0) * _bumps(x, y)
+	return (0.35 if lap > 0.0 or paved() else 1.0) * _bumps(x, y)
 
 
 func _bumps(x: float, y: float) -> float:
@@ -792,7 +801,7 @@ func _biome(x: float, y: float) -> float:
 ## Creeks run straight down the mountain (towards the camera) from a spring, crossing every leg below it.
 func _build_streams(rng: RandomNumberGenerator) -> void:
 	streams.clear()
-	if lap > 0.0:
+	if lap > 0.0 or paved():
 		return
 	for q in 2:
 		var ks := rng.randi_range(mini(3, legs_n - 1), mini(6, legs_n - 1))
@@ -883,7 +892,7 @@ func _build_terrain() -> void:
 			var b := _biome(x, y)
 			var col: Color
 			var kind := 0
-			if course.get("flowers", false):
+			if course.get("flowers", false) or paved():
 				f = 0.0              # a valley: no snow or scree, and much less forest
 				b -= 1.5
 			var cover := _snow_cover(x, y, f)
@@ -960,7 +969,7 @@ func _build_terrain() -> void:
 ## How snowy the mountain is at (x, y) at height fraction `f` (0..1): the snow line wanders, so there are patches
 ## below it and bare rock sticking out above, in every season.
 func _snow_cover(x: float, y: float, f: float) -> float:
-	if course.get("flowers", false):
+	if course.get("flowers", false) or paved():
 		return 0.0
 	var edge := 0.58 + 0.06 * sin(x * 0.31 + y * 0.23) + 0.05 * sin(x * 0.13 - y * 0.37) + 0.03 * sin(x * 0.7 + y * 0.9)
 	return smoothstep(edge - 0.07, edge + 0.04, f)
@@ -1017,7 +1026,7 @@ func _in_cliff(s: float, gap: float = 0.0) -> bool:
 ## start and finish, tunnels, creeks and the fans' campsites.
 func _build_cliffs(rng: RandomNumberGenerator) -> void:
 	cliffs.clear()
-	if course.get("flowers", false):
+	if course.get("flowers", false) or paved():
 		return
 	var length: float = course["length"]
 	var ok := func(i0: int, i1: int) -> bool:
@@ -1159,7 +1168,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 		s += 10.0
 	var want := int(length / 700.0)
 	var placed := 0
-	for _pass in 2:
+	for _pass in 2 if not paved() else 0:
 		while not cands.is_empty() and placed < want:
 			var c: float = cands.pop_at(rng.randi() % cands.size())
 			if _clear_of(c, 200.0, "jump") and _clear_of(c, 35.0):
@@ -1173,7 +1182,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 			s += 10.0
 	want = int(length / 550.0)
 	placed = 0
-	for _try in 400:
+	for _try in 400 if not paved() else 0:
 		if placed >= want:
 			break
 		var c := rng.randf_range(180.0, length - 90.0)
@@ -1204,6 +1213,58 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	for k in 18:
 		_put_fan(rng.randf_range(0.0, 30.0) if k < 9 else length - rng.randf_range(0.0, 30.0),
 			(1.0 if rng.randf() < 0.5 else -1.0) * (rng.randf_range(1.1, 2.4) + ROAD_GROW), rng)
+	house_lots.clear()
+	if paved():
+		_build_houses(rng)
+
+
+## A tarmac course outside the crit (the road race, "road"): town asphalt, rolling resistance and wildlife.
+func paved() -> bool:
+	return course.get("road", false)
+
+
+var house_lots: Array = []   # the road race's houses (Rect2, tiles, grown by a garden's width): no trees in them
+
+## The road race's houses (the town's chalets, 2x2 tiles like in town): one every HOUSE_EVERY m or so on each side,
+## set back from the road, some with a mailbox at the end of the drive, a lamp post here and there, and now and then
+## someone out in the front garden cheering. Kept off the start and finish, and off each other and the road.
+const HOUSE_EVERY := [12.0, 22.0]
+func _build_houses(rng: RandomNumberGenerator) -> void:
+	var length: float = course["length"]
+	var designs := 0
+	while Sprites.sheet("building_chalet_%02d" % (designs + 1)) != null:
+		designs += 1
+	if designs == 0:
+		return
+	for side in [-1.0, 1.0]:
+		var s := 70.0 + rng.randf_range(0.0, 20.0)
+		while s < length - 60.0:
+			var back := ROAD_HW + rng.randf_range(2.0, 2.9)   # tiles from the middle of the road to the lot's middle
+			var pz := _pose(s, side * back)
+			var c: Vector2 = pz["pos"]
+			var lot := Rect2(c - Vector2.ONE, Vector2(2, 2))
+			var ok := true
+			for q in [lot.position, lot.end, Vector2(lot.position.x, lot.end.y), Vector2(lot.end.x, lot.position.y), c]:
+				ok = ok and _rd(q) > ROAD_HW + 0.9
+			for o in house_lots:
+				ok = ok and not (o as Rect2).intersects(lot)
+			if ok:
+				house_lots.append(lot.grow(0.6))
+				var z := minf(minf(_tz(lot.position), _tz(lot.end)), minf(_tz(Vector2(lot.position.x, lot.end.y)), _tz(Vector2(lot.end.x, lot.position.y))))
+				# the door's on the right-hand wall (+x) or, mirrored, the left (+y): whichever looks at the road
+				var to_road: Vector2 = _pose(s, 0.0)["pos"] - c
+				_put_static(2, {"kind": "sprite", "name": "building_chalet_%02d" % (1 + rng.randi() % designs), "pos": lot.end, "z": z,
+					"flip": to_road.y > to_road.x}, [])
+				if rng.randf() < 0.4:
+					var box: Vector2 = _pose(s + rng.randf_range(-1.5, 1.5), side * (ROAD_HW + 0.7))["pos"]
+					_put_static(2, {"kind": "sprite", "name": "scenery_90s_mailbox_blue", "pos": box, "z": _tz(box), "flip": side < 0.0}, [])
+				if rng.randf() < 0.3:
+					_put_fan(s + rng.randf_range(-2.0, 2.0), side * (ROAD_HW + rng.randf_range(1.0, 1.4)), rng)
+			if rng.randf() < 0.25:
+				var lamp: Vector2 = _pose(s + 10.0, side * (ROAD_HW + 0.55))["pos"]
+				if _rd(lamp) > ROAD_HW + 0.3:
+					_put_static(2, {"kind": "sprite", "name": "scenery_lamp_post", "pos": lamp, "z": _tz(lamp)}, [])
+			s += rng.randf_range(HOUSE_EVERY[0], HOUSE_EVERY[1])
 
 
 ## Tunnels bored through the hillside along a straight stretch of a few of the middle legs.
@@ -1527,9 +1588,11 @@ func _build_flora(rng: RandomNumberGenerator) -> void:
 			var f := z / peak
 			var forest := smoothstep(-0.3, 0.6, _biome(x, y))
 			var chance := 0.04 + 0.42 * forest
-			if course.get("flowers", false):
+			if course.get("flowers", false) or paved():
 				forest = smoothstep(-0.3, 0.6, _biome(x, y) - 1.5)
 				chance = 0.01 + 0.3 * forest
+			if house_lots.any(func(r): return (r as Rect2).has_point(p)):
+				continue
 			if f > 0.8:
 				chance *= 0.3
 			if f > 0.9:
@@ -1639,6 +1702,9 @@ func _build_road_geometry() -> void:
 			"light": Ground.band(1.0 - clampf(grade_a[i], -0.1, 0.12) * 1.6)}
 		if velo:
 			_velo_segment(seg, i)
+		if paved() and i % 8 < 4:   # the road race: a dashed yellow line down the middle
+			seg["dash"] = PackedVector2Array([Iso.to_screen(pa - ua * 0.05, za + 0.5), Iso.to_screen(pb - ub * 0.05, zb + 0.5),
+				Iso.to_screen(pb + ub * 0.05, zb + 0.5), Iso.to_screen(pa + ua * 0.05, za + 0.5)])
 		# a chevron painted on the road every 40 m or so, pointing the way, coloured by how steep it is
 		if i % 24 == 12 and s_m[i] < float(course["length"]) and not velo:
 			var t := (pb - pa).normalized()
@@ -1684,7 +1750,9 @@ func _build_animals(rng: RandomNumberGenerator) -> void:
 		var f := elev[_idx(s)] / gain
 		var kind := ""
 		var r := rng.randf()
-		if s - last_bear > 1200.0 and f < 0.85:
+		if paved():   # gardens and verges: no bears, moose or mountain goats
+			kind = ["squirrel", "squirrel", "rabbit", "fox", "raccoon", "hedgehog", "chipmunk", "deer"][rng.randi() % 8]
+		elif s - last_bear > 1200.0 and f < 0.85:
 			kind = "bear"
 		elif _near_ford(s, 45.0) and rng.randf() < 0.5:
 			kind = "moose" if rng.randf() < 0.5 else "elk"
@@ -1770,7 +1838,7 @@ func _build_season() -> void:
 			"col": cols[rng.randi() % cols.size()]}, [p + Vector2(0, 3)] if kind == "skier" else [])
 
 
-var guest := {}                  # a guest rider for this race (the Tour de Crankmore champion), or {}
+var guest := {}                  # a guest rider for this race (Game.CHAMPION, Game.YOLANDA or Game.THUNDER), or {}
 
 
 func _build_riders() -> void:
@@ -2222,11 +2290,12 @@ func _pop_at(p: Vector2, text: String, col: Color) -> void:
 
 
 ## Rolling resistance on this course: the gravel courses add GRAVEL_EXTRA_CRR (less on a bike made for it), the
-## Crusty Crit is town tarmac (the bike's own), and the Velodoughm's boards roll like a velodrome's whatever you ride.
+## Crusty Crit and the road race are town tarmac (the bike's own), and the Velodoughm's boards roll like a velodrome's
+## whatever you ride.
 func _crr(b: Dictionary) -> float:
 	if velo:
 		return Game.VELO_CRR
-	if lap > 0.0:
+	if lap > 0.0 or paved():
 		return float(b["crr"])
 	return float(b["crr"]) + Game.GRAVEL_EXTRA_CRR * float(b.get("gravel", 1.0))
 
@@ -2823,9 +2892,9 @@ func _end_race() -> void:
 			else:
 				champ = k + 1
 	var new_bike := false
-	if champ > 0 and place < champ:   # you beat the champion: his bonus, and his bike
-		Game.add_money(Game.CHAMPION_BONUS)
-		new_bike = Game.give_bike(Game.CHAMPION_BIKE)
+	if champ > 0 and place < champ:   # you beat the champion: their bonus, and their bike
+		Game.add_money(int(guest.get("bonus", Game.CHAMPION_BONUS)))
+		new_bike = Game.give_bike(Game.TRI_BIKE if guest == Game.YOLANDA else Game.CHAMPION_BIKE)
 		Game.save_game()
 	finished.emit({"place": place, "time": riders[0]["time"] if riders[0]["done"] else clock, "prize": prize, "order": names, "course": course["name"],
 		"beat_champion": champ > 0 and place < champ, "champion": champ > 0, "champion_bike": new_bike,
@@ -3051,9 +3120,11 @@ func _draw() -> void:
 				var textured := Ground.tex("gravel_road") != null
 				if velo:
 					_draw_boards(seg)
-				elif lap > 0.0:   # a crit: town asphalt, with a pale kerb
+				elif lap > 0.0 or paved():   # a crit or the road race: town asphalt, with a pale kerb
 					Ground.fill(self, e, "sidewalk", 0.95, Color(0.7, 0.68, 0.64), snow_tint)
 					Ground.fill(self, seg["gravel"], "asphalt", 1.0, Color(0.33, 0.34, 0.4), snow_tint)
+					if seg.has("dash"):
+						draw_colored_polygon(seg["dash"], Color(0.95, 0.85, 0.35, 0.9))
 				elif textured:
 					Ground.fill(self, e, "dirt", float(seg["light"]) * 0.82, Color(0.5, 0.42, 0.33), snow_tint)
 					Ground.fill(self, seg["gravel"], "gravel_road", float(seg["light"]), Color(0.72, 0.64, 0.52), snow_tint)

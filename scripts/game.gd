@@ -38,6 +38,25 @@ const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between h
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
+## Yellow Jersey Yolanda, three-time winner of the Tour de French Bread. Like Maillot Max she's announced about once an
+## hour of riding in town (City._update_yolanda) and waits CHAMPION_WAIT at Race HQ, rides CHAMPION_EDGE harder than the
+## strongest rival, and finishing ahead of her pays her "bonus"; but she only races the road race (Race course
+## "road"); beat her and she hands over her tri bike, the Baguette Blade (TRI_BIKE). Art: bike_yolanda.png / bike_yolanda_fall.png, face_yolanda.png.
+const YOLANDA := {"name": "Yellow Jersey Yolanda", "short": "Yolanda", "color": Color(1.0, 0.72, 0.18), "ftp": 268.0, "speed": 4.3, "attack": 0.7,
+	"title": "three-time winner of the Tour de French Bread", "bonus": 500, "course": "Baguette Boulevard",
+	"sig": ["Three Tours de French Bread. Ask me about the baguette stage.", "I've eaten tougher climbs than this for breakfast. With butter.",
+		"Stay on my wheel if you can, {n}. Nobody can.", "This jersey is yellow because I keep winning in it.",
+		"Rise and shine, {n}. Like good dough."],
+	"lines": {
+		"race_start": ["Five kilometres of tarmac. I'll see you at the top, {n}. Probably from the podium.", "Bread is proved in the oven. Riders are proved on the climbs.",
+			"Ready, {n}? I've been ready since the Tour de French Bread."],
+		"race_pass_player": ["Coming through, {n}! Mind the crumbs.", "That's how we climb in the Tour de French Bread!", "Don't look so crusty, {n}. Grab my wheel!"],
+		"race_player_pass": ["Ooh, {n}! Now we've got a bake-off!", "Enjoy the view up front. It won't last.", "Well, butter my baguette!"],
+		"race_win_rival": ["Another day, another yellow jersey.", "Good ride, {n}. Come back when you've risen a little more.", "Fresh out of the oven: me, first."],
+		"race_lose_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Well done, {n}. That's a ride they'll write about in the bakeries.",
+			"I'm toast. Golden-brown, well-earned toast."],
+		"race_win_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Respect, {n}. Next time I'm bringing the sourdough legs."],
+	}}
 ## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him. He puts out THUNDER_PACE
 ## of your FTP on his own bike (RIVAL_BIKE, like everyone else) at his own weight (THUNDER_MASS), so only your FTP sets his speed: a
 ## better bike or a lighter you makes you faster, not him (see thunder_speed, thunder_watts). Art:
@@ -101,9 +120,16 @@ var bikes: Array = [
 		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.",
 		"good": "The lightest, most aero and toughest bike in the game.",
 		"bad": "There's only one: you have to beat Maillot Max to get it."},
+	# "gift": not for sale; yours for beating Yellow Jersey Yolanda on Baguette Boulevard (see Race._end_race). A tri bike
+	# with aero bars: the most aero bike there is, so the fastest on tarmac, but poor on gravel and twitchy in the corners
+	{"name": "Baguette Blade", "art": "tri", "price": 0, "gift": true, "mass": 7.6, "cda": 0.25, "crr": 0.0042, "hp": 120.0, "gravel": 0.95, "turn": 0.95,
+		"color": Color(1.0, 0.72, 0.18), "blurb": "Yellow Jersey Yolanda's tri bike, aero bars and all. Long, pointy and golden, like the best baguette.",
+		"good": "The most aero bike in the game: the fastest on tarmac, in town, the Crusty Crit and Baguette Boulevard.",
+		"bad": "Hates gravel, twitchy in the corners, and the only way to get it is to beat Yolanda."},
 ]
 const HOOFY := 6   # the Hoofy Bike's place in `bikes`
 const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
+const TRI_BIKE := 8   # the Baguette Blade's place in `bikes`: Yellow Jersey Yolanda's prize
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
@@ -133,6 +159,15 @@ var setup_done := false       # the rider has seen the setup screen at least onc
 
 func _ready() -> void:
 	load_game()
+	_dev_money()
+
+
+## Dev helper: PIZZA_MONEY=<dollars> sets your money when the game starts (whatever the save says) and for a New game,
+## so you can buy bikes and enter races without riding for it. Saved like any other money unless PIZZA_NO_SAVE is set.
+func _dev_money() -> void:
+	if OS.has_environment("PIZZA_MONEY"):
+		money = maxi(0, OS.get_environment("PIZZA_MONEY").to_int())
+		money_changed.emit()
 
 
 # ---- bikes -------------------------------------------------------------
@@ -345,7 +380,8 @@ func has_save() -> bool:
 
 ## Wipes the save and resets progress (money, garage, stats). Rider settings (FTP, weight, rivals) are kept.
 func new_game() -> void:
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	if not no_save:   # (a test run's New game leaves the player's save alone)
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	money = START_MONEY
 	owned = [0]
 	hp = {0: bikes[0]["hp"]}
@@ -358,6 +394,7 @@ func new_game() -> void:
 	rival_order.shuffle()   # a new game gets a random field
 	Talk.set_count(rival_count)
 	money_changed.emit()
+	_dev_money()
 
 
 var no_save := OS.has_environment("PIZZA_NO_SAVE")

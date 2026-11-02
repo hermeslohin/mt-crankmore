@@ -6,9 +6,9 @@ difficulty, wattage and seed, in parallel, and prints the lowest wattage that wo
   python3 tools/race_sim.py --races 3 --difficulty hard,ludicrous --watts 150:230:10 --jobs 16 --out crit.txt
   python3 tools/race_sim.py --summarize crit.txt more.txt      # just the table, from earlier runs
 
-Races: 0 Foothill Gravel Grind, 1 Summit Gravel Showdown, 2 Flour Run, 3 Crusty Crit, 4 the Velodoughm; add the
-champion's versions (Maillot Max) of 0-2 with --champion. Each run prints one line (appended to --out as it goes, so
-a long sweep can be stopped and summarized). A crit takes a few minutes of CPU per run, the road races one to five.
+Races: 0 Foothill Gravel Grind, 1 Summit Gravel Showdown, 2 Flour Run, 3 Crusty Crit, 4 the Velodoughm, 5 Baguette
+Boulevard; add the champions' versions (Maillot Max on 0-2, Yellow Jersey Yolanda on 5) with --champion. Each run prints
+one line (appended to --out as it goes, so a long sweep can be stopped and summarized). A crit takes a few minutes of CPU per run, the road races one to five.
 """
 import argparse
 import collections
@@ -19,7 +19,8 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NAMES = {0: "Foothill Gravel Grind", 1: "Summit Gravel Showdown", 2: "Flour Run", 3: "Crusty Crit", 4: "The Velodoughm"}
+NAMES = {0: "Foothill Gravel Grind", 1: "Summit Gravel Showdown", 2: "Flour Run", 3: "Crusty Crit", 4: "The Velodoughm",
+         5: "Baguette Boulevard"}
 DIFFS = ["easy", "medium", "hard", "ludicrous"]
 
 
@@ -52,7 +53,7 @@ def summarize(paths):
         diff, champ, course = key
         runs = res[key]
         sure = [w for w in sorted(runs) if all(all(runs[v]) for v in runs if v >= w)]
-        name = NAMES.get(course, str(course)) + (" vs Max" if champ else "")
+        name = NAMES.get(course, str(course)) + ((" vs Yolanda" if course == 5 else " vs Max") if champ else "")
         cells = "  ".join(f"{w}:{''.join('W' if x else 'l' for x in runs[w])}" for w in sorted(runs))
         print(f"{diff:9s} {name:32s} always wins from {str(sure[0]) + ' W' if sure else '?':>7} | {cells}")
 
@@ -78,7 +79,7 @@ def main():
     ap.add_argument("--bike", type=int, default=3, help="index into Game.bikes (default 3, the Carbon Crit Machine)")
     ap.add_argument("--difficulty", default="medium", help="comma-separated: " + ", ".join(DIFFS))
     ap.add_argument("--races", default="0,1,2,3,4", help="comma-separated race numbers (see above)")
-    ap.add_argument("--champion", action="store_true", help="also the champion's versions of races 0-2")
+    ap.add_argument("--champion", action="store_true", help="also the champions' versions of races 0-2 (Max) and 5 (Yolanda)")
     ap.add_argument("--watts", default="100:300:20", help="from:to:step, or a comma-separated list")
     ap.add_argument("--seeds", default="1", help="comma-separated")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 2))
@@ -98,7 +99,7 @@ def main():
     races = [int(r) for r in opts.races.split(",")]
     cfgs = [(r, False, w, s, d) for d in diffs for r in races for w in span(opts.watts) for s in span(opts.seeds)]
     if opts.champion:
-        cfgs += [(r, True, w, s, d) for d in diffs for r in races if r <= 2 for w in span(opts.watts) for s in span(opts.seeds)]
+        cfgs += [(r, True, w, s, d) for d in diffs for r in races if r <= 2 or r == 5 for w in span(opts.watts) for s in span(opts.seeds)]
     print(f"{len(cfgs)} runs, {opts.jobs} at a time: FTP {opts.ftp:g} W, {opts.weight_kg:.1f} kg, bike {opts.bike}", flush=True)
     with open(opts.out, "a") as f, ThreadPoolExecutor(opts.jobs) as ex:
         for done, (cfg, res) in enumerate(ex.map(lambda c: run(c, opts), cfgs), 1):

@@ -454,6 +454,14 @@ func _draw_city_hud(w: float, h: float) -> void:
 		var left := int(ceil(city.champion_left))
 		_text("Race %s at Race HQ:  %d:%02d" % [Game.CHAMPION["short"], left / 60, left % 60], r.position + Vector2(6, 22), 8,
 			Color.WHITE if left > 60 or int(Time.get_ticks_msec() / 400) % 2 == 0 else Color(1.0, 0.5, 0.4))
+		below += 36
+	if city.yolanda_left > 0.0:   # Yellow Jersey Yolanda's in town (City._update_yolanda)
+		var r := Rect2(w - 214, below, 210, 30)
+		_panel(r)
+		_text("YELLOW JERSEY YOLANDA IN TOWN!", r.position + Vector2(6, 10), 8, Game.YOLANDA["color"])
+		var left := int(ceil(city.yolanda_left))
+		_text("Race her at Race HQ:  %d:%02d" % [left / 60, left % 60], r.position + Vector2(6, 22), 8,
+			Color.WHITE if left > 60 or int(Time.get_ticks_msec() / 400) % 2 == 0 else Color(1.0, 0.5, 0.4))
 	_panel(Rect2(w - 214, 4, 210, 16 + lines.size() * 10))
 	_text("PIZZA ORDERS", Vector2(w - 208, 14), 8, Color(1.0, 0.85, 0.3))
 	for i in lines.size():

@@ -5,8 +5,9 @@ extends SceneTree
 ##   SIM_COURSE=2 SIM_WATTS=150 godot --headless --fixed-fps 10 --path . -s tools/race_sim.gd
 ##
 ## Environment:
-##   SIM_COURSE    index into Race.COURSES (0 Foothill, 1 Summit, 2 Flour Run, 3 Crusty Crit, 4 the Velodoughm)
-##   SIM_CHAMP     1: the champion's version of the race (Maillot Max rides too)
+##   SIM_COURSE    index into Race.COURSES (0 Foothill, 1 Summit, 2 Flour Run, 3 Crusty Crit, 4 the Velodoughm,
+##                 5 Baguette Boulevard)
+##   SIM_CHAMP     1: the champion's version of the race (Maillot Max rides too; on Baguette Boulevard, Yellow Jersey Yolanda)
 ##   SIM_WATTS     your steady power
 ##   SIM_FTP       your FTP (default 200), SIM_WEIGHT_KG your weight (default 75)
 ##   SIM_DIFF      easy | medium | hard | ludicrous (default medium)
@@ -54,7 +55,11 @@ func _process(delta: float) -> bool:
 		game.hp[bike] = float(game.bikes[bike]["hp"])
 		game.money = 100000
 		main.city.refresh_rivals()
-		main._start_race(_env("SIM_COURSE", "0").to_int(), _env("SIM_CHAMP", "0") == "1")
+		var course := _env("SIM_COURSE", "0").to_int()
+		var champ: Dictionary = {}
+		if _env("SIM_CHAMP", "0") == "1":
+			champ = game.YOLANDA if main.race.COURSES[course].get("road", false) else game.CHAMPION
+		main._start_race(course, champ)
 	if started:
 		# a trainer that's always there, always holding the same watts
 		var now := Time.get_ticks_msec()

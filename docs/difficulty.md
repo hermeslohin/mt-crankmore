@@ -43,7 +43,7 @@ Crr   the bike's rolling resistance      CdA  the bike's drag area (m²)
 0.975 drivetrain loss (2.5%)
 ```
 
-- **Gravel.** The gravel race courses (Foothill, Summit, Flour Run) add `0.014 × the bike's gravel factor` to its Crr. Town roads and the Crusty Crit are tarmac: just the bike's own Crr.
+- **Gravel.** The gravel race courses (Foothill, Summit, Flour Run) add `0.014 × the bike's gravel factor` to its Crr. Town roads, the Crusty Crit and Baguette Boulevard are tarmac: just the bike's own Crr.
 - **The Velodoughm's boards** roll like a real velodrome: Crr is `0.002` for everyone, whatever the bike.
 - **Creeks.** Wading through a ford adds 0.05 to Crr while you're in the water.
 - **Speed caps.** 16 m/s (57.6 km/h) in races, 13 m/s (46.8 km/h) in town, so descents stay sane.
@@ -64,6 +64,7 @@ Speeds at 200 W for a 79.4 kg (175 lb) rider. The bikes are spread so that the s
 | Fixie | 7.5 kg | 0.311 | 0.0052 | 0.77 | 33.7 | 10.7 | 28.1 |
 | Hoofy Bike (gift) | 11.1 kg | 0.371 | 0.0077 | 0.71 | 30.6 | 10.0 | 25.9 |
 | Champion's Bike (prize) | 6.5 kg | 0.270 | 0.0045 | 0.50 | 35.7 | 10.9 | 31.6 |
+| Baguette Blade (prize) | 7.6 kg | 0.250 | 0.0042 | 0.95 | 36.7 | 10.9 | 28.7 |
 | **Club Racer** (every rival) | 8.3 kg | 0.320 | 0.0056 | 0.68 | 33.2 | 10.6 | 28.3 |
 
 ## Rivals' watts

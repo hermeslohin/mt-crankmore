@@ -158,7 +158,7 @@
   .meter i { flex: 1; height: 8px; background: rgba(0, 0, 0, 0.35); border-radius: 2px; overflow: hidden; }
   .meter i::after { content: ""; display: block; height: 100%; width: var(--v); background: var(--c, var(--gold)); }
   .meter span { width: 74px; }
-  .champs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 16px; }
+  .champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
   .champs .rider { padding: 20px; }
   .champs .face { width: 128px; height: 128px; }
   .champs .ride { height: 128px; }
@@ -308,7 +308,7 @@
       <div>
         <h2>Race the bunch</h2>
         <p class="intro" style="margin-bottom:0">Rivals draft each other, take turns on the front and attack in the last two kilometres. They ride at a share of <em>your</em> power, so a race is a race whatever your FTP.</p>
-        <p class="small" style="margin-top:20px">Five courses, from a meadow loop to the summit: <a href="#courses">see them all</a>.</p>
+        <p class="small" style="margin-top:20px">Six courses, from a meadow loop to the summit: <a href="#courses">see them all</a>.</p>
       </div>
     </div>
   </div>
@@ -382,6 +382,14 @@
         <p class="blurb">Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.</p>
         <p class="stats"><span><b>6.5 kg</b></span><span><b>160</b> HP</span></p>
         <p class="pro">The lightest, most aero and toughest bike in the game</p><p class="con">There's only one: you have to beat Maillot Max to get it</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_tri.png" alt="The Baguette Blade, a golden tri bike with aero bars and a disc wheel" loading="lazy"></div>
+        <h3>Baguette Blade <span class="badge">COMING NEXT</span></h3>
+        <p class="price">Beat Yellow Jersey Yolanda</p>
+        <p class="blurb">Yolanda's tri bike, aero bars and all. Long, pointy and golden, like the best baguette.</p>
+        <p class="stats"><span><b>7.6 kg</b></span><span><b>120</b> HP</span></p>
+        <p class="pro">The most aero bike in the game: the fastest on tarmac</p><p class="pro">Made for Baguette Boulevard, the Crusty Crit and town</p><p class="con">Hates gravel, and twitchy in the corners</p><p class="con">The only way to get it is to beat Yolanda</p>
       </div>
     </div>
   </div>
@@ -467,6 +475,12 @@
         <p>Finish ahead of him for a $500 bonus, and he hands over his own bike.</p>
         <q>Is that a pizza bike? Adorable.</q>
       </div>
+      <div class="rider" style="--c:#ffb82e">
+        <h3>Yellow Jersey Yolanda <span class="badge">COMING NEXT</span></h3>
+        <p>Three-time winner of the Tour de French Bread, and the best climber on tarmac you'll ever chase. About once an hour of riding she's announced as visiting town: get to Race HQ within five minutes and race her on Baguette Boulevard, with all the rivals too. She rides 10% harder than the strongest of them and loves to attack on the climbs.</p>
+        <p>Finish ahead of her for a $500 bonus, and she hands over her tri bike, the Baguette Blade: the only way to get it.</p>
+        <q>Stay on my wheel if you can. Nobody can.</q>
+      </div>
       <div class="rider" style="--c:#f2383a">
         <div class="faces"><img class="face" src="img/face_mcgee.png" alt="Thunder Thighs McGee's face" loading="lazy"><img class="ride" src="img/rider_mcgee.png" alt="Thunder Thighs McGee riding" loading="lazy"></div>
         <h3>Thunder Thighs McGee <span class="badge">COMING NEXT</span></h3>
@@ -480,7 +494,7 @@
 <section id="courses">
   <div class="wrap">
     <h2>The courses</h2>
-    <p class="intro">Three races start from Mt. Crankmore Race HQ in town and head out into the valley and up the mountain. The Crusty Crit and the Velodoughm have their own buildings on the edges of town. Payouts on the bunch races: the winner takes the prize, 2nd half of it, 3rd 30% and 4th 15%.</p>
+    <p class="intro">Four races start from Mt. Crankmore Race HQ in town and head out through the village, into the valley and up the mountain. The Crusty Crit and the Velodoughm have their own buildings on the edges of town. Payouts on the bunch races: the winner takes the prize, 2nd half of it, 3rd 30% and 4th 15%.</p>
 
     <div class="course">
       <figure><img src="img/course_flour.png" alt="The Flour Run: the bunch splashing through a creek between flower meadows" width="1280" height="720" loading="lazy"></figure>
@@ -528,6 +542,23 @@
           <div class="fact"><b>$1,200</b><span>prize</span></div>
         </div>
         <ul><li>Two tunnels and the railway to cross</li><li>Logs, creeks and bears on the way up</li><li>Snow, skiers and groomers near the summit</li><li>Where Maillot Max likes to be raced, along with the Foothill</li></ul>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_road.png" alt="Baguette Boulevard: the bunch flying down a descent past the houses of Lower Crankmore, a mailbox and a picnic in a front garden" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Baguette Boulevard <span class="badge">COMING NEXT</span></h3>
+        <p>A proper road race. Five kilometres of tarmac through the houses of Lower Crankmore, with front gardens, mailboxes and half the street out cheering. Rolling climbs and quick dips all the way, finishing back level with the start. No gravel, so your road bike finally gets to shine.</p>
+        <div class="facts">
+          <div class="fact"><b>5 km</b><span>about 13 min</span></div>
+          <div class="fact"><b>~150 m</b><span>of climbing</span></div>
+          <div class="fact"><b>~150 m</b><span>of descents</span></div>
+          <div class="fact"><b>8.5%</b><span>steepest climb</span></div>
+          <div class="fact"><b>$60</b><span>entry</span></div>
+          <div class="fact"><b>$900</b><span>prize</span></div>
+        </div>
+        <ul><li>Asphalt the whole way: every bike rolls on its own tyres</li><li>Houses, lamp posts and mailboxes along the road</li><li>Squirrels, foxes and rabbits darting out of the gardens</li><li>Where Yellow Jersey Yolanda races on her visits, and gives away her tri bike if you beat her</li></ul>
       </div>
     </div>
 

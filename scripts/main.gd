@@ -655,9 +655,10 @@ func _pick_bike(title: String, go: Callable, back: Callable, race_day := false) 
 		hud._rebuild_menu()
 
 
-## Pick a bike for race `i` (from the menu `back` builds), then line up.
-func _race_bike(i: int, back: Callable, champion := false) -> void:
-	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], _start_race.bind(i, champion), func(): hud.open_menu(back), true)
+## Pick a bike for race `i` (from the menu `back` builds), then line up, against a visiting champion (`champ`: Game.CHAMPION
+## or Game.YOLANDA) if one's given.
+func _race_bike(i: int, back: Callable, champ := {}) -> void:
+	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], _start_race.bind(i, champ), func(): hud.open_menu(back), true)
 
 
 ## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
@@ -823,6 +824,14 @@ func _race_menu() -> Dictionary:
 	if city.champion_left > 0.0:   # the Tour de Crankmore champion is in town (see City._update_champion)
 		items.append({"label": "RACE %s, THE TOUR DE CRANKMORE CHAMPION!" % Game.CHAMPION["name"].to_upper(), "fn": func(): hud.open_menu(_champion_menu),
 			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
+	if city.yolanda_left > 0.0:   # Yellow Jersey Yolanda is in town (see City._update_yolanda): she races the road race
+		var y: Dictionary = Game.YOLANDA
+		var ri: int = race.COURSES.find_custom(func(c): return c["name"] == y["course"])
+		var rc: Dictionary = race.COURSES[ri]
+		items.append({"label": "RACE %s ON %s!    entry $%d" % [String(y["name"]).to_upper(), String(y["course"]).to_upper(), rc["entry"]],
+			"fn": func(): _race_bike(ri, _race_menu, y), "enabled": Game.money >= int(rc["entry"]) and Game.can_race(),
+			"detail": "%s, %s, is at the line in her yellow jersey, and she rides 10%% harder than anyone else. Finish ahead of her for a $%d bonus and her tri bike, the Baguette Blade.\n%s" % [
+				y["name"], y["title"], int(y["bonus"]), rc["blurb"]]})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
 		if c.get("crit", false) or c.get("velo", false):
@@ -838,10 +847,10 @@ func _champion_menu() -> Dictionary:
 	var items: Array = []
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
-		if c.get("crit", false) or c.get("velo", false):
-			continue
+		if c.get("crit", false) or c.get("velo", false) or c.get("road", false):
+			continue   # (the road race is Yellow Jersey Yolanda's)
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
-			"fn": func(): _race_bike(i, _champion_menu, true), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
+			"fn": func(): _race_bike(i, _champion_menu, Game.CHAMPION), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
 	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
 	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
@@ -908,11 +917,14 @@ func _start_rescue() -> void:
 	cam.position = race.cam_target()
 
 
-func _start_race(i: int, champion := false) -> void:
+## Line up for race `i`, against a visiting champion (`champ`: Game.CHAMPION or Game.YOLANDA) if one's given.
+func _start_race(i: int, champ := {}) -> void:
 	race.rescue = false
-	race.guest = Game.CHAMPION if champion else (Game.THUNDER if race.COURSES[i].get("velo", false) else {})
-	if champion:
+	race.guest = champ if not champ.is_empty() else (Game.THUNDER if race.COURSES[i].get("velo", false) else {})
+	if champ == Game.CHAMPION:
 		city.champion_left = 0.0   # he's raced you: off he goes after
+	elif champ == Game.YOLANDA:
+		city.yolanda_left = 0.0
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -955,7 +967,13 @@ func _on_race_finished(result: Dictionary) -> void:
 		var t: float = result["time"]
 		var title := "%s: you placed #%d!" % [result["course"], result["place"]]
 		var reward := ""
-		if result.get("beat_champion", false):
+		var champ: Dictionary = race.guest
+		if result.get("beat_champion", false) and champ == Game.YOLANDA:
+			title = "You beat %s, %s! #%d on %s" % [champ["name"], champ["title"], result["place"], result["course"]]
+			reward = "\nChampion's bonus: $%d" % int(champ["bonus"])
+			reward += ("\nShe hands you her tri bike: the BAGUETTE BLADE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
+				else "\n(You've already got her Baguette Blade.)")
+		elif result.get("beat_champion", false):
 			title = "You beat %s, the Tour de Crankmore champion! #%d on %s" % [Game.CHAMPION["name"], result["place"], result["course"]]
 			reward = "\nChampion's bonus: $%d" % Game.CHAMPION_BONUS
 			reward += ("\nHe hands you his bike: the CHAMPION'S BIKE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
@@ -965,7 +983,7 @@ func _on_race_finished(result: Dictionary) -> void:
 		elif result.get("thunder", false):
 			title = "%s wins at the Velodoughm. Flex for the crowd." % Game.THUNDER["name"]
 		elif result.get("champion", false):
-			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
+			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], champ.get("name", "The champion")] if result["place"] != 1 else title
 		return {"title": title,
 			"sub": "%sTime %d:%04.1f     Prize: $%d%s\n\n%s" % ["Laps: %d     " % result["laps"] if int(result.get("laps", 0)) > 0 and not result.get("thunder", false) else "",
 				int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],

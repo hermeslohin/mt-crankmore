@@ -32,6 +32,7 @@ The game renders at 640x360 and scales up in whole pixels (2x in the default 128
 | | |
 |---|---|
 | `PIZZA_NO_SAVE=1` | Never write the save file. Use it for every test and screenshot run. |
+| `PIZZA_MONEY=<dollars>` | Start with that much money: set when the game loads (whatever the save says) and on New game. Without `PIZZA_NO_SAVE` it's saved like money you earned. |
 | `--headless` | No window: for checking scripts and running logic. Nothing is drawn, so anything that waits for a frame to be drawn (`await RenderingServer.frame_post_draw`, the screenshot modes) waits forever. |
 | `--resolution 1280x720` | A fixed window size, so screenshots come out the same every time. |
 | `--fixed-fps 10` | Steps the game in fixed 0.1 s ticks as fast as the machine can go (the race simulator uses it). |
@@ -73,7 +74,7 @@ Global objects Godot creates at start-up (`project.godot`, `[autoload]`):
 | `main.gd` | Scene manager: title, town, races and the menus between them; all the `PIZZA_DEBUG` modes |
 | `city.gd` | Crankmore Village: roads, buildings, traffic, rivals, orders and the paid challenges |
 | `town_events.gd`, `town_happenings.gd` | Random happenings round town (parades, robberies, seagulls, zombie kids...) |
-| `race.gd` | A race: the course, riders, drafting and attacks, the Crusty Crit loop, the Velodoughm |
+| `race.gd` | A race: the courses (`COURSES`), riders, drafting and attacks, the Crusty Crit loop, the Velodoughm, Baguette Boulevard's houses |
 | `race_life.gd` | Race-day dressing: crowds, marshals, the TV moto, helicopters |
 | `hud.gd` | HUD, the WEEHOO bike computer, toasts, chat feed and every menu |
 | `session_chart.gd` | The Session over timeline |
@@ -95,7 +96,7 @@ Set `PIZZA_DEBUG` to start straight into something. Most of them quit by themsel
 | `city` | Starts a game and rides with W held. Add `PIZZA_POPS=<frames>` to report anything that pops in or out of sight (`tools/pop_watch.gd`; `PIZZA_POPS_EVENTS=1` sets off a happening every 15 s). |
 | `city_fast` | The same at 15x speed, steering right. |
 | `race` | Starts the Summit race with W held. |
-| `race_fast` | Starts race `PIZZA_COURSE` (0 Foothill, 1 Summit, 2 Flour Run, 3 Crusty Crit, 4 Velodoughm) at 40x. `PIZZA_PELOTON=1` prints where every rival is every 20 s and the result. |
+| `race_fast` | Starts race `PIZZA_COURSE` (0 Foothill, 1 Summit, 2 Flour Run, 3 Crusty Crit, 4 Velodoughm, 5 Baguette Boulevard) at 40x. `PIZZA_PELOTON=1` prints where every rival is every 20 s and the result. |
 | `shop` | Opens the bike shop with $3000. |
 | `er` | Gets hit by a car and wakes up in hospital. |
 | `shot` | Screenshots in town to `PIZZA_OUT`: `PIZZA_SHOTS=<n>` one a second, or `PIZZA_AT=x,y;...` / `junctions` / `shops` / `er` / `townhall` / `nineties` / `edges` for set spots. `PIZZA_CARRY=1` carries a pizza, `PIZZA_SHIFT=1` shifts up before each shot. |
@@ -113,6 +114,50 @@ Set `PIZZA_DEBUG` to start straight into something. Most of them quit by themsel
 | `overview` | The town map without the title menu (`PIZZA_ZOOM` to zoom out). |
 
 Other switches: `PIZZA_SEASON=spring|summer|fall|winter`, `PIZZA_TIME=<hour>` (holds the clock), `PIZZA_WEATHER=rain|snow|clear`, `PIZZA_FPS=1` (prints the frame rate), `PIZZA_TS=<time scale>` and `PIZZA_FRAMES=<n>` for the modes that take them.
+
+## Courses, champions and bikes
+
+### Courses
+
+Every race is an entry in `Race.COURSES` (`scripts/race.gd`), and new ones go on the end: the race simulator, `PIZZA_COURSE` and saved results refer to them by place. The keys:
+
+| Key | |
+|---|---|
+| `name`, `blurb`, `entry`, `prize`, `seed` | What the menus show; the seed fixes the layout and the scenery |
+| `length` | Metres to the finish (a 400 m cool-down follows) |
+| `grade`, `roll` | Base grade and how much it rolls; a mountain gets a random run of climbs, ramps and drops from them |
+| `profile` | `[metres, grade]` stretches instead, levelled so the finish is as high as the start |
+| `bump` | Gentle rollers on top |
+| `hairpins`, `stagger`, `tunnels` | Switchbacks stacked up the mountain, how ragged the stack is, how many tunnels |
+| `bends`, `gap` | Wide sweeping U-bends `gap` tiles across instead of hairpins (Flour Run, Baguette Boulevard) |
+| `flowers` | A valley of flower meadows: no snow, scree or cliffs, little forest |
+| `road` | A road race on town tarmac: asphalt with a yellow centre line, the bike's own rolling resistance, no creeks, cliffs, jumps or logs, garden animals only, and houses down both sides (`_build_houses`: the town's `building_chalet_NN` pictures on 2x2 lots, mailboxes, lamp posts, fans in the gardens; trees keep out of the lots) |
+| `crit`, `minutes`, `laps_after` | A flat loop raced against the clock, then that many more laps (Crusty Crit) |
+| `velo`, `laps`, `shares` | The Velodoughm |
+
+The gravel courses add `Game.GRAVEL_EXTRA_CRR` times the bike's `gravel` factor to its rolling resistance (`Race._crr`); `crit` and `road` courses don't. Race HQ (`main._race_menu`) lists every course that isn't a `crit` or `velo`, which have their own entrances in town.
+
+Check a new course's numbers with a throwaway script that calls `race.setup(i)` and adds up `race.elev` (climb and descent up to `course["length"]`), then look at it with `PIZZA_DEBUG=race_shot PIZZA_COURSE=<i>` and `PIZZA_ZOOM=0.75` for a wider view.
+
+### Champions
+
+A champion is a dictionary in `game.gd` that rides in a race as its guest (`Race.guest`): `name`, `short` (their sheets and face are `bike_<short>.png`, `bike_<short>_fall.png` and `face_<short>.png`, lower case), `color`, `attack`, `sig` (lines) and optionally `lines` per talk category, `title`, `bonus` and `course`.
+
+| | Maillot Max (`Game.CHAMPION`) | Yellow Jersey Yolanda (`Game.YOLANDA`) |
+|---|---|---|
+| Visits | About once an hour of riding in town (`City._update_champion`, `CHAMPION_EVERY`) | The same, on her own timer (`City._update_yolanda`), never while Max is in town |
+| Waits at Race HQ | `CHAMPION_WAIT` (5 minutes), with a countdown under the orders | The same |
+| Races | Any gravel course (`main._champion_menu`) | Baguette Boulevard only (her `course`) |
+| Strength | `CHAMPION_EDGE` (10%) harder than the strongest rival in the race | The same |
+| Beat them | `CHAMPION_BONUS` and the Champion's Bike (`CHAMPION_BIKE`) | Her `bonus` and the Baguette Blade (`TRI_BIKE`) |
+
+Thunder Thighs McGee (`Game.THUNDER`) is the Velodoughm's guest and rides to a share of your FTP instead (`THUNDER_PACE`).
+
+### Bikes
+
+`Game.bikes` lists every bike; new ones go on the end, because saves store bikes by their place in the list (`owned`, `equipped`, `hp`). Each has `name`, `art`, `price`, `mass` (kg), `cda` (m²), `crr`, `hp`, `gravel` (the gravel drag factor), `turn` (handling), `color`, `blurb`, `good` and `bad`, plus `fixed` for one gear and no brakes, and `gift` for bikes the shop doesn't sell (the Hoofy Bike from Santa, the Champion's Bike from Max, the Baguette Blade from Yolanda: `Game.give_bike`). Keep the spread small: the Rusty Trash Bike should be no more than about 20% slower than the best bike on the flat, up a climb or on gravel (the bike table on the [difficulty page](difficulty.md) shows the speeds).
+
+Its pictures: `art/shop_bike_<art>.png` and `docs/img/bike_<art>.png`, and rider sheets `bike_rookie_<boy|girl>_<art>*.png` if it has its own (see [Riders](#riders)).
 
 ## Testing changes
 
@@ -134,7 +179,7 @@ python3 tools/race_sim.py --ftp 200 --weight-lb 175 --bike 3 --difficulty easy,h
 python3 tools/race_sim.py --summarize sims.txt
 ```
 
-`--bike` is the bike's place in `Game.bikes` (0 Rusty Trash Bike ... 3 Carbon Crit Machine ... 7 Champion's Bike). A road race takes 1 to 5 minutes of CPU per run and a crit several, so sweep coarsely first (one seed, 10 to 20 W steps) and then narrow down with more seeds. The numbers on the difficulty page come from this.
+`--races` takes course numbers (0 Foothill ... 5 Baguette Boulevard); `--champion` adds Maillot Max to 0-2 and Yellow Jersey Yolanda to 5. `--bike` is the bike's place in `Game.bikes` (0 Rusty Trash Bike ... 3 Carbon Crit Machine ... 7 Champion's Bike, 8 Baguette Blade). A road race takes 1 to 5 minutes of CPU per run and a crit several, so sweep coarsely first (one seed, 10 to 20 W steps) and then narrow down with more seeds. The numbers on the difficulty page come from this.
 
 ## Art pipeline
 
@@ -154,9 +199,9 @@ A rider is a set of sheets named `bike_<rider>*.png`: 8 rows of directions (down
 | `..._turn.png` | In-between frames for turning (4 per pair of neighbouring rows) |
 | `winter_...` | The same in winter clothes |
 
-The player's sheets are `bike_rookie_boy*` and `bike_rookie_girl*`; with a bike of its own art they're `bike_rookie_<boy|girl>_<art>*`, where `<art>` is the bike's `"art"` in `Game.bikes` (`rusty`, `commuter`, `gravel`, `carbon`, `golden`, `fixie`, `hoofy`, `champion`). A missing sheet falls back: pizza to bag to plain, a bike's own sheets to the plain ones, a missing turn sheet to a cross-fade.
+The player's sheets are `bike_rookie_boy*` and `bike_rookie_girl*`; with a bike of its own art they're `bike_rookie_<boy|girl>_<art>*`, where `<art>` is the bike's `"art"` in `Game.bikes` (`rusty`, `commuter`, `gravel`, `carbon`, `golden`, `fixie`, `hoofy`, `champion`, `tri`). A missing sheet falls back: pizza to bag to plain, a bike's own sheets to the plain ones, a missing turn sheet to a cross-fade.
 
-Each bike also has a picture on its own, `art/shop_bike_<art>.png` (side view, trimmed, drawn at 1x), shown beside its details in the bike shop and My bikes. The website uses the same pictures at 3x (`docs/img/bike_<art>.png`). They were made with PixelLab's `create-image-pixflux` (128x96, `no_background`, side view, "no rider, isolated, no ground, 16-bit SNES style").
+Each bike also has a picture on its own, `art/shop_bike_<art>.png` (side view, trimmed, drawn at 1x), shown beside its details in the bike shop and My bikes. The website uses the same pictures at 3x (`docs/img/bike_<art>.png`). They were made with PixelLab's `create-image-pixflux` (128x96, `no_background`, side view, "no rider, isolated, no ground, 16-bit SNES style"). PixelLab won't draw a tri bike's aero bars, so the Baguette Blade's were drawn in by hand over a road bike's drops.
 
 To make a rider in PixelLab:
 

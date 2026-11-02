@@ -620,7 +620,7 @@ func crit_left() -> float:
 
 
 func laps_done(r: Dictionary) -> int:
-	return int(floorf(float(r["s"]) / lap)) if lap > 0.0 else 0
+	return maxi(0, int(floorf(float(r["s"]) / lap))) if lap > 0.0 else 0   # (the grid behind the line is on lap 1 too)
 
 
 ## Rider `r` (at `s0` a frame ago) is finishing. A crit is won at crit_end_s; after that everyone else finishes the
@@ -1192,7 +1192,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 		if ob["kind"] == "jump":
 			for k in 4:
 				_put_fan(float(ob["s"]) + rng.randf_range(-6.0, 6.0), (1.0 if k % 2 == 0 else -1.0) * (rng.randf_range(1.2, 2.0) + ROAD_GROW), rng)
-	_put_static(2, {"kind": "arch", "s": 0.0, "label": "START"}, [])
+	_put_static(2, {"kind": "arch", "s": start_s(), "label": "START"}, [])
 	_put_static(2, {"kind": "arch", "s": length - 2.0, "label": "FINISH"}, [])
 	var km := 500.0
 	while km < length - 60.0:
@@ -1817,22 +1817,37 @@ func _build_riders() -> void:
 	attack_talk = 0.0
 
 
-## The start grid: two abreast, rows GRID_GAP apart, everyone (you too) in a random order. The back row is on the
-## line and the rest line up up the road from it (a point-to-point course has no road behind its start). The
-## Velodoughm's two are one row already, and a rescue is you alone.
+## The start grid: two abreast behind the start line, rows GRID_GAP apart, everyone (you too) in a random order, the
+## front row GRID_BACK behind the line. A point-to-point course has no road behind its start, so its START arch stands
+## start_s() up the road with room for five rows behind it; a crit's grid goes back round the loop from the line. At
+## the Velodoughm it's you and McGee side by side, him on the inside (the sprinter's line he rides), you on the
+## outside. A rescue is you alone, from the bottom.
 const GRID_GAP := 4.0    # m between rows
+const GRID_BACK := 3.0   # m from the front row to the line
 const GRID_LANE := 0.3   # each column's distance from the middle of the road, in road widths
 
+## Where the start line is: room for five rows of the grid behind it on a point-to-point course, 0 on a loop.
+func start_s() -> float:
+	return 0.0 if lap > 0.0 else GRID_BACK + GRID_GAP * 4.0
+
+
 func _grid_up() -> void:
-	if velo or rescue:
+	if rescue:
+		return
+	if velo:
+		for r in riders:
+			# as far apart as the track lets them (it runs across the screen, so across it is up and down)
+			var lane := (1.0 if r["player"] else -1.0) * velo_out * 0.4 * ROAD_W
+			r["s"] = -GRID_BACK
+			r["lat"] = lane
+			r["lane"] = lane
 		return
 	var order := range(riders.size())
 	order.shuffle()
-	var rows := (order.size() + 1) / 2
 	for slot in order.size():
 		var r: Dictionary = riders[order[slot]]
 		var lane := (-GRID_LANE if slot % 2 == 0 else GRID_LANE) * ROAD_W
-		r["s"] = float(rows - 1 - slot / 2) * GRID_GAP
+		r["s"] = start_s() - GRID_BACK - float(slot / 2) * GRID_GAP
 		r["lat"] = lane
 		r["lane"] = lane
 

@@ -109,6 +109,12 @@
   .challenges li { padding: 10px 0 10px 34px; position: relative; border-bottom: 2px dashed var(--line); }
   .challenges li::before { content: "★"; position: absolute; left: 4px; color: var(--pizza); }
   .challenges b { color: var(--ink); }
+  .pus { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin-top: 20px; }
+  .pu { background: var(--panel-2); border: 3px solid var(--line); border-radius: 4px; padding: 16px; display: grid; grid-template-columns: 64px 1fr; grid-template-rows: auto auto 1fr; gap: 4px 14px; align-items: start; }
+  .pu img { width: 64px; height: 64px; image-rendering: pixelated; grid-row: span 3; }
+  .pu h3 { margin: 0; font-size: 17px; }
+  .pu .where { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gold); }
+  .pu p { margin: 0; color: var(--muted); font-size: 14px; }
   .challenges span { color: var(--muted); }
   figure { margin: 0; }
   figure img { border: 3px solid var(--line); border-radius: 4px; }
@@ -204,6 +210,7 @@
     <ul>
       <li><a href="#ride">Ride it</a></li>
       <li><a href="#level">Your level</a></li>
+      <li><a href="#powerups">Power-ups</a></li>
       <li><a href="#bikes">Bikes</a></li>
       <li><a href="#rivals">Rivals</a></li>
       <li><a href="#courses">Courses</a></li>
@@ -299,7 +306,25 @@
   </div>
 </section>
 
-<section class="band" id="races">
+<section class="band" id="powerups">
+  <div class="wrap">
+    <h2>Power-ups</h2>
+    <p class="intro">About one in eight townsfolk, and the fans along every race course, hold up a power-up. Ride past empty-handed and they toss it to you. You carry one at a time, it shows on the WEEHOO, and <b>Y</b> or your controller's power-up button uses it. The rivals grab them too, and they will use them on you.</p>
+    <div class="pus">
+      <div class="pu"><img src="img/pu_frisbee.png" alt="" width="64" height="64" loading="lazy"><h3>Pizza Frisbee</h3><p class="where">Town and races</p><p>Knocks a rival within 15 m off their bike for 5 seconds. Out of range, you keep it.</p></div>
+      <div class="pu"><img src="img/pu_mitt.png" alt="" width="64" height="64" loading="lazy"><h3>Oven Mitt</h3><p class="where">Town and races</p><p>Snatches from the nearest rider within 10 m: the pizza they're delivering in town, their power-up in a race.</p></div>
+      <div class="pu"><img src="img/pu_socks.png" alt="" width="64" height="64" loading="lazy"><h3>Fire Socks</h3><p class="where">Town and races</p><p>30% faster for 15 seconds.</p></div>
+      <div class="pu"><img src="img/pu_breadsticks.png" alt="" width="64" height="64" loading="lazy"><h3>Breadsticks</h3><p class="where">Town and races</p><p>You grow huge for 12 seconds, and anyone you ride into falls over.</p></div>
+      <div class="pu"><img src="img/pu_roller.png" alt="" width="64" height="64" loading="lazy"><h3>Dough Roller</h3><p class="where">Town and races</p><p>Rolls the hills flat for 15 seconds: climbs feel like flat road, on your trainer too. Descents still count.</p></div>
+      <div class="pu"><img src="img/pu_portal.png" alt="" width="64" height="64" loading="lazy"><h3>Pepperoni Portal</h3><p class="where">Town only</p><p>Warps you to the nearest pizza shop with a pizza waiting.</p></div>
+      <div class="pu"><img src="img/pu_wrench.png" alt="" width="64" height="64" loading="lazy"><h3>Bike Wrench</h3><p class="where">Town only</p><p>Fixes your bike back to full HP.</p></div>
+      <div class="pu"><img src="img/pu_walkie.png" alt="" width="64" height="64" loading="lazy"><h3>Walkie Talkie</h3><p class="where">Town only, rare</p><p>Summons a dancing pizza mascot that blocks the nearest rival for 12 seconds.</p></div>
+    </div>
+    <p class="small" style="margin-top:20px">Getting knocked off by a rival's power-up costs your bike 5 HP: the only way a race wears your bike. The Velodoughm has none: just legs.</p>
+  </div>
+</section>
+
+<section id="races">
   <div class="wrap">
     <div class="features">
       <figure>
@@ -314,7 +339,7 @@
   </div>
 </section>
 
-<section id="bikes">
+<section class="band" id="bikes">
   <div class="wrap">
     <h2>Pick your bike</h2>
     <p class="intro">You start on whatever was behind the dumpster. Deliver pizza, win races and save up at Spokes &amp; Stuff. A bike changes how fast your watts take you: lighter climbs better, more aero flies on the flat, and some love gravel more than others. Crash too often and its HP runs out. Every rival rides the same middle-of-the-road Club Racer, so a better bike makes <em>you</em> faster and nobody else. Own a few and you pick one from the garage every time you head into town or line up for a race.</p>
@@ -395,7 +420,7 @@
   </div>
 </section>
 
-<section class="band" id="rivals">
+<section id="rivals">
   <div class="wrap">
     <h2>The rivals</h2>
     <p class="intro">Eight couriers want your orders and your podium. Pick how many ride with you (one to eight) in Rider setup. They all trash-talk, steal orders, throw power-ups and race at a share of your power, but each has a style: some attack again and again, some sit in and wait.</p>
@@ -492,7 +517,7 @@
   </div>
 </section>
 
-<section id="courses">
+<section class="band" id="courses">
   <div class="wrap">
     <h2>The courses</h2>
     <p class="intro">Four races start from Mt. Crankmore Race HQ in town and head out through the village, into the valley and up the mountain. The Crusty Crit and the Velodoughm have their own buildings on the edges of town. Payouts on the bunch races: the winner takes the prize, 2nd half of it, 3rd 30% and 4th 15%.</p>
@@ -594,7 +619,7 @@
   </div>
 </section>
 
-<section class="band" id="stats">
+<section id="stats">
   <div class="wrap">
     <h2>Track your stats</h2>
     <p class="intro">Every ride counts. The game logs your session from the moment you hit New game or Continue until you quit to the title, and shows you exactly what you rode.</p>
@@ -645,7 +670,7 @@
   </div>
 </section>
 
-<section id="next">
+<section class="band" id="next">
   <div class="wrap next">
     <div>
       <h2>Coming next</h2>
@@ -663,7 +688,7 @@
   </div>
 </section>
 
-<section class="band">
+<section>
   <div class="wrap">
     <h2>Getting started</h2>
     <p class="intro">Download the build for your computer and you're riding in a minute.</p>

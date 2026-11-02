@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mt. Crankmore</title>
+<meta name="description" content="A 16-bit pizza-delivery racing game you ride on your bike trainer. Pizza pays the bills, cycling is life.">
+<meta property="og:title" content="Mt. Crankmore">
+<meta property="og:description" content="A 16-bit pizza-delivery racing game you ride on your bike trainer.">
+<meta property="og:image" content="https://hermeslohin.github.io/mt-crankmore/title.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍕</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #15133a;
+    --panel: #1f1c52;
+    --panel-2: #29256a;
+    --line: #3b3690;
+    --ink: #f3f1ff;
+    --muted: #b9b5e6;
+    --gold: #ffd84a;
+    --pizza: #ff8a3d;
+    --sauce: #e8473b;
+    --leaf: #59d18a;
+    --sky: #6fc3ff;
+    --pixel: "Press Start 2P", ui-monospace, monospace;
+    --body: "Nunito", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--ink);
+    font: 400 17px/1.6 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  a { color: var(--gold); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  /* top bar */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(21, 19, 58, 0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 3px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; }
+  .brand { font-family: var(--pixel); font-size: 13px; color: var(--gold); text-decoration: none; white-space: nowrap; }
+  nav ul { display: flex; gap: 20px; list-style: none; margin: 0; padding: 0; }
+  nav ul a { color: var(--muted); text-decoration: none; font-weight: 700; font-size: 15px; }
+  nav ul a:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { padding: 56px 0 40px; }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 40px; align-items: center; }
+  h1 {
+    font-family: var(--pixel); font-weight: 400;
+    font-size: clamp(26px, 4.6vw, 46px); line-height: 1.25; margin: 0 0 18px;
+    color: var(--gold);
+    text-shadow: 4px 4px 0 var(--sauce), 8px 8px 0 rgba(0, 0, 0, 0.35);
+  }
+  .tagline { font-family: var(--pixel); font-size: 12px; line-height: 1.8; color: var(--pizza); margin: 0 0 18px; }
+  .lede { font-size: 19px; color: var(--ink); margin: 0 0 26px; max-width: 34em; }
+  .shot {
+    border: 4px solid var(--gold);
+    box-shadow: 8px 8px 0 var(--sauce), 0 20px 50px rgba(0, 0, 0, 0.5);
+    border-radius: 4px; overflow: hidden; background: #000;
+  }
+
+  /* buttons */
+  .downloads { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--pixel); font-size: 11px; line-height: 1;
+    padding: 15px 18px; text-decoration: none;
+    color: var(--night); background: var(--gold);
+    border: 3px solid var(--night); box-shadow: 4px 4px 0 var(--sauce);
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--sauce); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sauce); }
+  .btn .arrow { font: 800 16px/1 var(--body); }
+  .small { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+
+  /* sections */
+  section { padding: 56px 0; }
+  section.band { background: var(--panel); border-top: 3px solid var(--line); border-bottom: 3px solid var(--line); }
+  h2 { font-family: var(--pixel); font-weight: 400; font-size: clamp(16px, 2.4vw, 22px); line-height: 1.5; color: var(--gold); margin: 0 0 10px; }
+  .intro { color: var(--muted); max-width: 46em; margin: 0 0 32px; font-size: 18px; }
+  h3 { font-size: 19px; font-weight: 800; margin: 0 0 6px; }
+
+  .gear { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel-2); border: 3px solid var(--line); padding: 20px; border-radius: 4px; }
+  .card p { margin: 0; color: var(--muted); }
+  .icon { font-size: 26px; line-height: 1; margin-bottom: 10px; }
+
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  figure { margin: 0; }
+  figure img { border: 3px solid var(--line); border-radius: 4px; }
+  figcaption { margin-top: 12px; }
+  figcaption p { margin: 0; color: var(--muted); }
+
+  .races { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 28px; }
+  .race { border-left: 4px solid var(--pizza); padding: 4px 0 4px 14px; }
+  .race b { display: block; }
+  .race span { color: var(--muted); font-size: 15px; }
+
+  .next { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: center; }
+  .next ul { margin: 0; padding: 0; list-style: none; }
+  .next li { padding: 10px 0 10px 34px; position: relative; border-bottom: 2px dashed var(--line); }
+  .next li::before { content: "▶"; position: absolute; left: 4px; color: var(--leaf); }
+  .badge { font-family: var(--pixel); font-size: 9px; color: var(--night); background: var(--leaf); padding: 5px 7px; vertical-align: middle; margin-left: 6px; }
+
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .step { counter-increment: s; background: var(--panel-2); border: 3px solid var(--line); padding: 20px 20px 20px 66px; position: relative; border-radius: 4px; }
+  .step::before { content: counter(s); position: absolute; left: 18px; top: 18px; font-family: var(--pixel); font-size: 18px; color: var(--gold); }
+  .step p { margin: 0; color: var(--muted); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em; background: rgba(0, 0, 0, 0.35); padding: 2px 6px; border-radius: 3px; color: var(--ink); word-break: break-all; }
+
+  footer { padding: 40px 0 56px; text-align: center; color: var(--muted); font-size: 15px; }
+  footer .tagline { margin-bottom: 10px; }
+
+  @media (max-width: 860px) {
+    .hero .wrap, .next, .features { grid-template-columns: 1fr; }
+    .hero { padding-top: 32px; }
+    nav ul { display: none; }
+  }
+  @media (max-width: 420px) {
+    .btn { font-size: 10px; padding: 13px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#">MT. CRANKMORE</a>
+    <ul>
+      <li><a href="#ride">Ride it</a></li>
+      <li><a href="#town">The town</a></li>
+      <li><a href="#races">Races</a></li>
+      <li><a href="#next">Coming next</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Mt.<br>Crankmore</h1>
+      <p class="tagline">Pizza pays the bills,<br>cycling is life.</p>
+      <p class="lede">A 16-bit pizza-delivery racing game you ride on your real bike. Pedal your smart trainer through a little 90s mountain town, beat rival couriers to the orders, and race up Mt. Crankmore when the shift is over.</p>
+      <div class="downloads" id="download">
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-windows-x86_64.zip"><span class="arrow" aria-hidden="true">↓</span>Windows</a>
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-macos.zip"><span class="arrow" aria-hidden="true">↓</span>macOS</a>
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-linux-x86_64.tar.gz"><span class="arrow" aria-hidden="true">↓</span>Linux</a>
+      </div>
+      <p class="small">Free. Works with just a keyboard, too. <a href="https://github.com/hermeslohin/mt-crankmore/releases">All releases</a></p>
+    </div>
+    <div class="shot"><img src="title.png" alt="The Mt. Crankmore title screen: a pixel-art mountain village" width="1280" height="720"></div>
+  </div>
+</header>
+
+<section class="band" id="ride">
+  <div class="wrap">
+    <h2>Your bike is the controller</h2>
+    <p class="intro">Your watts move your rider. Hills in the game make the trainer push back, and every pizza you deliver is a real effort.</p>
+    <div class="gear">
+      <div class="card"><div class="icon">🚴</div><h3>Smart trainers</h3><p>Any FTMS trainer over Bluetooth, and Wahoo KICKRs over Wi-Fi with Direct Connect. The game sets the resistance for every climb and descent.</p></div>
+      <div class="card"><div class="icon">⚡</div><h3>Power meters</h3><p>No smart trainer? A Bluetooth power meter on pedals, cranks or a spider works too.</p></div>
+      <div class="card"><div class="icon">🎮</div><h3>Handlebar controllers</h3><p>Steer at junctions, shift through 21 virtual gears and fire power-ups without letting go of the bars.</p></div>
+      <div class="card"><div class="icon">📈</div><h3>Strava</h3><p>Every session is logged and posts to Strava as a Virtual Ride, with power, cadence, distance, climbing and your pizza count.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="town">
+  <div class="wrap">
+    <h2>A town that keeps busy</h2>
+    <p class="intro">Day turns to night, the seasons change and there's always something going on: parades, fireworks, runaway dogs, robberies to break up and a bear up on the mountain.</p>
+    <div class="features">
+      <figure>
+        <img src="delivery.png" alt="Delivering a pizza through town, steam rising off the box" width="1280" height="720" loading="lazy">
+        <figcaption><h3>Deliver hot</h3><p>Grab an order from a glowing pizza window and get it there before it goes cold. The other couriers want it too.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="night.png" alt="The village at night with the street lamps on" width="1280" height="720" loading="lazy">
+        <figcaption><h3>Day, night and four seasons</h3><p>An hour-long day, street lamps at dusk, rain from spring to fall and snow all winter.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="bear.png" alt="The ski patrol wheeling the player's bike away after a bear attack" width="1280" height="720" loading="lazy">
+        <figcaption><h3>Mind the bear</h3><p>Get caught and you wipe out, and the ski patrol has to bring you a new bike.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="session.png" alt="The Session over screen: power, cadence, heart rate and speed charts with markers for pizzas and races" width="1280" height="720" loading="lazy">
+        <figcaption><h3>See what you rode</h3><p>When you finish, a timeline shows your power, cadence and speed, with every pizza, challenge and race result marked on it.</p></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="races">
+  <div class="wrap">
+    <div class="features">
+      <figure>
+        <img src="switchbacks.png" alt="Climbing the switchbacks on Mt. Crankmore past cliffs" width="1280" height="720" loading="lazy">
+      </figure>
+      <div>
+        <h2>Race the bunch</h2>
+        <p class="intro" style="margin-bottom:0">Rivals draft each other, take turns on the front and attack in the last two kilometres. They ride at a share of <em>your</em> power, so a race is a race whatever your FTP.</p>
+        <div class="races">
+          <div class="race"><b>Flour Run</b><span>3 km through the meadows</span></div>
+          <div class="race"><b>Foothill Gravel Grind</b><span>6 km of gravel switchbacks, jumps and creeks</span></div>
+          <div class="race"><b>Summit Gravel Showdown</b><span>Straight up Mt. Crankmore</span></div>
+          <div class="race"><b>Maillot Max</b><span>Beat the champion and win his bike</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="next">
+  <div class="wrap next">
+    <div>
+      <h2>Coming next</h2>
+      <p class="intro">Already being tested for the next update:</p>
+      <ul>
+        <li><b>The Velodoughm</b> <span class="badge">NEW</span><br><span style="color:var(--muted)">One flying lap of an indoor wooden track against Thunder Thighs McGee.</span></li>
+        <li><b>The Crusty Crit</b><br><span style="color:var(--muted)">25 minutes round the park, then two more laps.</span></li>
+        <li><b>Heart rate</b><br><span style="color:var(--muted)">From Bluetooth straps, or ANT+ through your Wahoo trainer. Logged and sent to Strava.</span></li>
+        <li><b>A look for every bike</b><br><span style="color:var(--muted)">From the Rusty Trash Bike to the Golden Pepperoni Pro.</span></li>
+      </ul>
+    </div>
+    <div class="shot"><img src="velodoughm.png" alt="Racing Thunder Thighs McGee round the banked wooden track of the Velodoughm" width="1280" height="720" loading="lazy"></div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Getting started</h2>
+    <p class="intro">Download the build for your computer and you're riding in a minute.</p>
+    <div class="steps">
+      <div class="step"><h3>Download and run</h3><p>Windows: unzip and run <code>MtCrankmore.exe</code>. Linux: extract and run the binary. macOS: see the next step.</p></div>
+      <div class="step"><h3>First launch on a Mac</h3><p>Right-click the app and choose Open. If macOS says it's damaged, run <code>xattr -cr "Mt. Crankmore.app"</code> once.</p></div>
+      <div class="step"><h3>Connect your trainer</h3><p>Choose Connect Trainer on the title screen. Installing the Bluetooth helper the first time needs Python 3 and an internet connection.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p class="tagline">Pizza pays the bills, cycling is life.</p>
+    <p>Made with <a href="https://godotengine.org">Godot</a>. Pixel art made with PixelLab. <a href="https://github.com/hermeslohin/mt-crankmore">Source on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

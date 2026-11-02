@@ -18,20 +18,20 @@ const SAVE_PATH := "user://pizza_city_save.json"
 const SLOGAN := "Pizza pays the bills, cycling is life"
 const LB_PER_KG := 2.20462
 
-## The share of YOUR W/kg (FTP / weight from the menu, at their own weight) rivals ride at, in town and in races alike ("share"), and how
-## good their bikes are (offset on their usual bike tier).
+## The share of YOUR W/kg (FTP / weight from the menu, at their own weight) rivals ride at, in town and in races alike ("share").
+## Their bikes don't change with it (see RIVAL_BIKE).
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "share": 0.5, "tier": -1, "blurb": "Rivals ride at about 50% of your W/kg. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "share": 0.65, "tier": 0, "blurb": "Rivals ride at about 65% of your W/kg. Push a bit and you'll win."},
-	"hard": {"label": "Hard", "share": 0.8, "tier": 1, "blurb": "Rivals ride at about 80% of your W/kg on better bikes. Good luck."},
-	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your W/kg on their best bikes. Bring snacks."},
+	"easy": {"label": "Easy", "share": 0.5, "blurb": "Rivals ride at about 50% of your W/kg. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "share": 0.65, "blurb": "Rivals ride at about 65% of your W/kg. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "share": 0.8, "blurb": "Rivals ride at about 80% of your W/kg. Good luck."},
+	"ludicrous": {"label": "Ludicrous", "share": 1.0, "blurb": "Rivals ride at 100% of your W/kg. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 
 ## The reigning Tour de Crankmore champion. About once an hour of riding in town he's announced as visiting
 ## (City._update_champion); get to Race HQ within CHAMPION_WAIT and you can race him and the rivals. He rides 10%
 ## harder than the strongest of them (Race._build_riders). Art: bike_max.png / bike_max_fall.png.
-const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "tier": 3, "speed": 4.4, "attack": 0.6,
+const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "speed": 4.4, "attack": 0.6,
 	"sig": ["The yellow jersey doesn't wear itself.", "I've won this town's tour three times. Keep up.", "Is that a pizza bike? Adorable.",
 		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels."]}
 const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
@@ -39,10 +39,10 @@ const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ 
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
 ## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him. He puts out THUNDER_PACE
-## of your FTP on his own bike (THUNDER_BIKE) at his own weight (THUNDER_MASS), so only your FTP sets his speed: a
+## of your FTP on his own bike (RIVAL_BIKE, like everyone else) at his own weight (THUNDER_MASS), so only your FTP sets his speed: a
 ## better bike or a lighter you makes you faster, not him (see thunder_speed, thunder_watts). Art:
 ## bike_mcgee.png / bike_mcgee_fall.png, face_mcgee.png. "lines": what he says for each Talk category ("sig" otherwise).
-const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "tier": 3, "attack": 0.0,
+const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "attack": 0.0,
 	"sig": ["These quads have their own postcode.", "I don't skip leg day. Leg day skips everything else.", "Do you even squat, bro?",
 		"My thighs have thighs.", "I warm up by leg-pressing the Zamboni."],
 	"lines": {
@@ -59,7 +59,6 @@ const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Col
 		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
 	}}
 const THUNDER_PACE := 1.5    # his watts, as a share of YOUR FTP
-const THUNDER_BIKE := "Carbon Crit Machine"
 const THUNDER_MASS := 75.0   # kg
 const MAX_RIVALS := 8
 
@@ -241,10 +240,15 @@ func rival_mass(i: int) -> float:
 	return 68.0 + (i % 3) * 3.0
 
 
-## Rivals stick to geared bikes.
-func rival_bike(info: Dictionary) -> Dictionary:
-	var geared := bikes.filter(func(b): return not b.get("fixed", false))
-	return geared[clampi(int(info["tier"]) + int(DIFFICULTIES[difficulty]["tier"]), 0, geared.size() - 1)]
+## What every rival rides, in town and in races (Maillot Max and Thunder Thighs McGee too): a middle-of-the-road bike,
+## the middle of the five bikes for sale on every count, whatever the difficulty. Only your bike changes with what you
+## buy, so a better bike makes you faster and nobody else.
+const RIVAL_BIKE := {"name": "Club Racer", "mass": 10.5, "cda": 0.38, "crr": 0.007, "hp": 110.0, "gravel": 0.9, "turn": 1.05,
+	"color": Color(0.55, 0.6, 0.7)}
+
+
+func rival_bike() -> Dictionary:
+	return RIVAL_BIKE
 
 
 ## True while riding a fixed-gear bike: no shifting, no brakes.
@@ -265,17 +269,9 @@ func set_rival_count(n: int) -> void:
 # ---- physics -----------------------------------------------------------
 
 ## Steady-state speed (m/s) for a given power and grade (fraction, 0.05 = 5%). Rider mass defaults to the player's weight.
-## The bike called `bike_name` (from `bikes`).
-func bike_named(bike_name: String) -> Dictionary:
-	for b in bikes:
-		if b["name"] == bike_name:
-			return b
-	return bikes[0]
-
-
-## How fast McGee goes on flat smooth boards (m/s): THUNDER_PACE of your FTP on THUNDER_BIKE, at THUNDER_MASS.
+## How fast McGee goes on flat smooth boards (m/s): THUNDER_PACE of your FTP on RIVAL_BIKE, at THUNDER_MASS.
 func thunder_speed() -> float:
-	var b := bike_named(THUNDER_BIKE)
+	var b := rival_bike()
 	return speed_from_power(ftp * THUNDER_PACE, b["mass"], b["cda"], b["crr"], 0.0, THUNDER_MASS)
 
 

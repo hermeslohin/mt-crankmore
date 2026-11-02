@@ -818,12 +818,24 @@ func _velo_menu() -> Dictionary:
 	var c: Dictionary = race.COURSES[i]
 	return {"title": "The Velodoughm", "sub": "%s\n%s is stretching his quads by the rail. Loudly." % [c["blurb"], Game.THUNDER["name"]],
 		"items": [
-			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": func(): _start_race(i),
+			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": _velo_enter.bind(i),
 				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
-				"detail": "He pushes %d W (%d%% of your FTP) on his %s. On your %s, hold more than %d W for the whole lap to beat him. Winner takes it all." % [
-					roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0), Game.THUNDER_BIKE, Game.bike()["name"], roundi(Game.thunder_watts())]},
+				"detail": ("McGee won't race anyone on the Rusty Trash Bike: come back on something better (My bikes, or the bike shop). " if _velo_rusty() else "") + "He pushes %d W (%d%% of your FTP) on his %s. On your %s, hold more than %d W for the whole lap to beat him. Winner takes it all." % [
+					roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0), Game.rival_bike()["name"], Game.bike()["name"], roundi(Game.thunder_watts())]},
 			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
 		]}
+
+
+## The Velodoughm turns the Rusty Trash Bike away at the door.
+func _velo_rusty() -> bool:
+	return Game.bike()["name"] == "Rusty Trash Bike"
+
+
+func _velo_enter(i: int) -> void:
+	if _velo_rusty():
+		Game.racer_says.emit("mcgee", Game.THUNDER["name"], "With that bike? Get out of here!!", "smug", Game.THUNDER["color"])
+		return
+	_start_race(i)
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a

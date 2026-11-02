@@ -261,7 +261,7 @@ func refresh_rivals() -> void:
 	for i in rival_state.size():
 		var info: Dictionary = Talk.rivals[i]
 		rival_state[i]["mass"] = Game.rival_mass(i)
-		rival_state[i]["bike"] = Game.rival_bike(info)
+		rival_state[i]["bike"] = Game.rival_bike()
 		rival_state[i]["ftp"] = Game.rival_ftp(info, Game.rival_mass(i))
 
 
@@ -1655,7 +1655,7 @@ func _spawn_rivals() -> void:
 		var p := astar.get_point_position(randi() % astar.get_point_count())
 		rival_state.append({"pos": p, "head": 0.0, "path": [], "state": "idle", "idle": randf_range(1.0, 5.0), "order": 0,
 			"stun": 0.0, "fall": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
-			"bike": Game.rival_bike(Talk.rivals[i]), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
+			"bike": Game.rival_bike(), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
 			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35)),
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "blocked": false})
 

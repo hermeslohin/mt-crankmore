@@ -32,7 +32,7 @@ const COURSES := [
 	# over "laps" laps against its guest (Game.THUNDER) alone. Entered from its own building in town (main._velo_menu).
 	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],
 		"entry": 50, "prize": 600, "seed": 61,
-		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He puts out 150% of your FTP on his own Carbon Crit Machine, so the better your bike, the less it takes to beat him. No drafting, no power-ups: just legs."},
+		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He puts out 150% of your FTP on his own Club Racer, so the better your bike, the less it takes to beat him. No drafting, no power-ups: just legs."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -1725,7 +1725,7 @@ func _build_riders() -> void:
 		var mass := Game.rival_mass(i)
 		var lane := ((i - (n - 1) * 0.5) * 0.1 + 0.05) * ROAD_W   # spread across the road
 		riders.append({"name": info["name"], "short": info["short"], "color": info["color"], "frame": Color(info["color"]).lerp(Color.WHITE, 0.2),
-			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(info), "player": false,
+			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(), "player": false,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": Game.rival_ftp(info, mass), "idx": i if i < Talk.rivals.size() else -1, "sig": info["sig"],
 			"trait": float(info.get("attack", 0.4)), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
@@ -1741,14 +1741,13 @@ func _build_riders() -> void:
 		if velo:   # Thunder Thighs McGee, down on the sprinter's line on the inside
 			lane = -velo_out * 0.3 * ROAD_W
 		riders.append({"name": guest["name"], "short": guest["short"], "color": guest["color"], "frame": Color(guest["color"]).lerp(Color.WHITE, 0.2),
-			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(guest), "player": false, "guest": true,
+			"s": 0.0, "v": 0.0, "lat": lane, "lane": lane, "bike": Game.rival_bike(), "player": false, "guest": true,
 			"phase": randf() * TAU, "done": false, "time": 0.0, "mass": mass, "ftp": maxf(top, Game.wkg()) * Game.CHAMPION_EDGE * mass, "idx": -1,
 			"trait": float(guest.get("attack", 0.6)), "power": 0.0, "wiggle": randf() * TAU,
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 		if velo:
 			riders[-1]["pace"] = Game.THUNDER_PACE   # that share of your FTP on his own bike (see _step_pacer)
-			riders[-1]["bike"] = Game.bike_named(Game.THUNDER_BIKE)
 			riders[-1]["mass"] = Game.THUNDER_MASS
 		else:
 			Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])

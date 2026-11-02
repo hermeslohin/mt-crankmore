@@ -5,21 +5,21 @@ extends Node
 ## "attack" (0-1): how often they break away from the group in a race (see race.gd ATTACK_EVERY).
 
 var roster: Array = [
-	{"name": "Cryptic Carl", "short": "Carl", "attack": 0.5, "color": Color(0.6, 0.35, 0.9), "ftp": 238.0, "tier": 2, "speed": 3.9,
+	{"name": "Cryptic Carl", "short": "Carl", "attack": 0.5, "color": Color(0.6, 0.35, 0.9), "ftp": 238.0, "speed": 3.9,
 		"sig": ["Mothman delivers faster than you. Just saying.", "They don't want you to know this, but I'm winning.", "That was no pothole. That was a cover-up."]},
-	{"name": "Super Sarah", "short": "Sarah", "attack": 0.6, "color": Color(0.9, 0.2, 0.25), "ftp": 222.0, "tier": 1, "speed": 3.6,
+	{"name": "Super Sarah", "short": "Sarah", "attack": 0.6, "color": Color(0.9, 0.2, 0.25), "ftp": 222.0, "speed": 3.6,
 		"sig": ["Have no fear, Super Sarah is here!", "My cape makes me 12% faster. Scientifically.", "I can't be late. I have to save the city. And deliver pizza."]},
-	{"name": "Cadence Carla", "short": "Carla", "attack": 0.2, "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "ftp_pct": 0.9, "tier": 3, "speed": 4.1,
+	{"name": "Cadence Carla", "short": "Carla", "attack": 0.2, "color": Color(0.1, 0.75, 0.75), "ftp": 262.0, "ftp_pct": 0.9, "speed": 4.1,
 		"sig": ["My cadence is 92. Yours is... a rumor.", "Statistically, you're losing.", "I've calculated your odds. Rounding error."]},
-	{"name": "Wheelie Wanda", "short": "Wanda", "attack": 0.85, "color": Color(1.0, 0.4, 0.7), "ftp": 246.0, "tier": 2, "speed": 4.0,
+	{"name": "Wheelie Wanda", "short": "Wanda", "attack": 0.85, "color": Color(1.0, 0.4, 0.7), "ftp": 246.0, "speed": 4.0,
 		"sig": ["Watch this wheelie! ...Did you watch? Rewind!", "I'm not showing off. This is just how I ride.", "Smile, I'm in your rearview mirror's highlight reel!"]},
-	{"name": "Gear Grinder Gus", "short": "Gus", "attack": 0.3, "color": Color(0.5, 0.4, 0.3), "ftp": 275.0, "tier": 3, "speed": 4.2,
+	{"name": "Gear Grinder Gus", "short": "Gus", "attack": 0.3, "color": Color(0.5, 0.4, 0.3), "ftp": 275.0, "speed": 4.2,
 		"sig": ["Back in my day we delivered uphill both ways.", "Kids these days and their fancy 'derailleurs'.", "I've worn out more chains than you've had hot dinners."]},
-	{"name": "Margherita Maya", "short": "Maya", "attack": 0.45, "color": Color(0.35, 0.8, 0.35), "ftp": 252.0, "tier": 2, "speed": 4.0,
+	{"name": "Margherita Maya", "short": "Maya", "attack": 0.45, "color": Color(0.35, 0.8, 0.35), "ftp": 252.0, "speed": 4.0,
 		"sig": ["Aw, sweetie, bless your little pedals.", "I'd say good luck, but I'd be lying. Nicely.", "Don't worry, there's always second place! (It's mine, though.)"]},
-	{"name": "Tubeless Tony", "short": "Tony", "attack": 0.1, "color": Color(0.95, 0.85, 0.2), "ftp": 215.0, "tier": 1, "speed": 3.5,
+	{"name": "Tubeless Tony", "short": "Tony", "attack": 0.1, "color": Color(0.95, 0.85, 0.2), "ftp": 215.0, "speed": 3.5,
 		"sig": ["Dude. Chill. I'm winning, but, like, chill.", "Nap time after this one, bro.", "Is it already over? I was vibing."]},
-	{"name": "Karate Kim", "short": "Kim", "attack": 0.75, "color": Color(0.85, 0.85, 0.9), "ftp": 258.0, "tier": 3, "speed": 4.1,
+	{"name": "Karate Kim", "short": "Kim", "attack": 0.75, "color": Color(0.85, 0.85, 0.9), "ftp": 258.0, "speed": 4.1,
 		"sig": ["I'm a black belt. In pedaling, too.", "Hi-YAH! That was me passing you.", "Focus. Breathe. Win."]},
 ]
 

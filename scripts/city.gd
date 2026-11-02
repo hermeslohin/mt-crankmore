@@ -2185,10 +2185,16 @@ func _update_uturn_hint() -> void:
 	uturn_hint = _path_len(behind, obj["pos"]) + 8.0 < _path_len(ahead, obj["pos"])
 
 
+## Getting hit by a car: a medical bill of ER_BILL[0]..ER_BILL[1] dollars, mostly at the low end (squaring a random
+## 0..1 makes half of all bills $100 or less, $117 on average), and CAR_DAMAGE[0]..CAR_DAMAGE[1] HP off the bike.
+const ER_BILL := [50, 250]
+const CAR_DAMAGE := [10, 30]
+
+
 func _hit_by_car(c: Dictionary) -> void:
 	p_fall = 0.0
 	p_fall_pizza = not carry.is_empty()
-	er_bill = 120 + int(p_speed * 35.0) + randi() % 60
+	er_bill = ER_BILL[0] + roundi((ER_BILL[1] - ER_BILL[0]) * pow(randf(), 2.0))
 	Game.add_money(-er_bill)
 	er_timer = 6.0
 	er_text = ER_JOKES.pick_random()
@@ -2211,8 +2217,11 @@ func _leave_er() -> void:
 	place_on(zone_anchor("er"))
 	rdir = 1.0
 	invuln = 2.0
-	if Game.damage_bike(40.0):   # hit by a car: the bike takes 40 HP
+	var hit := randi_range(CAR_DAMAGE[0], CAR_DAMAGE[1])   # hit by a car: the bike takes a knock too
+	if Game.damage_bike(hit):
 		Talk.say_random("bike_destroyed", true)
+	else:
+		Game.toast.emit("Your bike took a beating: -%d HP." % hit, Color(1.0, 0.6, 0.4))
 	Game.save_game()
 
 

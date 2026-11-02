@@ -128,6 +128,7 @@ Every race is an entry in `Race.COURSES` (`scripts/race.gd`), and new ones go on
 | `grade`, `roll` | Base grade and how much it rolls; a mountain gets a random run of climbs, ramps and drops from them |
 | `profile` | `[metres, grade]` stretches instead, levelled so the finish is as high as the start |
 | `bump` | Gentle rollers on top |
+| `hills` | Metres of climbing in a chain of rounded hills of random lengths and heights (`Race._hills`): flat at both ends, level finish, no slope over `HILL_MAX` (6.5%), which can cap the climb below what's asked |
 | `hairpins`, `stagger`, `tunnels` | Switchbacks stacked up the mountain, how ragged the stack is, how many tunnels |
 | `bends`, `gap` | Wide sweeping U-bends `gap` tiles across instead of hairpins (Flour Run, Baguette Boulevard) |
 | `flowers` | A valley of flower meadows: no snow, scree or cliffs, little forest |

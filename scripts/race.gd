@@ -34,14 +34,13 @@ const COURSES := [
 		"entry": 50, "prize": 600, "seed": 61,
 		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He puts out 150% of your FTP on his own Club Racer, so the better your bike, the less it takes to beat him. No drafting, no power-ups: just legs."},
 	# "road": a road race on town tarmac, the Flour Run's wide bends lined with houses and gardens (see _build_houses),
-	# with no obstacles, creeks or cliffs and only town wildlife: about 150 m up and as much back down, finishing level
-	# with the start. Yellow Jersey Yolanda (Game.YOLANDA) races it on her visits.
-	{"name": "Baguette Boulevard", "road": true, "length": 5000.0, "grade": 0.0, "roll": 0.0, "bump": 0.003, "entry": 60, "prize": 900, "seed": 77,
+	# with no obstacles, creeks or cliffs and only town wildlife. "hills": gentle rounded hills of random sizes (see
+	# _hills) adding up to that many metres of climbing, and as much back down, finishing level with the start.
+	# Yellow Jersey Yolanda (Game.YOLANDA) races it on her visits.
+	{"name": "Baguette Boulevard", "road": true, "length": 5000.0, "grade": 0.0, "roll": 0.0, "entry": 60, "prize": 900, "seed": 77,
 		"hairpins": 5, "bends": true, "gap": 40.0, "stagger": 0.12,
-		"profile": [[200, 0.0], [400, 0.061], [250, -0.076], [350, 0.061], [300, -0.065], [200, 0.0], [400, 0.078], [300, -0.087],
-			[300, 0.056], [250, -0.071], [350, 0.083], [400, -0.082], [250, 0.078], [300, -0.065], [350, 0.067], [300, -0.082],
-			[100, 0.0]],
-		"blurb": "5 km of tarmac through the houses of Lower Crankmore: rolling climbs and fast descents, 150 m up and all of it back down, about 13 minutes for the front of the pack. Front gardens, mailboxes and the whole street out cheering."},
+		"hills": 80.0,
+		"blurb": "5 km of tarmac through the houses of Lower Crankmore over gentle rolling hills, 80 m up and all of it back down, about 13 minutes for the front of the pack. Front gardens, mailboxes and the whole street out cheering."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -375,7 +374,8 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 	var p1 := rng.randf() * TAU
 	var p2 := rng.randf() * TAU
 	# a mountain gets a random run of climbs, ramps, flats and drops instead of the same rolling wave
-	var prof: Array = [] if course.has("profile") else _random_profile(rng, length, g0)
+	var prof: Array = [] if course.has("profile") or course.has("hills") else _random_profile(rng, length, g0)
+	var hills := _hills(length) if course.has("hills") else {}
 	var e := 0.0
 	var lo := 0.0
 	for i in M:
@@ -388,6 +388,8 @@ func _build_road(rng: RandomNumberGenerator) -> void:
 			g = _profile_grade(course["profile"], s)
 		g += float(course.get("bump", 0.0)) * (sin(TAU * s / 420.0 + p1) + 0.4 * sin(TAU * s / 160.0 + p2))
 		g = lerpf(0.01, clampf(g, MIN_GRADE, MAX_GRADE), smoothstep(0.0, 120.0, s))
+		if not hills.is_empty():   # (already flat at the start and the finish)
+			g = clampf(_hill_g(hills, s), MIN_GRADE, MAX_GRADE)
 		grade_a[i] = g
 		if i > 0 and s <= length:
 			e += g * ds_m
@@ -729,6 +731,58 @@ func _random_profile(rng: RandomNumberGenerator, length: float, g0: float) -> Ar
 
 
 ## Grade (fraction) at `s` metres along a [metres, grade] profile, eased over 40 m either side of each change.
+## A course's "hills": a chain of rounded hills of random lengths and heights. The road climbs from a valley to a top
+## and back down to the next valley, each slope an S-curve (half a cosine), so every top and bottom is rounded and
+## no slope is a straight ramp. The valleys sit near the start's height, so the finish is level with it, with HILL_FLAT m
+## of flat at either end. Scaled so the climbing adds up to course["hills"] metres, as long as no slope gets steeper
+## than HILL_MAX. Returns what _hill_g needs: {x: [knot m], h: [knot height m]}.
+const HILL_LEN := [240.0, 720.0]   # m from a valley to a top, or a top to a valley
+const HILL_FLAT := 220.0
+const HILL_MAX := 0.065
+func _hills(length: float) -> Dictionary:
+	var geo := RandomNumberGenerator.new()
+	geo.seed = int(course["seed"]) * 104729 + 3
+	var room := length - 2.0 * HILL_FLAT
+	var lens: Array = []
+	var total := 0.0
+	while total < room or lens.size() % 2 == 1:   # (an even count: up, down, ... ending on the way down)
+		var l := geo.randf_range(HILL_LEN[0], HILL_LEN[1])
+		lens.append(l)
+		total += l
+	var x: Array = [HILL_FLAT]
+	for l in lens:
+		x.append(float(x[-1]) + float(l) * room / total)
+	# valleys near the start's height (the first and the last on it), tops above both the valleys either side
+	var h: Array = []
+	for k in x.size():
+		h.append(0.0 if k == 0 or k == x.size() - 1 or k % 2 == 1 else geo.randf_range(-3.0, 14.0))
+	for k in range(1, x.size(), 2):
+		var run := minf(float(x[k]) - float(x[k - 1]), float(x[k + 1]) - float(x[k]))
+		h[k] = maxf(float(h[k - 1]), float(h[k + 1])) + run * geo.randf_range(0.034, 0.05)
+	var up := 0.0
+	var steep := 0.0
+	for k in x.size() - 1:
+		var d := float(h[k + 1]) - float(h[k])
+		up += maxf(0.0, d)
+		steep = maxf(steep, absf(d) * PI * 0.5 / (float(x[k + 1]) - float(x[k])))
+	var kk := minf(float(course["hills"]) / maxf(up, 0.001), HILL_MAX / maxf(steep, 0.0001))
+	for k in h.size():
+		h[k] = float(h[k]) * kk
+	return {"x": x, "h": h}
+
+
+## The grade of a course's hills (see _hills) `s` m along.
+func _hill_g(hl: Dictionary, s: float) -> float:
+	var x: Array = hl["x"]
+	if s <= float(x[0]) or s >= float(x[-1]):
+		return 0.0
+	var k := 0
+	while float(x[k + 1]) < s:
+		k += 1
+	var l := float(x[k + 1]) - float(x[k])
+	return (float(hl["h"][k + 1]) - float(hl["h"][k])) * PI * 0.5 / l * sin(PI * (s - float(x[k])) / l)
+
+
 func _profile_grade(profile: Array, s: float) -> float:
 	var g: float = profile[0][1]
 	var at := 0.0
@@ -1216,6 +1270,13 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 	house_lots.clear()
 	if paved():
 		_build_houses(rng)
+
+
+## The height (m) the course profile on the WEEHOO spans: the course's own climb, but at least CHART_MIN of its length,
+## so gentle hills look gentle instead of being stretched to fill the screen like a mountain.
+const CHART_MIN := 0.015
+func chart_top() -> float:
+	return maxf(gain, float(course["length"]) * CHART_MIN)
 
 
 ## A tarmac course outside the crit (the road race, "road"): town asphalt, rolling resistance and wildlife.

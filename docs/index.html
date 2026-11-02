@@ -99,6 +99,17 @@
   .icon { font-size: 26px; line-height: 1; margin-bottom: 10px; }
 
   .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .features.three { grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0 12px; }
+  .level { background: var(--panel-2); border: 3px solid var(--line); border-radius: 4px; padding: 16px; }
+  .level b { display: block; font-family: var(--pixel); font-size: 11px; color: var(--gold); margin-bottom: 10px; }
+  .level span { color: var(--muted); font-size: 15px; }
+  .level .pct { display: block; font-size: 26px; font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+  .challenges { list-style: none; margin: 18px 0 0; padding: 0; }
+  .challenges li { padding: 10px 0 10px 34px; position: relative; border-bottom: 2px dashed var(--line); }
+  .challenges li::before { content: "★"; position: absolute; left: 4px; color: var(--pizza); }
+  .challenges b { color: var(--ink); }
+  .challenges span { color: var(--muted); }
   figure { margin: 0; }
   figure img { border: 3px solid var(--line); border-radius: 4px; }
   figcaption { margin-top: 12px; }
@@ -125,7 +136,8 @@
   footer .tagline { margin-bottom: 10px; }
 
   @media (max-width: 860px) {
-    .hero .wrap, .next, .features { grid-template-columns: 1fr; }
+    .hero .wrap, .next, .features, .features.three { grid-template-columns: 1fr; }
+    .levels { grid-template-columns: repeat(2, 1fr); }
     .hero { padding-top: 32px; }
     nav ul { display: none; }
   }
@@ -141,6 +153,7 @@
     <a class="brand" href="#">MT. CRANKMORE</a>
     <ul>
       <li><a href="#ride">Ride it</a></li>
+      <li><a href="#level">Your level</a></li>
       <li><a href="#town">The town</a></li>
       <li><a href="#races">Races</a></li>
       <li><a href="#next">Coming next</a></li>
@@ -179,11 +192,25 @@
   </div>
 </section>
 
-<section id="town">
+<section id="level">
+  <div class="wrap">
+    <h2>Ride at your level</h2>
+    <p class="intro">Tell the game your <b>FTP</b> (the power you can hold for about an hour) and your weight, once, in Rider setup. Then pick a <b>difficulty</b> for how you feel today: it sets how hard the other riders go, as a share of what you can do. Fresh legs? Turn it up. Tired, or just spinning? Turn it down. Every rival, race and challenge in town follows it, so a race is a race whatever your FTP.</p>
+    <div class="levels">
+      <div class="level"><b>Easy</b><span class="pct">50%</span><span>A recovery spin</span></div>
+      <div class="level"><b>Medium</b><span class="pct">65%</span><span>A solid ride</span></div>
+      <div class="level"><b>Hard</b><span class="pct">80%</span><span>A proper workout</span></div>
+      <div class="level"><b>Ludicrous</b><span class="pct">100%</span><span>Race day legs</span></div>
+    </div>
+    <p class="small">Want the details? The <a href="https://github.com/hermeslohin/mt-crankmore/blob/dev/docs/difficulty.md">difficulty guide</a> has the formulas and what it takes to win each race.</p>
+  </div>
+</section>
+
+<section class="band" id="town">
   <div class="wrap">
     <h2>A town that keeps busy</h2>
-    <p class="intro">Day turns to night, the seasons change and there's always something going on: parades, fireworks, runaway dogs, robberies to break up and a bear up on the mountain.</p>
-    <div class="features">
+    <p class="intro">Day turns to night, the seasons change and there's always something going on: parades, fireworks, runaway dogs and robberies to break up.</p>
+    <div class="features three">
       <figure>
         <img src="delivery.png" alt="Delivering a pizza through town, steam rising off the box" width="1280" height="720" loading="lazy">
         <figcaption><h3>Deliver hot</h3><p>Grab an order from a glowing pizza window and get it there before it goes cold. The other couriers want it too.</p></figcaption>
@@ -193,12 +220,32 @@
         <figcaption><h3>Day, night and four seasons</h3><p>An hour-long day, street lamps at dusk, rain from spring to fall and snow all winter.</p></figcaption>
       </figure>
       <figure>
-        <img src="bear.png" alt="The ski patrol wheeling the player's bike away after a bear attack" width="1280" height="720" loading="lazy">
-        <figcaption><h3>Mind the bear</h3><p>Get caught and you wipe out, and the ski patrol has to bring you a new bike.</p></figcaption>
-      </figure>
-      <figure>
         <img src="session.png" alt="The Session over screen: power, cadence, heart rate and speed charts with markers for pizzas and races" width="1280" height="720" loading="lazy">
         <figcaption><h3>See what you rode</h3><p>When you finish, a timeline shows your power, cadence and speed, with every pizza, challenge and race result marked on it.</p></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="challenges">
+  <div class="wrap">
+    <div class="features">
+      <div>
+        <h2>Town challenges</h2>
+        <p class="intro" style="margin-bottom:0">While you deliver, the town throws in efforts that pay. Each one asks for a share of your FTP, so it's a real interval whatever your level. A few of them:</p>
+        <ul class="challenges">
+          <li><b>Catch the thief</b> <span>(110% of FTP): chase down a robber running from a shop.</span></li>
+          <li><b>Stop the bike thief</b> <span>(130%): he's off on a brand-new bike. Catch him for $300.</span></li>
+          <li><b>Beat the hot rod</b> <span>(120%): a drag race to a chequered line through town.</span></li>
+          <li><b>Race the kid</b> <span>(60%): a kid on a BMX wants a race. Don't lose.</span></li>
+          <li><b>Hill sprint</b> <span>(105%): beat the clock up one of the town's named hills.</span></li>
+          <li><b>Pizza rush</b> <span>(80%): five deliveries back to back, for a bonus.</span></li>
+          <li><b>Catch the dog</b> <span>(80%): a runaway dog has slipped its lead.</span></li>
+          <li><b>Seagulls!</b> <span>(90%): they want your pizza. Get away.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img src="race_arrow.png" alt="Racing the hot rod through town, a big red arrow painted on the road at the turn" width="1280" height="720" loading="lazy">
       </figure>
     </div>
   </div>

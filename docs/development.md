@@ -1,6 +1,6 @@
 # Developing Mt. Crankmore
 
-How the game is put together, how to run and test it, how the art is made, and how a release is cut. For playing the game see the [README](../README.md); for how rivals, races and challenges are balanced against your FTP see the [difficulty page](https://hermeslohin.github.io/mt-crankmore/difficulty.html) (`docs/difficulty.html`).
+How the game is put together, how to run and test it, how the art is made, and how a release is cut. For playing the game see the [README](../README.md); for how rivals, races and challenges are balanced against your FTP see the [difficulty page](difficulty.md).
 
 - [Requirements](#requirements)
 - [Running the game](#running-the-game)
@@ -232,4 +232,4 @@ The macOS export needs `textures/vram_compression/import_s3tc_bptc=true` (alread
 
 ## The website
 
-`docs/` is the game's site on GitHub Pages, published from `docs/` on the `dev` branch (switch it to `main` in the repository's Pages settings once `main` has it): `index.html` (the home page) and `difficulty.html` (balance and formulas). `.nojekyll` makes Pages serve the files as they are, so Markdown files in `docs/`, like this one, are read on GitHub rather than on the site. The screenshots are the README's: regenerate them with `PIZZA_DEBUG=readme`.
+`docs/` is the game's site on GitHub Pages, published from `docs/` on the `dev` branch (switch it to `main` in the repository's Pages settings once `main` has it): `index.html` is the home page. `.nojekyll` makes Pages serve the files as they are, so the Markdown documents in `docs/` (this one and `difficulty.md`, balance and formulas) are read on GitHub rather than on the site. The screenshots are the README's: regenerate them with `PIZZA_DEBUG=readme`.

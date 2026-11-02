@@ -38,8 +38,9 @@ const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between h
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
-## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him, and he goes exactly as
-## fast as you would at THUNDER_PACE of your FTP on your own bike, so beating him takes more than that. Art:
+## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him. He puts out THUNDER_PACE
+## of your FTP on his own bike (THUNDER_BIKE) at his own weight (THUNDER_MASS), so only your FTP sets his speed: a
+## better bike or a lighter you makes you faster, not him (see thunder_speed, thunder_watts). Art:
 ## bike_mcgee.png / bike_mcgee_fall.png, face_mcgee.png. "lines": what he says for each Talk category ("sig" otherwise).
 const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "tier": 3, "attack": 0.0,
 	"sig": ["These quads have their own postcode.", "I don't skip leg day. Leg day skips everything else.", "Do you even squat, bro?",
@@ -57,7 +58,9 @@ const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Col
 			"My quads... they've never felt this way before."],
 		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
 	}}
-const THUNDER_PACE := 1.5    # the share of YOUR FTP his speed matches
+const THUNDER_PACE := 1.5    # his watts, as a share of YOUR FTP
+const THUNDER_BIKE := "Carbon Crit Machine"
+const THUNDER_MASS := 75.0   # kg
 const MAX_RIVALS := 8
 
 var bikes: Array = [
@@ -262,6 +265,34 @@ func set_rival_count(n: int) -> void:
 # ---- physics -----------------------------------------------------------
 
 ## Steady-state speed (m/s) for a given power and grade (fraction, 0.05 = 5%). Rider mass defaults to the player's weight.
+## The bike called `bike_name` (from `bikes`).
+func bike_named(bike_name: String) -> Dictionary:
+	for b in bikes:
+		if b["name"] == bike_name:
+			return b
+	return bikes[0]
+
+
+## How fast McGee goes on flat smooth boards (m/s): THUNDER_PACE of your FTP on THUNDER_BIKE, at THUNDER_MASS.
+func thunder_speed() -> float:
+	var b := bike_named(THUNDER_BIKE)
+	return speed_from_power(ftp * THUNDER_PACE, b["mass"], b["cda"], b["crr"], 0.0, THUNDER_MASS)
+
+
+## The watts it takes you to match McGee on your current bike (flat, smooth boards): beat this to beat him.
+func thunder_watts() -> float:
+	return power_for_speed(thunder_speed(), bike()["mass"], bike()["cda"], bike()["crr"], 0.0)
+
+
+## The other way round from speed_from_power: the watts that hold `v` m/s.
+func power_for_speed(v: float, bike_mass: float, cda: float, crr: float, grade: float, rider_mass: float = -1.0) -> float:
+	if rider_mass < 0.0:
+		rider_mass = weight_kg
+	var m := rider_mass + bike_mass
+	var theta := atan(grade)
+	return v * (m * GRAVITY * (sin(theta) + crr * cos(theta)) + 0.5 * AIR_RHO * cda * v * v) / 0.975
+
+
 func speed_from_power(power: float, bike_mass: float, cda: float, crr: float, grade: float, rider_mass: float = -1.0) -> float:
 	if rider_mass < 0.0:
 		rider_mass = weight_kg

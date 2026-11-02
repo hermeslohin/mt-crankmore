@@ -32,7 +32,7 @@ const COURSES := [
 	# over "laps" laps against its guest (Game.THUNDER) alone. Entered from its own building in town (main._velo_menu).
 	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],
 		"entry": 50, "prize": 600, "seed": 61,
-		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He rides as fast as you would at 150% of your FTP. No drafting, no power-ups: just legs."},
+		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He puts out 150% of your FTP on his own Carbon Crit Machine, so the better your bike, the less it takes to beat him. No drafting, no power-ups: just legs."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -1747,7 +1747,9 @@ func _build_riders() -> void:
 			"air": 0.0, "air_tot": 1.0, "air_h": 0.0, "land": 0.0, "ob": 0, "wet": false,
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "down": 0.0, "fall": 0.0, "gv": 0, "draft": 0.0})
 		if velo:
-			riders[-1]["pace"] = Game.THUNDER_PACE   # rides at your speed for that share of your FTP (see _step_riders)
+			riders[-1]["pace"] = Game.THUNDER_PACE   # that share of your FTP on his own bike (see _step_pacer)
+			riders[-1]["bike"] = Game.bike_named(Game.THUNDER_BIKE)
+			riders[-1]["mass"] = Game.THUNDER_MASS
 		else:
 			Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
 	for r in riders:   # the group riding (see _step_riders)
@@ -1946,7 +1948,7 @@ func _step_riders(delta: float) -> void:
 			r["s"] = r["s"] + r["v"] * delta if lap > 0.0 else minf(r["s"] + r["v"] * delta, road_len)
 			r["phase"] += r["v"] * 14.0 / 60.0 * TAU * delta
 			continue
-		if r.has("pace"):   # Thunder Thighs: exactly your speed at "pace" x your FTP on your bike, no matter what
+		if r.has("pace"):   # Thunder Thighs: "pace" x your FTP on his own bike, no matter what
 			_step_pacer(k, delta)
 			continue
 		var finale: bool = goal_s() - float(r["s"]) < FINALE or (lap > 0.0 and crit_end_s <= 0.0 and crit_left() < 120.0)
@@ -2042,15 +2044,15 @@ func _step_riders(delta: float) -> void:
 		_end_race()
 
 
-## A pace rider (Thunder Thighs McGee): goes as fast as you would on your bike at r["pace"] times your FTP, so to beat
-## him you have to hold more than that. No drafting, no fatigue, no attacks.
+## A pace rider (Thunder Thighs McGee): r["pace"] times your FTP, on his own bike at his own weight, so your bike and
+## weight change how fast you go but not him. No drafting, no fatigue, no attacks.
 func _step_pacer(k: int, delta: float) -> void:
 	var r: Dictionary = riders[k]
-	var b := Game.bike()
-	r["power"] = Game.ftp * float(r["pace"])   # (the watts it takes you to match him)
+	var b: Dictionary = r["bike"]
+	r["power"] = Game.ftp * float(r["pace"])
 	r["draft"] = 0.0
 	r["wheel"] = -1
-	var vt := Game.speed_from_power(Game.ftp * float(r["pace"]), b["mass"], b["cda"], _crr(b), _grade_at(r["s"]))
+	var vt := Game.speed_from_power(r["power"], b["mass"], b["cda"], _crr(b), _grade_at(r["s"]), r["mass"])
 	if float(r["down"]) > 0.0:
 		vt = 0.0
 	r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))

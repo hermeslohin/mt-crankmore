@@ -812,7 +812,7 @@ func _crit_menu() -> Dictionary:
 
 
 ## The Velodoughm's entrance on the east edge of town: one lap of the indoor wooden track against Thunder Thighs McGee,
-## who rides as fast as you would at Game.THUNDER_PACE of your FTP (race.gd, a course with "velo").
+## who puts out Game.THUNDER_PACE of your FTP on his own bike (race.gd, a course with "velo").
 func _velo_menu() -> Dictionary:
 	var i: int = race.COURSES.find_custom(func(c): return c.get("velo", false))
 	var c: Dictionary = race.COURSES[i]
@@ -820,7 +820,8 @@ func _velo_menu() -> Dictionary:
 		"items": [
 			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": func(): _start_race(i),
 				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
-				"detail": "Hold more than %d W (%d%% of your FTP) for the whole lap to beat him. Winner takes it all." % [roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0)]},
+				"detail": "He pushes %d W (%d%% of your FTP) on his %s. On your %s, hold more than %d W for the whole lap to beat him. Winner takes it all." % [
+					roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0), Game.THUNDER_BIKE, Game.bike()["name"], roundi(Game.thunder_watts())]},
 			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
 		]}
 

@@ -1127,6 +1127,7 @@ func _clear_of(s: float, gap: float, kind: String = "") -> bool:
 func _build_features(rng: RandomNumberGenerator) -> void:
 	var length: float = course["length"]
 	obstacles.clear()
+	balloon_rings.clear()
 	if lap > 0.0:   # a crit: no obstacles, one arch over the line (its crowds: RaceLife._build_crit_crowd)
 		fords = PackedFloat32Array()
 		statics.clear()
@@ -1134,6 +1135,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 			_build_velo_arena()
 		else:
 			_put_static(2, {"kind": "balloons", "s": 0.0}, [])
+			_build_balloon_arch()
 		return
 	for st in streams:
 		for i in M - 1:
@@ -1436,6 +1438,61 @@ func _put_fan(s: float, off: float, rng: RandomNumberGenerator) -> void:
 
 
 ## Static things go in the bucket of their depth diagonal (or the deepest one of `shape`).
+## The crit's balloon arch over the start/finish line: a thick garland of rings of three balloons, the colours
+## spiralling along it, up from each kerb and across the top with rounded corners (an arch reads best as a gantry in
+## this view). Each ring is depth-sorted on its own, by the point on the ground under it (see _draw), so riders
+## behind the arch or under it pass beneath the balloons and riders in front of it go over them.
+var balloon_rings: Array = []   # {"p": screen centre, "tng": along the garland, "q": ring number, "foot": world point under it}
+
+func _build_balloon_arch() -> void:
+	balloon_rings.clear()
+	var pz := _pose(0.0, 0.0)
+	var n: Vector2 = pz["n"]
+	var w := ROAD_HW + 0.35
+	var a := Iso.to_screen(pz["pos"] - n * w, pz["z"])
+	var c := Iso.to_screen(pz["pos"] + n * w, pz["z"])
+	var up := Vector2(0.0, -BALLOON_ARCH_H)
+	var path := PackedVector2Array()
+	var corners := [a, a + up, c + up, c]
+	for k in 3:
+		for q in 12:
+			path.append((corners[k] as Vector2).lerp(corners[k + 1], q / 12.0))
+	path.append(c)
+	for pass_ in 3:   # round the corners off
+		var soft := PackedVector2Array([path[0]])
+		for i in range(1, path.size() - 1):
+			soft.append((path[i - 1] + path[i] * 2.0 + path[i + 1]) * 0.25)
+		soft.append(path[path.size() - 1])
+		path = soft
+	var cum := PackedFloat32Array([0.0])
+	for i in range(1, path.size()):
+		cum.append(cum[i - 1] + path[i].distance_to(path[i - 1]))
+	var rings := maxi(8, int(cum[path.size() - 1] / 5.0))
+	var j := 0
+	for q in rings + 1:
+		var d := cum[path.size() - 1] * q / float(rings)
+		while j < path.size() - 2 and cum[j + 1] < d:
+			j += 1
+		var p := path[j].lerp(path[j + 1], clampf(inverse_lerp(cum[j], cum[j + 1], d), 0.0, 1.0))
+		# the ground under it: how far across from kerb a to kerb c it is on screen
+		var f := clampf((p - a).dot(c - a) / (c - a).length_squared(), 0.0, 1.0)
+		balloon_rings.append({"p": p, "tng": (path[j + 1] - path[j]).normalized(), "q": q, "foot": (pz["pos"] as Vector2) - n * w + n * (2.0 * w * f)})
+
+
+func _draw_balloon_ring(ring: Dictionary) -> void:
+	const COLS := [Color(0.95, 0.2, 0.2), Color(0.97, 0.97, 0.97), Color(0.25, 0.5, 0.95), Color(1.0, 0.85, 0.2)]
+	var tng: Vector2 = ring["tng"]
+	var across := Vector2(-tng.y, tng.x)
+	var q: int = ring["q"]
+	var bob := sin(t_ * 2.2 + q * 0.7) * 0.6
+	for k in 3:
+		var bp: Vector2 = ((ring["p"] as Vector2) + across * (k - 1) * 3.6 + Vector2(0.0, bob)).round()
+		var col: Color = COLS[(q + k) % COLS.size()]
+		draw_circle(bp, 4.0, Iso.OUTLINE)
+		draw_circle(bp, 3.2, col)
+		draw_rect(Rect2(bp + Vector2(-2, -2), Vector2(1, 1)), col.lightened(0.6))
+
+
 func _put_static(type: int, data: Dictionary, shape: Array) -> void:
 	var p: Vector2 = data["pos"] if data.has("pos") else _pose(float(data.get("s", 0.0)), 0.0)["pos"]
 	if data.has("s") and not data.has("pos"):
@@ -1751,12 +1808,33 @@ func _build_riders() -> void:
 			riders[-1]["mass"] = Game.THUNDER_MASS
 		else:
 			Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
+	_grid_up()
 	for r in riders:   # the group riding (see _step_riders)
 		if not r["player"]:
 			r.merge({"home": r["lane"], "tired_m": 0.0, "attack": 0.0, "pull_t": 0.0, "pull_len": randf_range(PULL_TIME[0], PULL_TIME[1]),
 				"swing": 0.0, "swing_to": 0.0})
 			r["attack_in"] = maxf(20.0, _attack_gap(r, false) * randf_range(0.4, 1.0))
 	attack_talk = 0.0
+
+
+## The start grid: two abreast, rows GRID_GAP apart, everyone (you too) in a random order. The back row is on the
+## line and the rest line up up the road from it (a point-to-point course has no road behind its start). The
+## Velodoughm's two are one row already, and a rescue is you alone.
+const GRID_GAP := 4.0    # m between rows
+const GRID_LANE := 0.3   # each column's distance from the middle of the road, in road widths
+
+func _grid_up() -> void:
+	if velo or rescue:
+		return
+	var order := range(riders.size())
+	order.shuffle()
+	var rows := (order.size() + 1) / 2
+	for slot in order.size():
+		var r: Dictionary = riders[order[slot]]
+		var lane := (-GRID_LANE if slot % 2 == 0 else GRID_LANE) * ROAD_W
+		r["s"] = float(rows - 1 - slot / 2) * GRID_GAP
+		r["lat"] = lane
+		r["lane"] = lane
 
 
 ## A rider says something: one of your usual rivals through Talk; the guest champion, or a rival who only came out for
@@ -2859,6 +2937,14 @@ func _draw() -> void:
 			if not buckets.has(d):
 				buckets[d] = []
 			buckets[d].append([3, mv[1]])
+	for ring in balloon_rings:   # after the riders, so a rider in the same row is under the balloons
+		var fp: Vector2 = ring["foot"]
+		if absf(fp.x - me_pos.x) > VIEW_R + 4 or absf(fp.y - me_pos.y) > VIEW_R + 4:
+			continue
+		var d := _diag(fp)
+		if not buckets.has(d):
+			buckets[d] = []
+		buckets[d].append([3, _draw_balloon_ring.bind(ring)])
 	if not patrol.is_empty():
 		var sp := _patrol_at(patrol["t"])
 		if not sp.is_empty():
@@ -3346,52 +3432,13 @@ func _draw_deco(e: Dictionary) -> void:
 			var b := Iso.to_screen(pz["pos"], pz["z"])
 			_wide(b, pz, ROAD_W, func(): Sprites.draw_vehicle(self, "obj_race_arch", b + Vector2(0, -34), along))
 			draw_string(font, b + Vector2(-60, -88), e["label"], HORIZONTAL_ALIGNMENT_CENTER, 120.0, 12, Color(0.15, 0.15, 0.2) if e["label"] == "START" else Color.WHITE)
-		"balloons":   # a crit's start/finish: an arch of balloons over the road, bobbing a little
+		"balloons":   # a crit's start/finish: the arch's feet (its balloons: balloon_rings, drawn with the riders)
 			var pz: Dictionary = e["pz"]
 			var n: Vector2 = pz["n"]
 			var w := ROAD_HW + 0.35
-			var a := Iso.to_screen(pz["pos"] - n * w, pz["z"])
-			var c := Iso.to_screen(pz["pos"] + n * w, pz["z"])
-			for foot in [a, c]:
+			for foot in [Iso.to_screen(pz["pos"] - n * w, pz["z"]), Iso.to_screen(pz["pos"] + n * w, pz["z"])]:
 				draw_rect(Rect2(foot - Vector2(4, 3), Vector2(8, 5)), Iso.OUTLINE)
 				draw_rect(Rect2(foot - Vector2(3, 2), Vector2(6, 3)), Color(0.45, 0.45, 0.5))
-			# a thick garland of rings of three balloons, the colours spiralling along it: up from each kerb and across the
-			# top with rounded corners (an arch reads best as a gantry in this view)
-			var cols := [Color(0.95, 0.2, 0.2), Color(0.97, 0.97, 0.97), Color(0.25, 0.5, 0.95), Color(1.0, 0.85, 0.2)]
-			var up := Vector2(0.0, -BALLOON_ARCH_H)
-			var path := PackedVector2Array()
-			var corners := [a, a + up, c + up, c]
-			for k in 3:
-				var p0: Vector2 = corners[k]
-				var p1: Vector2 = corners[k + 1]
-				for q in 12:
-					path.append(p0.lerp(p1, q / 12.0))
-			path.append(c)
-			for pass_ in 3:   # round the corners off
-				var soft := PackedVector2Array([path[0]])
-				for i in range(1, path.size() - 1):
-					soft.append((path[i - 1] + path[i] * 2.0 + path[i + 1]) * 0.25)
-				soft.append(path[path.size() - 1])
-				path = soft
-			var cum := PackedFloat32Array([0.0])
-			for i in range(1, path.size()):
-				cum.append(cum[i - 1] + path[i].distance_to(path[i - 1]))
-			var rings := maxi(8, int(cum[path.size() - 1] / 5.0))
-			var j := 0
-			for q in rings + 1:
-				var d := cum[path.size() - 1] * q / float(rings)
-				while j < path.size() - 2 and cum[j + 1] < d:
-					j += 1
-				var p := path[j].lerp(path[j + 1], clampf(inverse_lerp(cum[j], cum[j + 1], d), 0.0, 1.0))
-				var tng := (path[j + 1] - path[j]).normalized()
-				var across := Vector2(-tng.y, tng.x)
-				var bob := sin(t_ * 2.2 + q * 0.7) * 0.6
-				for k in 3:
-					var bp: Vector2 = (p + across * (k - 1) * 3.6 + Vector2(0.0, bob)).round()
-					var col: Color = cols[(q + k) % cols.size()]
-					draw_circle(bp, 4.0, Iso.OUTLINE)
-					draw_circle(bp, 3.2, col)
-					draw_rect(Rect2(bp + Vector2(-2, -2), Vector2(1, 1)), col.lightened(0.6))
 		"sign":
 			var pz: Dictionary = e["pz"]
 			var b := Iso.to_screen(pz["pos"] + (pz["n"] as Vector2) * (1.1 + ROAD_GROW), pz["z"])

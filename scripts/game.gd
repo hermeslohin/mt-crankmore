@@ -118,7 +118,7 @@ var bikes: Array = [
 	# "gift": not for sale; yours for beating the Tour de Crankmore champion (see Race._end_race)
 	{"name": "Champion's Bike", "art": "champion", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
 		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.",
-		"good": "The lightest, most aero and toughest bike in the game.",
+		"good": "The lightest and toughest bike in the game, and great on every course.",
 		"bad": "There's only one: you have to beat Maillot Max to get it."},
 	# "gift": not for sale; yours for beating Yellow Jersey Yolanda on Baguette Boulevard (see Race._end_race). A tri bike
 	# with aero bars: the most aero bike there is, so the fastest on tarmac, but poor on gravel and twitchy in the corners

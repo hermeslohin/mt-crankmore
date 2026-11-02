@@ -74,10 +74,10 @@ var bikes: Array = [
 		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain.",
 		"good": "Cheap, and a big step up from the trash bike.",
 		"bad": "Still heavy, upright and draggy. Not much of a racer."},
-	{"name": "Gravel Grinder", "art": "gravel", "price": 8000, "mass": 8.3, "cda": 0.32, "crr": 0.0056, "hp": 110.0, "gravel": 0.43, "turn": 1.05,
+	{"name": "Gravel Grinder", "art": "gravel", "price": 3000, "mass": 8.3, "cda": 0.32, "crr": 0.0056, "hp": 110.0, "gravel": 0.43, "turn": 1.05,
 		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast.",
 		"good": "The best bike on gravel by far, so the mountain races are its home.",
-		"bad": "Costs the most, and on tarmac it's only as quick as the rivals' bikes."},
+		"bad": "Heavier than the race bikes, and on tarmac only as quick as the rivals' bikes."},
 	{"name": "Carbon Crit Machine", "art": "carbon", "price": 2600, "mass": 7.2, "cda": 0.293, "crr": 0.0047, "hp": 130.0, "gravel": 0.68, "turn": 1.15,
 		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one.",
 		"good": "Light, slippery and sharp in the corners. Quick round town and in the Crusty Crit.",
@@ -145,8 +145,16 @@ func bike_hp() -> float:
 	return hp.get(equipped, 0.0)
 
 
-func hp_ratio() -> float:
-	return clampf(bike_hp() / float(bike()["hp"]), 0.0, 1.0)
+## The share of its HP a bike has left: the one you're riding, or bike `i`.
+func hp_ratio(i: int = -1) -> float:
+	if i < 0:
+		i = equipped
+	return clampf(hp.get(i, 0.0) / float(bikes[i]["hp"]), 0.0, 1.0)
+
+
+## Whether any bike in the garage is fit to race (more than 10% HP left).
+func can_race() -> bool:
+	return owned.any(func(i): return hp_ratio(i) > 0.1)
 
 
 ## Returns true if the bike was destroyed by this damage.

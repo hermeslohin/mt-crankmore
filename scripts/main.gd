@@ -460,10 +460,11 @@ func _new_game() -> void:
 
 
 func _start_or_setup() -> void:
+	var into_town := func(): _pick_bike("Head into town", _start_game, _show_title)
 	if Game.setup_done:
-		_start_game()
+		into_town.call()
 	else:
-		_open_setup(_start_game)
+		_open_setup(into_town)
 
 
 # ---- rider setup ---------------------------------------------------------
@@ -607,19 +608,56 @@ func _open_garage() -> void:
 		for i in Game.owned:
 			var b: Dictionary = Game.bikes[i]
 			var riding: bool = i == Game.equipped
-			var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
-			var hp_now: float = Game.hp.get(i, 0.0)
 			items.append({"label": ("%s   [riding]" if riding else "%s") % b["name"], "enabled": not riding,
 				"fn": func():
 					Game.equipped = i
 					Game.save_game()
 					Game.toast.emit("Now riding the %s" % b["name"], Color(0.5, 1.0, 0.6))
 					_open_garage(),
-				"image": _bike_image(b),
-				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"],
-					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"], _bike_good_bad(b)]})
+				"image": _bike_image(b), "detail": _owned_bike_detail(i)})
 		items.append({"label": "Back", "fn": _open_pause, "detail": ""})
 		return {"title": "My bikes", "sub": "%d bike%s in the garage. Riding: %s" % [Game.owned.size(), "" if Game.owned.size() == 1 else "s", Game.bike()["name"]], "items": items})
+
+
+## An owned bike's line in My bikes and the bike picker: blurb, weight, HP left, speed at your FTP, handling, gravel drag,
+## and what it's good and bad at.
+func _owned_bike_detail(i: int) -> String:
+	var b: Dictionary = Game.bikes[i]
+	var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
+	return "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"],
+		"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(Game.hp.get(i, 0.0)), int(b["hp"]), at_ftp, b["turn"],
+		b["gravel"], _bike_good_bad(b)]
+
+
+## Heading into town or to a start line: pick which bike from the garage to ride, starting on the one you rode last.
+## `go` runs once it's picked; `back` is the menu's Back. Skipped with only one bike. On race day (`race_day`), bikes with
+## 10% HP or less stay in the garage.
+func _pick_bike(title: String, go: Callable, back: Callable, race_day := false) -> void:
+	if Game.owned.size() < 2:
+		go.call()
+		return
+	hud.open_menu(func():
+		var items: Array = []
+		for i in Game.owned:
+			var b: Dictionary = Game.bikes[i]
+			var fit: bool = not race_day or Game.hp_ratio(i) > 0.1
+			items.append({"label": ("%s   [last ridden]" if i == Game.equipped else "%s") % b["name"] + ("" if fit else "   (too broken to race)"),
+				"enabled": fit, "image": _bike_image(b), "detail": _owned_bike_detail(i),
+				"fn": func():
+					Game.equipped = i
+					Game.save_game()
+					go.call()})
+		items.append({"label": "Back", "fn": back, "detail": ""})
+		return {"title": title, "sub": "Which bike from the garage? %d to choose from." % Game.owned.size(), "items": items})
+	var at := Game.owned.find(Game.equipped)
+	if at > 0:
+		hud.menu_index = at
+		hud._rebuild_menu()
+
+
+## Pick a bike for race `i` (from the menu `back` builds), then line up.
+func _race_bike(i: int, back: Callable, champion := false) -> void:
+	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], _start_race.bind(i, champion), func(): hud.open_menu(back), true)
 
 
 ## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
@@ -790,7 +828,7 @@ func _race_menu() -> Dictionary:
 		if c.get("crit", false) or c.get("velo", false):
 			continue   # raced from their own entrances (see _crit_menu, _velo_menu)
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
-			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			"fn": func(): _race_bike(i, _race_menu), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Your bike only loses HP if a rival knocks you off (5 HP a time)." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Mt. Crankmore Race HQ", "sub": "All %d racers in town are warming up. You can hear them talking about you." % Talk.roster.size(), "items": items}
@@ -803,7 +841,7 @@ func _champion_menu() -> Dictionary:
 		if c.get("crit", false) or c.get("velo", false):
 			continue
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
-			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			"fn": func(): _race_bike(i, _champion_menu, true), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
 	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
 	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
@@ -816,8 +854,8 @@ func _crit_menu() -> Dictionary:
 	var c: Dictionary = race.COURSES[i]
 	return {"title": "Crusty Crit", "sub": "%s\nAll %d racers in town are signing on." % [c["blurb"], Talk.roster.size()],
 		"items": [
-			{"label": "Enter the Crusty Crit    entry $%d   prize pool $%d" % [c["entry"], c["prize"]], "fn": func(): _start_race(i),
-				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			{"label": "Enter the Crusty Crit    entry $%d   prize pool $%d" % [c["entry"], c["prize"]], "fn": func(): _race_bike(i, _crit_menu),
+				"enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 				"detail": "Most laps wins; on the same lap, whoever crosses the line first. Payouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%."},
 			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
 		]}
@@ -831,7 +869,7 @@ func _velo_menu() -> Dictionary:
 	return {"title": "The Velodoughm", "sub": "%s\n%s is stretching his quads by the rail. Loudly." % [c["blurb"], Game.THUNDER["name"]],
 		"items": [
 			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": _velo_enter.bind(i),
-				"enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+				"enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 				"detail": ("McGee won't race anyone on the Rusty Trash Bike: come back on something better (My bikes, or the bike shop). " if _velo_rusty() else "") + "He pushes %d W (%d%% of your FTP) on his %s. On your %s, hold more than %d W for the whole lap to beat him. Winner takes it all." % [
 					roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0), Game.rival_bike()["name"], Game.bike()["name"], roundi(Game.thunder_watts())]},
 			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
@@ -844,10 +882,12 @@ func _velo_rusty() -> bool:
 
 
 func _velo_enter(i: int) -> void:
-	if _velo_rusty():
-		Game.racer_says.emit("mcgee", Game.THUNDER["name"], "With that bike? Get out of here!!", "smug", Game.THUNDER["color"])
-		return
-	_start_race(i)
+	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], func():
+		if _velo_rusty():
+			hud.open_menu(_velo_menu)
+			Game.racer_says.emit("mcgee", Game.THUNDER["name"], "With that bike? Get out of here!!", "smug", Game.THUNDER["color"])
+			return
+		_start_race(i), func(): hud.open_menu(_velo_menu), true)
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a

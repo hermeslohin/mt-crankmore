@@ -3,8 +3,10 @@ extends Node
 ## for the player: it installs it into bridge/.venv, launches it in --managed mode, and sends it
 ## scan / connect / disconnect commands from the Connect Trainer screen. The helper also finds and
 ## connects Wi-Fi trainers (Direct Connect); to the game they are just devices with "wifi": true.
-## Bridge -> game (port 9871): {"type":"data", "power","cadence","speed","buttons":[...],"trainer","controller"}
-##                             {"type":"status", "scanning", "devices":[...], "trainer":{...}, "controller":{...}, "error"}
+## Heart rate comes from a strap of its own (role "hrm") or from the trainer, which can relay a strap paired to it
+## (a Wahoo KICKR passes on an ANT+ strap); the bridge sends the freshest, a strap first, as "hr" (0 = none).
+## Bridge -> game (port 9871): {"type":"data", "power","cadence","speed","buttons":[...],"trainer","controller","hr","hr_source"}
+##                             {"type":"status", "scanning", "devices":[...], "trainer":{...}, "controller":{...}, "hrm":{...}, "error"}
 ## Game -> bridge (port 9872): {"grade": percent, "gear": ratio, "mass": kg} or {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}
 ## With no bridge running, the keyboard stands in for the trainer and controllers.
 ## Virtual shifting: a 21-speed bike, gear 1 (easiest) to 21 (hardest). LS1 (left shifter) shifts
@@ -36,6 +38,11 @@ var trainer_speed_kmh := 0.0
 var trainer_live := false
 var _lost_trainer := false   # it dropped out and hasn't come back yet
 var controller_live := false
+var heart_rate := 0               # bpm, while hr_live
+var hr_live := false
+var hr_source := ""               # "hrm" (a strap of its own) or "trainer" (relayed by the trainer)
+var hr_seen := false              # a heart rate has come in since the game started (the WEEHOO keeps its row from then on)
+var last_hr_ms := -100000
 var bridge_live := false
 var last_msg_ms := -100000
 var last_trainer_ms := -100000
@@ -274,6 +281,8 @@ func _process(delta: float) -> void:
 		_release_all()
 	elif now - last_trainer_ms > 2500:
 		trainer_live = false
+	if now - last_hr_ms > 2500:
+		hr_live = false
 	# say so when the trainer drops out mid-ride (you'd otherwise just grind to a halt), and when it's back
 	if had_trainer and not trainer_live:
 		_lost_trainer = true
@@ -310,6 +319,15 @@ func _on_message(d: Dictionary) -> void:
 		status = d
 		return
 	controller_live = bool(d.get("controller", false))
+	var bpm := int(d.get("hr", 0))
+	if bpm > 0:
+		heart_rate = bpm
+		hr_source = str(d.get("hr_source", ""))
+		hr_live = true
+		hr_seen = true
+		last_hr_ms = last_msg_ms
+	else:
+		hr_live = false
 	if bool(d.get("trainer", false)):
 		trainer_live = true
 		last_trainer_ms = last_msg_ms

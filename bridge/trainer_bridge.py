@@ -9,6 +9,8 @@ Godot has no Bluetooth LE support, so this small program talks BLE and relays ov
   or a power meter (Cycling Power, 0x1818: pedals, cranks, spiders) -> power / cadence -> game
      (no resistance to control: hills and virtual gears don't change how hard it feels, shift the real bike)
   handlebar controllers (proprietary, service 0xFC82) -> button presses -> game
+  heart rate (Heart Rate, 0x180D): a Bluetooth strap or watch, or the trainer itself -> bpm -> game
+     (a Wahoo KICKR relays an ANT+ or Bluetooth strap paired to it, over Bluetooth or Direct Connect)
 
 Wi-Fi / Ethernet trainers (Wahoo KICKR and others with "Direct Connect", a.k.a. DIRCON) work too: they are found over
 mDNS (needs the zeroconf package; without it only Bluetooth is used) and carry the same FTMS / Cycling Power services
@@ -61,6 +63,9 @@ FTMS_CONTROL_POINT = "00002ad9-0000-1000-8000-00805f9b34fb"
 CPS_SERVICE = "00001818-0000-1000-8000-00805f9b34fb"       # Cycling Power: power meters (and many trainers too)
 CP_MEASUREMENT = "00002a63-0000-1000-8000-00805f9b34fb"
 
+HR_SERVICE = "0000180d-0000-1000-8000-00805f9b34fb"        # Heart Rate: straps, watches, and trainers that relay one
+HR_MEASUREMENT = "00002a37-0000-1000-8000-00805f9b34fb"
+
 CTRL_SERVICE = "0000fc82-0000-1000-8000-00805f9b34fb"
 CTRL_ASYNC = "00000002-19ca-4651-86e5-fa29dcdd09d1"      # notifications: buttons
 CTRL_SYNC_RX = "00000003-19ca-4651-86e5-fa29dcdd09d1"     # write: handshake
@@ -90,7 +95,9 @@ BUTTONS_FILE = Path(__file__).with_name("buttons.json")
 DEVICES_FILE = Path(__file__).with_name("devices.json")
 LOG_FILE = Path(__file__).with_name("bridge.log")    # --managed: what happened, for when something goes wrong
 STALL_S = 8.0       # no data from the trainer / power meter this long while "connected": drop it and reconnect
-ROLES = ("trainer", "controller")
+HR_STALE_S = 5.0    # a heart rate older than this isn't sent to the game
+HR_STALL_S = 30.0   # a strap that sends nothing this long (taken off and put on again) is dropped and reconnected
+ROLES = ("trainer", "controller", "hrm")
 
 
 class State:
@@ -101,6 +108,7 @@ class State:
         self.trainer = False
         self.controller = False
         self.trainer_seen = 0.0
+        self.hr = {"hrm": (0, 0.0), "trainer": (0, 0.0)}   # source -> (bpm, when): a strap of its own, or the trainer's relay
         self.pressed = set()
         self.taps = set()           # buttons pressed since the last packet, so a quick tap is never missed
         self.grade = 0.0
@@ -110,12 +118,21 @@ class State:
         self.recorder = None        # --inspect: called with every raw controller message
         self.control_ready = False
         # what the game asked for, and what is actually happening
-        self.want = {"trainer": None, "controller": None}
+        self.want = {"trainer": None, "controller": None, "hrm": None}
         self.conn = {r: {"state": "idle", "name": "", "address": ""} for r in ROLES}
         self.scan_on = False
         self.error = ""
         self.last_ping = time.time()
         self.quit = False
+
+    def heart_rate(self):
+        """(bpm, source) from the freshest source, a strap of its own before the trainer's relay; (0, "") without one."""
+        now = time.time()
+        for src in ("hrm", "trainer"):
+            bpm, at = self.hr[src]
+            if bpm > 0 and now - at < HR_STALE_S:
+                return bpm, src
+        return 0, ""
 
 
 _log_file = None
@@ -171,8 +188,13 @@ def is_power_meter(dev, adv):
     return CPS_SERVICE in u and FTMS_SERVICE not in u
 
 
+def is_hrm(dev, adv):
+    """A heart rate strap or watch. A trainer that also offers heart rate is a trainer (its heart rate comes along)."""
+    return HR_SERVICE in uuids(adv) and not is_trainer(dev, adv)
+
+
 def is_controller(dev, adv):
-    if is_trainer(dev, adv) or getattr(dev, "wifi", False):
+    if is_trainer(dev, adv) or is_hrm(dev, adv) or getattr(dev, "wifi", False):
         return False
     return (CTRL_SERVICE in uuids(adv) or CTRL_COMPANY_ID in (adv.manufacturer_data or {})
             or "zwift" in name_of(dev, adv).lower())
@@ -300,12 +322,13 @@ class Discovery:
                 continue
             trainer = is_trainer(dev, adv)
             controller = is_controller(dev, adv)
-            if not (trainer or controller):
+            hrm = is_hrm(dev, adv)
+            if not (trainer or controller or hrm):
                 continue
             out.append({"address": addr, "name": name_of(dev, adv) or "(unnamed)", "rssi": adv.rssi or -99,
-                        "kind": "trainer" if trainer else "controller", "power_meter": is_power_meter(dev, adv),
-                        "wifi": getattr(dev, "wifi", False)})
-        out.sort(key=lambda d: (d["kind"] != "trainer", -d["rssi"]))
+                        "kind": "trainer" if trainer else "hrm" if hrm else "controller", "power_meter": is_power_meter(dev, adv),
+                        "wifi": getattr(dev, "wifi", False), "heart_rate": HR_SERVICE in uuids(adv)})
+        out.sort(key=lambda d: (["trainer", "hrm", "controller"].index(d["kind"]), -d["rssi"]))
         return out
 
 
@@ -429,6 +452,7 @@ async def power_meter_session(client, state: State, addr: str):
 
 
 async def trainer_session(client, state: State, addr: str):
+    await start_heart_rate(client, state, "trainer")
     if client.services.get_service(FTMS_SERVICE) is None:
         if client.services.get_service(CPS_SERVICE) is not None:
             await power_meter_session(client, state, addr)
@@ -496,6 +520,52 @@ async def trainer_session(client, state: State, addr: str):
         await asyncio.sleep(0.25)
     state.trainer = False
     state.control_ready = False
+
+
+# ---------------------------------------------------------------- heart rate
+
+def parse_heart_rate(data: bytes):
+    """Heart Rate Measurement: flags, then the bpm as a u8 (or a u16 with flag bit 0). None while a strap that can
+    tell says it has no skin contact."""
+    flags = data[0]
+    if flags & 0x04 and not flags & 0x02:      # sensor contact supported, and not detected
+        return None
+    return struct.unpack_from("<H", data, 1)[0] if flags & 0x01 else data[1]
+
+
+async def start_heart_rate(client, state: State, source: str) -> bool:
+    """Subscribe to the device's Heart Rate service if it has one. `source` is "hrm" (a strap) or "trainer"
+    (a trainer relaying the strap paired to it, like a Wahoo KICKR with an ANT+ strap)."""
+    if client.services.get_service(HR_SERVICE) is None:
+        return False
+
+    def on_hr(_, data: bytearray):
+        try:
+            bpm = parse_heart_rate(bytes(data))
+        except Exception:
+            return
+        if bpm is not None and 25 <= bpm <= 250:
+            state.hr[source] = (bpm, time.time())
+
+    try:
+        await client.start_notify(HR_MEASUREMENT, on_hr)
+    except Exception as e:
+        log(f"{source}: heart rate not available (", e, ")")
+        return False
+    log(f"{source}: heart rate on" + (" (relayed by the trainer: a strap paired to it, ANT+ or Bluetooth)" if source == "trainer" else ""))
+    return True
+
+
+async def hrm_session(client, state: State, addr: str):
+    if not await start_heart_rate(client, state, "hrm"):
+        log("hrm: no heart rate service on this device")
+        return
+    started = time.time()
+    while client.is_connected and state.want["hrm"] == addr and not state.quit:
+        if time.time() - max(started, state.hr["hrm"][1]) > HR_STALL_S:
+            log(f"hrm: no heart rate for {HR_STALL_S:.0f} s - reconnecting")
+            break
+        await asyncio.sleep(0.5)
 
 
 # ---------------------------------------------------------------- handlebar controllers
@@ -750,8 +820,8 @@ class DirconClient:
 
 async def role_task(role: str, state: State, disc: Discovery, args):
     """Keeps one device (trainer or controller) connected to whatever the game asked for."""
-    auto_pred = is_trainer if role == "trainer" else is_controller
-    name_filter = args.trainer if role == "trainer" else args.controller
+    auto_pred = {"trainer": is_trainer, "controller": is_controller, "hrm": is_hrm}[role]
+    name_filter = {"trainer": args.trainer, "controller": args.controller, "hrm": args.hrm}[role]
     while not state.quit:
         addr = state.want[role]
         if addr is None and not args.managed:
@@ -781,6 +851,8 @@ async def role_task(role: str, state: State, disc: Discovery, args):
                     save_wanted(state)
                 if role == "trainer":
                     await trainer_session(client, state, addr)
+                elif role == "hrm":
+                    await hrm_session(client, state, addr)
                 else:
                     await controller_session(client, state, addr, args.dump)
             state.conn[role] = {"state": "idle", "name": "", "address": ""}
@@ -793,6 +865,9 @@ async def role_task(role: str, state: State, disc: Discovery, args):
             disc.busy.discard(addr)
             if role == "trainer":
                 state.trainer = False
+                state.hr["trainer"] = (0, 0.0)
+            elif role == "hrm":
+                state.hr["hrm"] = (0, 0.0)
             else:
                 state.controller = False
                 state.pressed = set()
@@ -934,13 +1009,15 @@ async def sender_task(state: State, disc, args):
     while not state.quit:
         if state.trainer and time.time() - state.trainer_seen > 3.0:
             state.trainer = False
+        bpm, hr_src = state.heart_rate()
         msg = {"type": "data", "power": state.power, "cadence": state.cadence, "speed": state.speed,
-               "trainer": state.trainer, "controller": state.controller, "buttons": sorted(state.pressed | state.taps)}
+               "trainer": state.trainer, "controller": state.controller, "buttons": sorted(state.pressed | state.taps),
+               "hr": bpm, "hr_source": hr_src}
         state.taps = set()
         packets = [msg]
         if tick % 10 == 0:
             packets.append({"type": "status", "scanning": bool(disc and disc._needed()), "devices": disc.device_list() if disc else [],
-                            "trainer": state.conn["trainer"], "controller": state.conn["controller"], "error": state.error,
+                            "trainer": state.conn["trainer"], "controller": state.conn["controller"], "hrm": state.conn["hrm"], "error": state.error,
                             "managed": args.managed})
         for p in packets:
             try:
@@ -955,7 +1032,8 @@ async def sender_task(state: State, disc, args):
 
 
 class CommandProtocol(asyncio.DatagramProtocol):
-    """Messages from the game: {"grade": %, "gear": ratio, "mass": kg}, {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}."""
+    """Messages from the game: {"grade": %, "gear": ratio, "mass": kg}, {"cmd": "ping"|"scan"|"connect"|"disconnect"|"quit", ...}
+    (role: "trainer", "controller" or "hrm")."""
 
     def __init__(self, state: State):
         self.state = state
@@ -998,11 +1076,13 @@ async def fake_task(state: State):
     state.controller = True
     state.conn["trainer"] = {"state": "connected", "name": "Fake Trainer", "address": "fake"}
     state.conn["controller"] = {"state": "connected", "name": "Fake Controls", "address": "fake"}
+    state.conn["hrm"] = {"state": "connected", "name": "Fake Strap", "address": "fake"}
     while not state.quit:
         t = time.time() - t0
         state.power = 190 + 70 * math.sin(t * 0.4)
         state.cadence = 85 + 8 * math.sin(t * 0.7)
         state.speed = 20 + 5 * math.sin(t * 0.4)
+        state.hr["hrm"] = (round(140 + 15 * math.sin(t * 0.4 - 1.0)), time.time())   # lags the power, like a heart does
         state.trainer = True
         state.trainer_seen = time.time()
         await asyncio.sleep(0.1)
@@ -1032,6 +1112,8 @@ async def scan_once():
             tags.append("TRAINER(FTMS)")
         if is_controller(dev, adv):
             tags.append("CONTROLLER")
+        if HR_SERVICE in uuids(adv):
+            tags.append("HEART RATE")
         if getattr(dev, "wifi", False):
             print(f"  Wi-Fi    {name_of(dev, adv):<28} {addr} ({dev.host}:{dev.port})  {' '.join(tags)}")
         else:
@@ -1062,6 +1144,8 @@ async def amain(args):
         tasks.append(role_task("trainer", state, disc, args))
     if not args.no_controller:
         tasks.append(role_task("controller", state, disc, args))
+    if not args.no_hrm:
+        tasks.append(role_task("hrm", state, disc, args))
     if args.learn:
         tasks.append(learn_task(state))
     if args.inspect:
@@ -1088,8 +1172,10 @@ def main():
     ap.add_argument("--fake", action="store_true", help="send fake trainer data (no Bluetooth)")
     ap.add_argument("--no-trainer", action="store_true")
     ap.add_argument("--no-controller", action="store_true")
+    ap.add_argument("--no-hrm", action="store_true", help="don't connect a heart rate strap (a trainer's relayed heart rate still works)")
     ap.add_argument("--trainer", help="only auto-connect a trainer whose name contains this")
     ap.add_argument("--controller", help="only auto-connect a controller whose name contains this")
+    ap.add_argument("--hrm", help="only auto-connect a heart rate strap whose name contains this")
     args = ap.parse_args()
     if args.managed:
         global _log_file

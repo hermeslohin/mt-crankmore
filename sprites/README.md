@@ -59,6 +59,13 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 | Tubeless Tony | `c24f5a17-892a-4f35-b39c-b80583615a13` | `61bba4dc-bd4d-42d1-9353-abfcc12176f7` | `7569f3ce-817c-4b77-9a62-7dae1f71f0ff` |
 | Karate Kim | `2e1f7947-16b2-473c-a7b8-1a962a7c1fbb` | `b4bb88d3-df0e-4eb7-b38e-2fe7dd394fab` | `a88325ae-189e-4e74-949e-1e552955e718` |
 
+Maillot Max (`Champion`, `119017b2-3d3d-4384-8e6c-887688149c1c`) and Thunder Thighs McGee (`Thunder Thighs`,
+`45804065-977d-416a-a869-d847194f1bc6`) are extra states of Tubeless Tony's PixelLab character, so they share his
+build and bike; only their packed sheets are kept (`art/bike_max*.png`, `art/bike_mcgee*.png`). Yellow Jersey Yolanda
+(`Yolanda`, `cf01bac9-60da-4326-895a-4832f2f83d16`) is a state of the same character made from Maillot Max's, with her own
+look and a green bike: `art/bike_yolanda.png` and `art/bike_yolanda_fall.png` were packed with the Rookies' `rows=`. Her
+face strip (`art/face_yolanda.png`) is PixelLab's `edit-image` of Max's, laid out 4x2.
+
 ## Notes
 
 - The PixelLab diagonals are true 45 degree views, while the game's isometric roads run at about 27 degrees, so
@@ -77,7 +84,7 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 | `props/pizza-spin/` | the thrown pizza, spinning (8 frames) | `art/pizza_spin.png` |
 | `vehicles/<kind>/` | the traffic in 8 directions (`rotations/`): `car` and `truck` (white, painted in game), `motorcycle`, and 27 coloured `sedan_*`, `truck_*` and `van_*` | `art/vehicle_<kind>.png` |
 | `buildings/hospital.png` | St. Pedro's Hospital with a helicopter pad on the roof (a 192x176 image) | `art/hospital.png` |
-| `buildings/landmarks/` | the 7 pizza shops, 2 bike shops, race HQ and gondola base (192x176) | `art/building_<name>.png` |
+| `buildings/landmarks/` | the 7 pizza shops, 2 bike shops, race HQ, gondola base, Crusty Crit and Velodoughm (192x176) | `art/building_<name>.png` |
 | `buildings/shops/` | one themed shop per shop name (128x128) | `art/building_<name>.png` |
 | `buildings/hotels/` | one themed hotel per hotel name (192x208) | `art/building_<name>.png` |
 | `buildings/condos/` | the six condo blocks (160x160) | `art/building_<name>.png` |

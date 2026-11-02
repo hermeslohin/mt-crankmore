@@ -75,11 +75,20 @@ func build(rng: RandomNumberGenerator) -> void:
 	news.place(race._pose(0.0, -(race.ROAD_HW + 6.0))["pos"], Vector2(1, 1))
 	news_on = 0
 	news_t = rng.randf_range(NEWS_SWITCH[0], NEWS_SWITCH[1])
+	if race.velo:   # indoors: no helicopters or drones, just the crowd
+		pilots.clear()
+		_build_velo_crowd(rng, length)
+		return
 	_build_pilots(rng, length)
 	_build_start_finish(rng, length)
+	if race.lap > 0.0:   # a crit round town: the whole loop lined with townsfolk, and none of the mountain's extras
+		_build_crit_crowd(rng, length)
+		return
 	_build_hairpins(rng)
 	_build_ramps(rng, length)
 	_build_feed_zone(rng, length)
+	if race.paved():   # the road race: its houses are the scenery (Race._build_houses), no mountain campers, trains or skiers
+		return
 	_build_camps(rng, length)
 	_build_devil(rng, length)
 	_build_railway(rng, length)
@@ -99,11 +108,15 @@ func _sprite(name: String, s: float, lat: float, flip := false) -> void:
 	if Sprites.sheet(name) == null:
 		return
 	var p: Vector2 = race._pose(s, lat)["pos"]
+	if race.behind_house(p, race._tz(p)):
+		return   # (nothing goes where one of the road race's houses would hide it)
 	race._put_static(2, {"kind": "sprite", "name": name, "pos": p, "z": race._tz(p), "flip": flip}, [])
 
 
 func _fan(s: float, lat: float, rng: RandomNumberGenerator, design := "") -> void:
 	var p: Vector2 = race._pose(s, lat)["pos"]
+	if race.behind_house(p, race._tz(p)):
+		return
 	var e := {"kind": "fan", "s": s, "lat": lat, "pos": p, "z": race._tz(p), "design": design if design != "" else _fan_design(rng),
 		"col": Color.from_hsv(rng.randf(), 0.7, 0.95)}
 	race._put_static(2, e, [])
@@ -130,6 +143,63 @@ func _build_start_finish(rng: RandomNumberGenerator, length: float) -> void:
 				_fan(s + dir * k * 4.0 + 2.0, -2.1 - g, rng)
 	_fan(30.0, 1.2 + race.ROAD_GROW, rng, "fan_highfive_kid")
 	_fan(length - 40.0, -1.2 - race.ROAD_GROW, rng, "fan_highfive_kid")
+
+
+## The Crusty Crit's crowd: barriers along both sides of the whole loop (bar the start/finish, which has its own),
+## townsfolk standing along them, now and then two or three deep, and a thinner crowd in the infield.
+## Nothing is put down where the circuit doubles back close by (`clear`: tiles it needs from any road).
+func _build_crit_crowd(rng: RandomNumberGenerator, length: float) -> void:
+	var g: float = race.ROAD_GROW
+	var put := func(s: float, lat: float, clear: float, barrier := false) -> void:
+		if race._rd(race._pose(s, lat)["pos"]) < clear + g:
+			return
+		if barrier:
+			_sprite("race_crowd_barrier", s, lat, lat < 0.0)
+		else:
+			_fan(s, lat, rng)
+	var s := 50.0
+	while s < length - 50.0:
+		put.call(s, 1.45 + g, 1.3, true)
+		put.call(s, -1.45 - g, 1.3, true)
+		for row in 2:
+			if rng.randf() < 0.42:
+				put.call(s + rng.randf_range(-1.5, 1.5), 2.1 + g + row * 0.9 + rng.randf_range(0.0, 0.3), 1.9)
+		if rng.randf() < 0.15:
+			put.call(s + rng.randf_range(-1.5, 1.5), 3.9 + g + rng.randf_range(0.0, 0.4), 1.9)
+		if rng.randf() < 0.27:
+			put.call(s + rng.randf_range(-1.5, 1.5), -2.1 - g - rng.randf_range(0.0, 0.6), 1.9)
+		s += 4.0
+
+
+## The Velodoughm's crowd, about as thick as the Crusty Crit's: up in the wooden stands round the far side and the ends
+## (Race.stands), VELO_TIERS deep; along the rail at floor level on the near side, where stands would hide the
+## track; and a thinner crowd inside the track round the basketball courts. Nobody runs alongside in here.
+func _build_velo_crowd(rng: RandomNumberGenerator, length: float) -> void:
+	var out: float = race.velo_out
+	var hw: float = race.ROAD_HW
+	race.stands.clear()
+	var s := 0.0
+	while s < length:
+		var pz: Dictionary = race._pose(s, out * hw)
+		var away: float = ((pz["n"] as Vector2) * out).dot(race.VELO_V)   # > 0: the outside faces the camera here
+		if away < race.VELO_STAND_FACING:
+			race.stands.append(s)
+			for tier in race.VELO_TIERS:
+				if rng.randf() < 0.45:
+					_stand_fan(s + rng.randf_range(0.5, 3.5), out * (hw + race.VELO_GAP + race.VELO_TIER * (tier + 0.55)), float(pz["z"]) + race.VELO_RISE * (tier + 1), rng)
+		else:
+			for row in 2:
+				if rng.randf() < 0.42:
+					_stand_fan(s + rng.randf_range(0.5, 3.5), out * (hw + 0.9 + row * 0.9 + rng.randf_range(0.0, 0.3)), 0.0, rng)
+		if rng.randf() < 0.27:   # in the middle, by the apron
+			_stand_fan(s + rng.randf_range(0.5, 3.5), -out * (hw + 1.9 + rng.randf_range(0.0, 0.8)), 0.0, rng)
+		s += 4.0
+
+
+func _stand_fan(s: float, lat: float, z: float, rng: RandomNumberGenerator) -> void:
+	var p: Vector2 = race._pose(s, lat)["pos"]
+	race._put_static(2, {"kind": "fan", "s": s, "lat": lat, "pos": p, "z": z, "design": _fan_design(rng),
+		"col": Color.from_hsv(rng.randf(), 0.7, 0.95)}, [])
 
 
 func _build_hairpins(rng: RandomNumberGenerator) -> void:
@@ -502,6 +572,8 @@ func draw_lift_cables(ci: CanvasItem) -> void:
 func update(delta: float) -> void:
 	t_ += delta
 	_step_runners(delta)
+	if race.velo:
+		return
 	_step_flyover(delta)
 	_step_news(delta)
 	_step_pilots(delta)
@@ -535,7 +607,7 @@ func _step_news(delta: float) -> void:
 		for r in race.riders:
 			if float(r["s"]) > float(who["s"]) and not r["done"]:
 				who = r
-	var s := minf(float(who["s"]) + 5.0, float(race.course["length"]))
+	var s := minf(float(who["s"]) + 5.0, race.goal_s())
 	news.update(delta, race._pose(s, -(race.ROAD_HW + 3.0))["pos"])
 
 
@@ -710,18 +782,17 @@ func movers() -> Array:
 	if race.rescue:   # the injured skier and the patroller waving you in
 		var pz: Dictionary = race._pose(race.rescue_s, 2.2 + race.ROAD_GROW)
 		out.append([pz["pos"], _draw_casualty.bind(pz)])
-	var length: float = race.course["length"]
 	var me: Dictionary = race.riders[0]
 	var lead := 0.0
 	var last := 1e9
 	for r in race.riders:
 		lead = maxf(lead, float(r["s"]))
 		last = minf(last, float(r["s"]))
-	# the motos ahead of the leader, the team car behind the last rider
-	if lead < length - 20.0:
+	# the motos ahead of the leader, the team car behind the last rider (not on the Velodoughm's boards)
+	if lead < race.goal_s() - 20.0 and not race.velo:
 		_add_vehicle(out, "vehicle_tv_moto", lead + 9.0, -0.5 * race.ROAD_W)
 		_add_vehicle(out, "vehicle_marshal_moto", lead + 22.0, 0.45 * race.ROAD_W)
-	if last > 20.0 and last < length:
+	if last > 20.0 and last < race.goal_s() and not race.velo:
 		_add_vehicle(out, "vehicle_team_car", last - 13.0, -0.35 * race.ROAD_W)
 	# fans running with you
 	for e in run_fans:
@@ -843,6 +914,8 @@ func draw_crossing(ci: CanvasItem, e: Dictionary) -> void:
 
 ## A TV helicopter hanging over the leader, rotor flickering.
 func draw_helicopter(ci: CanvasItem) -> void:
+	if race.velo:
+		return   # under the Velodoughm's roof
 	_draw_flyover(ci)
 	if race.riders.is_empty():
 		return

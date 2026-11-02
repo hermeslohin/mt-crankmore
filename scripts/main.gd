@@ -11,6 +11,7 @@ var hud: Control
 var title_t := 0.0
 var shot_at := Vector2.INF   # dev helper: camera pinned on a world point for screenshots
 var viewer := {}             # dev helper: the event viewer (PIZZA_DEBUG=eventviewer), see _debug_viewer
+var outdoors: Array = []     # the weather and the night layers
 
 
 func _ready() -> void:
@@ -36,6 +37,7 @@ func _ready() -> void:
 	var dusk := CanvasLayer.new()   # night and rain clouds over the world and the weather, under the HUD
 	dusk.layer = 6
 	add_child(dusk)
+	outdoors = [sky, dusk]   # (hidden under the Velodoughm's roof, see _process)
 	var night := preload("res://scripts/night.gd").new()
 	night.source = func(): return city.night_lights() if mode == Mode.CITY else race.night_lights() if mode == Mode.RACE else []
 	dusk.add_child(night)
@@ -70,6 +72,7 @@ func _ready() -> void:
 			_start_race(1)
 			Input.action_press("pedal")
 		"race_fast":
+			Trainer._autostart_clock = 0.0   # leave a real trainer alone (it would let go of the held pedal key)
 			_start_game()
 			_start_race(OS.get_environment("PIZZA_COURSE").to_int())
 			Input.action_press("pedal")
@@ -122,6 +125,8 @@ func _ready() -> void:
 				var key := "%s %dx%d" % [b["kind"], int(b["size"].x), int(b["size"].y)]
 				count[key] = int(count.get(key, 0)) + 1
 			print("BUILDINGS total=%d %s" % [city.buildings.size(), count])
+			for kind in ["race", "crit", "velo"]:
+				print("  %s entrance at %s" % [kind, city.zone_anchor(kind).get("pos", "?")])
 			get_tree().quit()
 		"seasons":
 			_debug_seasons()
@@ -205,6 +210,8 @@ func _process(delta: float) -> void:
 		_:
 			target = race.cam_target()
 	cam.position = cam.position.lerp(target, 1.0 - exp(-6.0 * delta))
+	for l in outdoors:
+		l.visible = not (mode == Mode.RACE and race.velo)
 	# flat road on the trainer whenever you're not riding (title, menus, the bike shop, the ER)
 	if mode == Mode.TITLE or (mode == Mode.CITY and (not city.active or city.er_timer > 0.0)):
 		Trainer.send_grade(0.0)
@@ -305,6 +312,24 @@ func _role_line(label: String, role: String, live_text: String) -> String:
 	return "%s: not connected" % label
 
 
+## What a device is used as, for its line's detail on the Connect Trainer screen.
+func _role_use(role: String, power_meter: bool) -> String:
+	match role:
+		"trainer":
+			return "power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if power_meter else "trainer (power, cadence, climbs)"
+		"hrm":
+			return "heart rate monitor (shown on the WEEHOO, logged and posted to Strava)"
+	return "handlebar controllers (buttons)"
+
+
+## The heart rate status line: a strap of its own, or the one the trainer relays (an ANT+ strap paired to a Wahoo
+## KICKR comes this way, over Bluetooth or Wi-Fi).
+func _hr_line() -> String:
+	if Trainer.hr_live and Trainer.hr_source == "trainer":
+		return "Heart rate: %d bpm, from your trainer" % Trainer.heart_rate
+	return _role_line("Heart rate", "hrm", "(%d bpm)" % Trainer.heart_rate if Trainer.hr_live else "")
+
+
 func _trainer_menu() -> Dictionary:
 	var items: Array = []
 	var lines: Array = []
@@ -327,12 +352,13 @@ func _trainer_menu() -> Dictionary:
 		var pressed := "  buttons: " + " ".join(Trainer.pressed_names) if not Trainer.pressed_names.is_empty() else ""
 		lines.append(_role_line("Trainer", "trainer", trainer_live))
 		lines.append(_role_line("Controls", "controller", pressed))
+		lines.append(_hr_line())
 		var err: String = Trainer.status.get("error", "")
 		if err != "":
 			lines.append("! " + err)
 		var scanning: bool = Trainer.status.get("scanning", false)
 		items.append({"label": "Scanning..." if scanning else "Scan for devices", "fn": func(): Trainer.scan(true),
-			"detail": "Pedal or press a button so the devices wake up. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer."})
+			"detail": "Pedal or press a button so the devices wake up, and put your heart rate strap on. Close any other trainer app first: trainers only accept one connection. Wi-Fi trainers show up when they're on the same network as this computer. An ANT+ strap: pair it to your Wahoo trainer and its heart rate comes through the trainer."})
 		var shown := {}
 		for d in Trainer.devices():
 			var role: String = d["kind"]
@@ -342,8 +368,8 @@ func _trainer_menu() -> Dictionary:
 			var connected: bool = info.get("address", "") == addr and info.get("state", "") in ["connected", "connecting", "searching"]
 			var pm: bool = d.get("power_meter", false)   # power and cadence only: no resistance for hills or gears
 			var wifi: bool = d.get("wifi", false)         # Direct Connect over the network: no signal strength to show
-			var tag := ("POWER   " if pm else "TRAINER ") if role == "trainer" else "CONTROLS"
-			var nm := _device_name(d["name"], addr)
+			var tag: String = {"trainer": "POWER   " if pm else "TRAINER ", "hrm": "HEART   "}.get(role, "CONTROLS")
+			var nm := _device_name(d["name"], addr) + (" + heart rate" if role == "trainer" and d.get("heart_rate", false) else "")
 			var signal_bars := "" if wifi else "  " + "|".repeat(clampi(int((float(d["rssi"]) + 100.0) / 12.0), 1, 5))
 			if connected and info.get("state", "") != "connected":
 				# still connecting (it can take 10 s): selecting it again must not cancel it
@@ -355,15 +381,16 @@ func _trainer_menu() -> Dictionary:
 					"fn": _confirm_disconnect.bind(role), "detail": "Select twice to disconnect this device."})
 			else:
 				items.append({"label": "%s  %s%s" % [tag, nm, signal_bars], "fn": Trainer.connect_device.bind(role, addr),
-					"detail": "Select to use this as your %s. It will reconnect automatically next time." % (("power meter (power and cadence; hills and gears won't change how hard it feels, so shift your real bike)" if pm else "trainer (power, cadence, climbs)") if role == "trainer" else "handlebar controllers (buttons)")
-						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")})
-		for role in ["trainer", "controller"]:
+					"detail": "Select to use this as your %s. It will reconnect automatically next time." % _role_use(role, pm)
+						+ (" Connects over your network (Wi-Fi / Ethernet)." if wifi else "")
+						+ (" It also passes on the heart rate strap paired to it (ANT+ or Bluetooth)." if role == "trainer" and d.get("heart_rate", false) else "")})
+		for role in ["trainer", "controller", "hrm"]:
 			var info := Trainer.role_info(role)
 			if info.get("address", "") != "" and not shown.has(info["address"]) and info.get("state", "idle") != "idle":
-				items.append({"label": "%s  %s  [forget]" % ["TRAINER " if role == "trainer" else "CONTROLS", _device_name(info.get("name", "device"), info.get("address", ""))],
+				items.append({"label": "%s  %s  [forget]" % [{"trainer": "TRAINER ", "hrm": "HEART   "}.get(role, "CONTROLS"), _device_name(info.get("name", "device"), info.get("address", ""))],
 					"fn": Trainer.disconnect_device.bind(role), "detail": "Stop using this device."})
 		if Trainer.devices().is_empty():
-			lines.append("No trainers, power meters or handlebar controllers found yet.")
+			lines.append("No trainers, power meters, handlebar controllers or heart rate monitors found yet.")
 	items.append({"label": "Back", "fn": func():
 		Trainer.scan(false)
 		_show_title(), "detail": ""})
@@ -401,7 +428,7 @@ func _strava_menu(back: Callable) -> Dictionary:
 		lines.append(Strava.status_text() + ". Post your ride here or from the pause menu before you quit: an unposted ride isn't kept.")
 		var post_label := "Uploading..." if Strava.busy() else "Post this ride to Strava"
 		items.append({"label": post_label, "fn": Strava.post_ride, "enabled": not Strava.busy() and Ride.can_post(),
-			"detail": ("Posts a Virtual Ride with your distance, speed, power and cadence, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
+			"detail": ("Posts a Virtual Ride with your distance, speed, power, cadence and heart rate, and the pizzas and races in the notes:\n%s" % Ride.description()) if Ride.can_post() else "Ride for at least a minute first."})
 		if not Strava.last_activity.is_empty():
 			var shots_dir: String = Strava.last_activity.get("shots_dir", "")
 			items.append({"label": "Add screenshots to the last ride" if shots_dir != "" else "Open the last ride on Strava", "fn": Strava.open_last_activity,
@@ -433,10 +460,11 @@ func _new_game() -> void:
 
 
 func _start_or_setup() -> void:
+	var into_town := func(): _pick_bike("Head into town", _start_game, _show_title)
 	if Game.setup_done:
-		_start_game()
+		into_town.call()
 	else:
-		_open_setup(_start_game)
+		_open_setup(into_town)
 
 
 # ---- rider setup ---------------------------------------------------------
@@ -459,7 +487,7 @@ func _open_setup(done: Callable) -> void:
 func _setup_menu(finish: Callable) -> Dictionary:
 	var lbs := Game.units == "lbs"
 	var diff: Dictionary = Game.DIFFICULTIES[Game.difficulty]
-	var names: Array = Talk.roster.slice(0, Game.rival_count).map(func(r): return r["short"])
+	var names: Array = Talk.rivals.map(func(r): return r["short"])
 	var items: Array = [
 		{"label": "Rider: %s" % Game.RIDERS[Game.rider]["label"], "fn": func(): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
 			"adjust": func(_d: int): Game.set_rider("girl" if Game.rider == "boy" else "boy"),
@@ -478,7 +506,7 @@ func _setup_menu(finish: Callable) -> Dictionary:
 			"detail": diff["blurb"]},
 		{"label": "Rival bikers: %d" % Game.rival_count, "fn": func(): pass,
 			"adjust": func(d: int): Game.set_rival_count(Game.rival_count + d),
-			"detail": "Riding against you: %s." % ", ".join(names)},
+			"detail": "Riding against you in town: %s. Every race has all %d racers." % [", ".join(names), Talk.roster.size()]},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
 	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}
@@ -510,7 +538,7 @@ func _open_pause() -> void:
 			]})
 
 
-## Quitting to the title ends the session: save, then show what you rode (power, cadence and speed over time, with
+## Quitting to the title ends the session: save, then show what you rode (power, cadence, heart rate and speed over time, with
 ## the pizzas, challenges and race placings on it) with the option to post just this session to Strava.
 func _end_session() -> void:
 	Game.save_game()
@@ -562,7 +590,7 @@ func _session_menu() -> Dictionary:
 	elif Strava.linked():
 		items.append({"label": "Uploading..." if Strava.busy() else "Post this session to Strava", "fn": Strava.post_ride,
 			"enabled": not Strava.busy() and Ride.can_post(),
-			"detail": "Posts just this session (since you hit New game / Continue game) as a Virtual Ride with its distance, speed, power and cadence." if Ride.can_post() else "Ride for at least a minute to post a session."})
+			"detail": "Posts just this session (since you hit New game / Continue game) as a Virtual Ride with its distance, speed, power, cadence and heart rate." if Ride.can_post() else "Ride for at least a minute to post a session."})
 	else:
 		items.append({"label": "Set up Strava to post this session", "fn": _open_strava_menu.bind(func(): hud.open_menu(_session_menu, true)),
 			"detail": "Link your Strava account, then post this session. It's kept until you start the next one."})
@@ -580,18 +608,57 @@ func _open_garage() -> void:
 		for i in Game.owned:
 			var b: Dictionary = Game.bikes[i]
 			var riding: bool = i == Game.equipped
-			var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
-			var hp_now: float = Game.hp.get(i, 0.0)
 			items.append({"label": ("%s   [riding]" if riding else "%s") % b["name"], "enabled": not riding,
 				"fn": func():
 					Game.equipped = i
 					Game.save_game()
 					Game.toast.emit("Now riding the %s" % b["name"], Color(0.5, 1.0, 0.6))
 					_open_garage(),
-				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"],
-					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"]]})
+				"image": _bike_image(b), "detail": _owned_bike_detail(i)})
 		items.append({"label": "Back", "fn": _open_pause, "detail": ""})
 		return {"title": "My bikes", "sub": "%d bike%s in the garage. Riding: %s" % [Game.owned.size(), "" if Game.owned.size() == 1 else "s", Game.bike()["name"]], "items": items})
+
+
+## An owned bike's line in My bikes and the bike picker: blurb, weight, HP left, speed at your FTP, handling, gravel drag,
+## and what it's good and bad at.
+func _owned_bike_detail(i: int) -> String:
+	var b: Dictionary = Game.bikes[i]
+	var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
+	return "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"],
+		"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(Game.hp.get(i, 0.0)), int(b["hp"]), at_ftp, b["turn"],
+		b["gravel"], _bike_good_bad(b)]
+
+
+## Heading into town or to a start line: pick which bike from the garage to ride, starting on the one you rode last.
+## `go` runs once it's picked; `back` is the menu's Back. Skipped with only one bike. On race day (`race_day`), bikes with
+## 10% HP or less stay in the garage.
+func _pick_bike(title: String, go: Callable, back: Callable, race_day := false) -> void:
+	if Game.owned.size() < 2:
+		go.call()
+		return
+	hud.open_menu(func():
+		var items: Array = []
+		for i in Game.owned:
+			var b: Dictionary = Game.bikes[i]
+			var fit: bool = not race_day or Game.hp_ratio(i) > 0.1
+			items.append({"label": ("%s   [last ridden]" if i == Game.equipped else "%s") % b["name"] + ("" if fit else "   (too broken to race)"),
+				"enabled": fit, "image": _bike_image(b), "detail": _owned_bike_detail(i),
+				"fn": func():
+					Game.equipped = i
+					Game.save_game()
+					go.call()})
+		items.append({"label": "Back", "fn": back, "detail": ""})
+		return {"title": title, "sub": "Which bike from the garage? %d to choose from." % Game.owned.size(), "items": items})
+	var at := Game.owned.find(Game.equipped)
+	if at > 0:
+		hud.menu_index = at
+		hud._rebuild_menu()
+
+
+## Pick a bike for race `i` (from the menu `back` builds), then line up, against a visiting champion (`champ`: Game.CHAMPION
+## or Game.YOLANDA) if one's given.
+func _race_bike(i: int, back: Callable, champ := {}) -> void:
+	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], _start_race.bind(i, champ), func(): hud.open_menu(back), true)
 
 
 ## LEFT / RIGHT picks the season (or select to step through them). "Today" follows the date.
@@ -677,6 +744,11 @@ func _on_interact(kind: String) -> void:
 				"annoyed" if Game.hp_ratio() < 0.5 else "happy")
 		"race":
 			hud.open_menu(_race_menu)
+		"crit":
+			hud.open_menu(_crit_menu)
+		"velo":
+			hud.open_menu(_velo_menu)
+			Game.racer_says.emit("mcgee", Game.THUNDER["name"], Game.THUNDER["sig"].pick_random(), "smug", Game.THUNDER["color"])
 		"rescue":
 			_start_rescue()
 
@@ -717,8 +789,8 @@ func _bike_shop_menu() -> Dictionary:
 						"Ooh, the %s. Ride it like you stole it. But you didn't. You paid." % b["name"]].pick_random(), "happy")
 					Talk.say_random("new_bike", true)
 		var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
-		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
-		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail})
+		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"], _bike_good_bad(b)]
+		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail, "image": _bike_image(b)})
 	var hurt := Game.needs_repair()
 	var rc := Game.repair_cost()
 	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
@@ -736,29 +808,95 @@ func _bike_shop_menu() -> Dictionary:
 	return {"title": "Spokes & Stuff Bike Shop", "sub": "Cash: $%d.   \"Careful out there. The cars don't brake for dreams.\"" % Game.money, "items": items}
 
 
+## A bike's picture for the shop and My bikes (art/shop_bike_<art>.png), or "" if it has none.
+func _bike_image(b: Dictionary) -> String:
+	var path := "res://art/shop_bike_%s.png" % b.get("art", "")
+	return path if ResourceLoader.exists(path) else ""
+
+
+## What a bike is good and bad at, as two lines to add to its details.
+func _bike_good_bad(b: Dictionary) -> String:
+	return "\nGood: %s\nBad: %s" % [b["good"], b["bad"]] if b.has("good") else ""
+
+
 func _race_menu() -> Dictionary:
 	var items: Array = []
 	if city.champion_left > 0.0:   # the Tour de Crankmore champion is in town (see City._update_champion)
 		items.append({"label": "RACE %s, THE TOUR DE CRANKMORE CHAMPION!" % Game.CHAMPION["name"].to_upper(), "fn": func(): hud.open_menu(_champion_menu),
 			"detail": "He's waiting at the line in the yellow jersey, and he rides 10% harder than anyone else. Pick your mountain."})
+	if city.yolanda_left > 0.0:   # Yellow Jersey Yolanda is in town (see City._update_yolanda): she races the road race
+		var y: Dictionary = Game.YOLANDA
+		var ri: int = race.COURSES.find_custom(func(c): return c["name"] == y["course"])
+		var rc: Dictionary = race.COURSES[ri]
+		items.append({"label": "RACE %s ON %s!    entry $%d" % [String(y["name"]).to_upper(), String(y["course"]).to_upper(), rc["entry"]],
+			"fn": func(): _race_bike(ri, _race_menu, y), "enabled": Game.money >= int(rc["entry"]) and Game.can_race(),
+			"detail": "%s, %s, is at the line in her yellow jersey, and she rides 10%% harder than anyone else. Finish ahead of her for a $%d bonus and her tri bike, the Baguette Blade.\n%s" % [
+				y["name"], y["title"], int(y["bonus"]), rc["blurb"]]})
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
+		if c.get("crit", false) or c.get("velo", false):
+			continue   # raced from their own entrances (see _crit_menu, _velo_menu)
 		items.append({"label": "%s    entry $%d   prize pool $%d" % [c["name"], c["entry"], c["prize"]],
-			"fn": func(): _start_race(i), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
-			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Racing wears your bike a little." % c["blurb"]})
+			"fn": func(): _race_bike(i, _race_menu), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
+			"detail": "%s\nPayouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%. Your bike only loses HP if a rival knocks you off (5 HP a time)." % c["blurb"]})
 	items.append({"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
-	return {"title": "Mt. Crankmore Race HQ", "sub": "%s %s warming up. You can hear %s talking about you." % [_cap(_rivals_text()), "is" if Talk.rivals.size() == 1 else "are", "them"], "items": items}
+	return {"title": "Mt. Crankmore Race HQ", "sub": "All %d racers in town are warming up. You can hear them talking about you." % Talk.roster.size(), "items": items}
 
 
 func _champion_menu() -> Dictionary:
 	var items: Array = []
 	for i in race.COURSES.size():
 		var c: Dictionary = race.COURSES[i]
+		if c.get("crit", false) or c.get("velo", false) or c.get("road", false):
+			continue   # (the road race is Yellow Jersey Yolanda's)
 		items.append({"label": "%s vs %s    entry $%d   prize pool $%d" % [c["name"], Game.CHAMPION["short"], c["entry"], c["prize"]],
-			"fn": func(): _start_race(i, true), "enabled": Game.money >= int(c["entry"]) and Game.hp_ratio() > 0.1,
+			"fn": func(): _race_bike(i, _champion_menu, Game.CHAMPION), "enabled": Game.money >= int(c["entry"]) and Game.can_race(),
 			"detail": "%s\n%s and all %d racers in town line up with you." % [c["blurb"], Game.CHAMPION["name"], Talk.roster.size()]})
 	items.append({"label": "Back", "fn": func(): hud.open_menu(_race_menu), "detail": ""})
 	return {"title": "Race the champion", "sub": "%s: \"%s\"" % [Game.CHAMPION["name"], Game.CHAMPION["sig"].pick_random()], "items": items}
+
+
+## The Crusty Crit's entrance on the west edge of town: a flat loop raced for CRIT_TIME and then CRIT_EXTRA more laps,
+## against every racer in town (race.gd, a course with "crit").
+func _crit_menu() -> Dictionary:
+	var i: int = race.COURSES.find_custom(func(c): return c.get("crit", false))
+	var c: Dictionary = race.COURSES[i]
+	return {"title": "Crusty Crit", "sub": "%s\nAll %d racers in town are signing on." % [c["blurb"], Talk.roster.size()],
+		"items": [
+			{"label": "Enter the Crusty Crit    entry $%d   prize pool $%d" % [c["entry"], c["prize"]], "fn": func(): _race_bike(i, _crit_menu),
+				"enabled": Game.money >= int(c["entry"]) and Game.can_race(),
+				"detail": "Most laps wins; on the same lap, whoever crosses the line first. Payouts: 1st 100%%, 2nd 50%%, 3rd 30%%, 4th 15%%."},
+			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
+		]}
+
+
+## The Velodoughm's entrance on the east edge of town: one lap of the indoor wooden track against Thunder Thighs McGee,
+## who puts out Game.THUNDER_PACE of your FTP on his own bike (race.gd, a course with "velo").
+func _velo_menu() -> Dictionary:
+	var i: int = race.COURSES.find_custom(func(c): return c.get("velo", false))
+	var c: Dictionary = race.COURSES[i]
+	return {"title": "The Velodoughm", "sub": "%s\n%s is stretching his quads by the rail. Loudly." % [c["blurb"], Game.THUNDER["name"]],
+		"items": [
+			{"label": "Race %s    entry $%d   win $%d" % [Game.THUNDER["name"], c["entry"], c["prize"]], "fn": _velo_enter.bind(i),
+				"enabled": Game.money >= int(c["entry"]) and Game.can_race(),
+				"detail": ("McGee won't race anyone on the Rusty Trash Bike: come back on something better (My bikes, or the bike shop). " if _velo_rusty() else "") + "He pushes %d W (%d%% of your FTP) on his %s. On your %s, hold more than %d W for the whole lap to beat him. Winner takes it all." % [
+					roundi(Game.ftp * Game.THUNDER_PACE), roundi(Game.THUNDER_PACE * 100.0), Game.rival_bike()["name"], Game.bike()["name"], roundi(Game.thunder_watts())]},
+			{"label": "Not today", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""},
+		]}
+
+
+## The Velodoughm turns the Rusty Trash Bike away at the door.
+func _velo_rusty() -> bool:
+	return Game.bike()["name"] == "Rusty Trash Bike"
+
+
+func _velo_enter(i: int) -> void:
+	_pick_bike("Pick your bike: %s" % race.COURSES[i]["name"], func():
+		if _velo_rusty():
+			hud.open_menu(_velo_menu)
+			Game.racer_says.emit("mcgee", Game.THUNDER["name"], "With that bike? Get out of here!!", "smug", Game.THUNDER["color"])
+			return
+		_start_race(i), func(): hud.open_menu(_velo_menu), true)
 
 
 ## A mountain rescue: up Mt. Crankmore on your own (no entry fee, no rivals) with a medical kit for an injured skier a
@@ -779,11 +917,14 @@ func _start_rescue() -> void:
 	cam.position = race.cam_target()
 
 
-func _start_race(i: int, champion := false) -> void:
+## Line up for race `i`, against a visiting champion (`champ`: Game.CHAMPION or Game.YOLANDA) if one's given.
+func _start_race(i: int, champ := {}) -> void:
 	race.rescue = false
-	race.guest = Game.CHAMPION if champion else {}
-	if champion:
+	race.guest = champ if not champ.is_empty() else (Game.THUNDER if race.COURSES[i].get("velo", false) else {})
+	if champ == Game.CHAMPION:
 		city.champion_left = 0.0   # he's raced you: off he goes after
+	elif champ == Game.YOLANDA:
+		city.yolanda_left = 0.0
 	var c: Dictionary = race.COURSES[i]
 	Game.add_money(-int(c["entry"]))
 	hud.close_menu()
@@ -826,15 +967,26 @@ func _on_race_finished(result: Dictionary) -> void:
 		var t: float = result["time"]
 		var title := "%s: you placed #%d!" % [result["course"], result["place"]]
 		var reward := ""
-		if result.get("beat_champion", false):
+		var champ: Dictionary = race.guest
+		if result.get("beat_champion", false) and champ == Game.YOLANDA:
+			title = "You beat %s, %s! #%d on %s" % [champ["name"], champ["title"], result["place"], result["course"]]
+			reward = "\nChampion's bonus: $%d" % int(champ["bonus"])
+			reward += ("\nShe hands you her tri bike: the BAGUETTE BLADE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
+				else "\n(You've already got her Baguette Blade.)")
+		elif result.get("beat_champion", false):
 			title = "You beat %s, the Tour de Crankmore champion! #%d on %s" % [Game.CHAMPION["name"], result["place"], result["course"]]
 			reward = "\nChampion's bonus: $%d" % Game.CHAMPION_BONUS
 			reward += ("\nHe hands you his bike: the CHAMPION'S BIKE is yours, and you're riding it now (switch in the pause menu: My bikes)." if result.get("champion_bike", false)
 				else "\n(You've already got his bike.)")
+		elif result.get("beat_thunder", false):
+			title = "You beat %s at the Velodoughm!" % Game.THUNDER["name"]
+		elif result.get("thunder", false):
+			title = "%s wins at the Velodoughm. Flex for the crowd." % Game.THUNDER["name"]
 		elif result.get("champion", false):
-			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], Game.CHAMPION["name"]] if result["place"] != 1 else title
+			title = "%s: #%d. %s takes the win in the yellow jersey." % [result["course"], result["place"], champ.get("name", "The champion")] if result["place"] != 1 else title
 		return {"title": title,
-			"sub": "Time %d:%04.1f     Prize: $%d%s\n\n%s" % [int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
+			"sub": "%sTime %d:%04.1f     Prize: $%d%s\n\n%s" % ["Laps: %d     " % result["laps"] if int(result.get("laps", 0)) > 0 and not result.get("thunder", false) else "",
+				int(t) / 60, fmod(t, 60.0), result["prize"], reward, lines],
 			"items": [{"label": "Back to town", "fn": _leave_race}]}, true)
 
 
@@ -846,7 +998,8 @@ func _leave_race() -> void:
 	city.visible = true
 	mode = Mode.CITY
 	city.active = true
-	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor("race"))
+	var from := "crit" if race.course.get("crit", false) else ("velo" if race.course.get("velo", false) else "race")
+	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor(from))
 	race.rescue = false
 	rescue_from = {}
 	city.invuln = 1.5
@@ -878,16 +1031,18 @@ func _debug_ride() -> void:
 	get_tree().quit()
 
 
-## Dev helper: PIZZA_DEBUG=session [PIZZA_TRAINER=0] [PIZZA_OUT=dir] fakes a 40-minute session (with or without
-## trainer power and cadence, plus pizzas, challenges and race placings), quits to the title and saves the
-## end-of-session screen as session.png.
+## Dev helper: PIZZA_DEBUG=session [PIZZA_TRAINER=0] [PIZZA_HR=0] [PIZZA_OUT=dir] fakes a 40-minute session (with or
+## without trainer power and cadence and heart rate, plus pizzas, challenges and race placings), quits to the title and
+## saves the end-of-session screen as session.png.
 func _debug_session() -> void:
 	var out := OS.get_environment("PIZZA_OUT") if OS.has_environment("PIZZA_OUT") else "user://shots"
 	DirAccess.make_dir_recursive_absolute(out)
 	_start_game()
 	city.active = false
 	var trainer := OS.get_environment("PIZZA_TRAINER") != "0"
+	var heart := OS.get_environment("PIZZA_HR") != "0"
 	var t := int(Time.get_unix_time_from_system()) - 2400
+	var bpm := 95.0
 	for i in 2400:
 		if i > 900 and i < 1020:
 			continue   # a pause in the menus
@@ -895,7 +1050,9 @@ func _debug_session() -> void:
 		var v := 6.0 + w / 40.0 + randf_range(-0.5, 0.5)
 		Ride.distance += v
 		Ride._riding += 1.0
-		Ride.samples.append([t + i, Ride.distance, 1250.0, v, roundi(w) if trainer else -1, roundi(85.0 + 10.0 * sin(i / 60.0)) if trainer else -1])
+		bpm = move_toward(bpm, 75.0 + w * 0.3, 0.6)   # a heart follows the effort, a little behind
+		Ride.samples.append([t + i, Ride.distance, 1250.0, v, roundi(w) if trainer else -1, roundi(85.0 + 10.0 * sin(i / 60.0)) if trainer else -1,
+			roundi(bpm) if heart else -1])
 	for e in [[200, "pizza", "Pizza delivered", 0], [520, "won", "Catch The Thief", 0], [700, "pizza", "Pizza delivered", 0], [710, "pizza", "Pizza delivered", 0],
 			[1300, "lost", "Beat The Hot Rod", 0], [1800, "race", "Flour Run: #2", 2], [2100, "won", "Hill Sprint: Bakers Hill", 0], [2300, "race", "Mt. Crankmore: #1", 1]]:
 		Ride.events.append({"t": t + e[0], "kind": e[1], "text": e[2], "place": e[3]})

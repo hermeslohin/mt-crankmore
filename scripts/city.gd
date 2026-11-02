@@ -147,6 +147,8 @@ var news_state := "off"         # off, on (following you), leaving
 var news_t := randf_range(240.0, NEWS_EVERY[1])
 var champion_t := randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])   # riding in town until the champion next visits
 var champion_left := 0.0        # > 0: he's in town and waiting at Race HQ for that many more seconds
+var yolanda_t := randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])   # riding in town until Yellow Jersey Yolanda next visits
+var yolanda_left := 0.0         # > 0: she's at Race HQ for that many more seconds (see _update_yolanda)
 var boats: Array = []
 var astar := AStar2D.new()
 var gondola_top := Vector2.ZERO
@@ -261,7 +263,7 @@ func refresh_rivals() -> void:
 	for i in rival_state.size():
 		var info: Dictionary = Talk.rivals[i]
 		rival_state[i]["mass"] = Game.rival_mass(i)
-		rival_state[i]["bike"] = Game.rival_bike(info)
+		rival_state[i]["bike"] = Game.rival_bike()
 		rival_state[i]["ftp"] = Game.rival_ftp(info, Game.rival_mass(i))
 
 
@@ -779,7 +781,7 @@ func _add_building(lot: Dictionary, kind: String, bname: String, accent: Color =
 		"er":
 			b["h"] = 62.0
 			b["col"] = Color(0.96, 0.97, 1.0)
-		"race":
+		"race", "crit", "velo":
 			b["h"] = 30.0
 			b["col"] = Color(0.2, 0.2, 0.26)
 		"gondola":
@@ -834,6 +836,8 @@ func _place_specials() -> void:
 		["bike", "Gravel Gods Cycles", Vector2(126, 96), Vector2(3, 3)],
 		["er", "St. Pedro's Hospital", Vector2(96, 92), Vector2(3, 3)],
 		["race", "Mt. Crankmore Race HQ", Vector2(30, 42), Vector2(3, 3)],
+		["crit", "Crusty Crit", Vector2(16, 66), Vector2(3, 3)],   # out on the west edge of town
+		["velo", "The Velodoughm", Vector2(152, 58), Vector2(3, 3)],   # and the indoor track on the east edge
 		["gondola", "Gondola Base", Vector2(24, 28), Vector2(3, 3)],
 		["townhall", "Mt. Crankmore Town Hall", Vector2(81, 67), Vector2(3, 3)],
 		["site", "Crankmore Heights", Vector2(46, 66), Vector2(3, 3)],
@@ -882,7 +886,7 @@ func _place_specials() -> void:
 				shops.append({"b": bi, "window": w, "hatch": hatch, "name": sp[1], "color": accent, "road": lot["road"], "s": lot["s"],
 					"chef": w + (hatch - w).normalized() * 0.4})
 				pizza_i += 1
-			"bike", "er", "race":
+			"bike", "er", "race", "crit", "velo":
 				zones.append({"pos": lot["door"], "r": 3.0, "kind": kind, "road": lot["road"], "s": lot["s"]})
 			"gondola":
 				gondola_top = b["pos"] + b["size"] * 0.5
@@ -1653,7 +1657,7 @@ func _spawn_rivals() -> void:
 		var p := astar.get_point_position(randi() % astar.get_point_count())
 		rival_state.append({"pos": p, "head": 0.0, "path": [], "state": "idle", "idle": randf_range(1.0, 5.0), "order": 0,
 			"stun": 0.0, "fall": 0.0, "wait": 0.0, "phase": randf() * TAU, "speed": 0.0, "mass": Game.rival_mass(i),
-			"bike": Game.rival_bike(Talk.rivals[i]), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
+			"bike": Game.rival_bike(), "ftp": Game.rival_ftp(Talk.rivals[i], Game.rival_mass(i)),
 			"off": Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35)),
 			"pu": "", "pu_hold": 0.0, "socks": 0.0, "bread": 0.0, "roller": 0.0, "blocked": false})
 
@@ -1727,6 +1731,7 @@ func _process(delta: float) -> void:
 	heli.update(delta)
 	_update_news(delta)
 	_update_champion(delta)
+	_update_yolanda(delta)
 	_update_frisbees(delta)
 	_update_squash()
 	if active:
@@ -1840,6 +1845,10 @@ func _update_player(delta: float) -> void:
 					prompt = "A / E:  Enter the bike shop"
 				"race":
 					prompt = "A / E:  Enter a Mt. Crankmore race"
+				"crit":
+					prompt = "A / E:  Enter the Crusty Crit"
+				"velo":
+					prompt = "A / E:  Enter the Velodoughm"
 				"er":
 					prompt = "St. Pedro's ER. Frequent flyers welcome."
 			if Input.is_action_just_pressed("act_select") and z["kind"] != "er":
@@ -2179,10 +2188,16 @@ func _update_uturn_hint() -> void:
 	uturn_hint = _path_len(behind, obj["pos"]) + 8.0 < _path_len(ahead, obj["pos"])
 
 
+## Getting hit by a car: a medical bill of ER_BILL[0]..ER_BILL[1] dollars, mostly at the low end (squaring a random
+## 0..1 makes half of all bills $100 or less, $117 on average), and CAR_DAMAGE[0]..CAR_DAMAGE[1] HP off the bike.
+const ER_BILL := [50, 250]
+const CAR_DAMAGE := [10, 30]
+
+
 func _hit_by_car(c: Dictionary) -> void:
 	p_fall = 0.0
 	p_fall_pizza = not carry.is_empty()
-	er_bill = 120 + int(p_speed * 35.0) + randi() % 60
+	er_bill = ER_BILL[0] + roundi((ER_BILL[1] - ER_BILL[0]) * pow(randf(), 2.0))
 	Game.add_money(-er_bill)
 	er_timer = 6.0
 	er_text = ER_JOKES.pick_random()
@@ -2205,8 +2220,11 @@ func _leave_er() -> void:
 	place_on(zone_anchor("er"))
 	rdir = 1.0
 	invuln = 2.0
-	if Game.damage_bike(40.0):   # hit by a car: the bike takes 40 HP
+	var hit := randi_range(CAR_DAMAGE[0], CAR_DAMAGE[1])   # hit by a car: the bike takes a knock too
+	if Game.damage_bike(hit):
 		Talk.say_random("bike_destroyed", true)
+	else:
+		Game.toast.emit("Your bike took a beating: -%d HP." % hit, Color(1.0, 0.6, 0.4))
 	Game.save_game()
 
 
@@ -2740,9 +2758,36 @@ func _update_champion(delta: float) -> void:
 		return
 	champion_t -= delta
 	if champion_t <= 0.0:
+		if yolanda_left > 0.0:
+			champion_t = Game.CHAMPION_WAIT   # one champion at a time
+			return
 		champion_t = randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])
 		champion_left = Game.CHAMPION_WAIT
 		Game.toast.emit("ANNOUNCEMENT: %s, winner of the Tour de Crankmore, is visiting town! Get to Race HQ within 5 minutes to race him!" % Game.CHAMPION["name"], Game.CHAMPION["color"])
+
+
+## Yellow Jersey Yolanda's visits (see Game.YOLANDA): announced about once an hour, then she waits at Race HQ for
+## CHAMPION_WAIT seconds to race the road race. Never while Maillot Max is in town: she turns up a little after he's gone.
+func _update_yolanda(delta: float) -> void:
+	if not active:
+		return
+	var y: Dictionary = Game.YOLANDA
+	if yolanda_left > 0.0:
+		var was := yolanda_left
+		yolanda_left = maxf(0.0, yolanda_left - delta)
+		if yolanda_left <= 0.0:
+			Game.toast.emit("%s has left town. Maybe next time." % y["name"], Color(0.8, 0.85, 1.0))
+		elif int(was / 60.0) != int(yolanda_left / 60.0):
+			Game.toast.emit("%s leaves Race HQ in %d minute%s!" % [y["name"], int(yolanda_left / 60.0) + 1, "" if yolanda_left < 60.0 else "s"], y["color"])
+		return
+	yolanda_t -= delta
+	if yolanda_t <= 0.0:
+		if champion_left > 0.0:
+			yolanda_t = Game.CHAMPION_WAIT   # one champion at a time
+			return
+		yolanda_t = randf_range(Game.CHAMPION_EVERY[0], Game.CHAMPION_EVERY[1])
+		yolanda_left = Game.CHAMPION_WAIT
+		Game.toast.emit("ANNOUNCEMENT: %s, %s, is in town! Get to Race HQ within 5 minutes to race her on %s!" % [y["name"], y["title"], y["course"]], y["color"])
 
 
 ## Moves a rival along its path. Returns true when the path is finished.
@@ -3052,9 +3097,12 @@ func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 		p_fall = 0.0
 		p_fall_pizza = not carry.is_empty()
 		p_speed = 0.0
-		Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
-		if by >= 0:
+		if by >= 0:   # a rival knocked you off: your bike takes a knock too
+			Game.toast.emit("%s %s! Down for %d s. Bike -%d HP." % [_rider_name(by), how, int(secs), int(Game.KNOCK_DAMAGE)], Color(1.0, 0.45, 0.35))
+			Game.damage_bike(Game.KNOCK_DAMAGE)
 			Talk.say(by, "pu_hit_player", true)
+		else:
+			Game.toast.emit("%s %s! Down for %d s." % [_rider_name(by), how, int(secs)], Color(1.0, 0.45, 0.35))
 	else:
 		var r: Dictionary = rival_state[who]
 		r["stun"] = secs
@@ -4261,7 +4309,7 @@ func _draw_beacons() -> void:
 				var s: Dictionary = shops[o["shop"]]
 				_beacon(s["window"], Color(1.0, 0.7, 0.15), "$%d  %s" % [o["pay"], s["name"]])
 	for z in zones:
-		var col := Color(0.4, 0.8, 1.0) if z["kind"] == "bike" else (Color(1.0, 0.9, 0.3) if z["kind"] == "race" else Color(1.0, 0.4, 0.4))
+		var col := Color(0.4, 0.8, 1.0) if z["kind"] == "bike" else (Color(1.0, 0.9, 0.3) if z["kind"] in ["race", "crit", "velo"] else Color(1.0, 0.4, 0.4))
 		_ring(z["pos"], z["r"] * 0.7, col, 2.0)
 
 
@@ -4291,7 +4339,7 @@ func _draw_building(b: Dictionary) -> void:
 	_draw_building_inner(b)
 	Iso.fade = 1.0
 	var kind: String = b["kind"]
-	var always := kind in ["pizza", "bike", "er", "race", "gondola", "townhall", "site"]
+	var always := kind in ["pizza", "bike", "er", "race", "crit", "velo", "gondola", "townhall", "site"]
 	var center: Vector2 = b["pos"] + b["size"] * 0.5
 	if always or (active and p_pos.distance_to(center) < 7.0) or kind == "hotel":
 		var col := Color(1.0, 0.95, 0.5) if always else Color(1, 1, 1)
@@ -4311,6 +4359,10 @@ func _building_art(b: Dictionary) -> String:
 			art = "hospital"
 		"race":
 			art = "building_race_hq"
+		"crit":
+			art = "building_crusty_crit"
+		"velo":
+			art = "building_velodoughm"
 		"gondola":
 			art = "building_gondola_base"
 		"townhall":
@@ -4397,7 +4449,7 @@ func _draw_building_inner(b: Dictionary) -> void:
 		"er":
 			# St. Pedro's hospital, with its helicopter pad on the roof: a picture standing on the lot's near corner
 			Sprites.draw_image(self, "hospital", Iso.to_screen(pos + size))
-		"race":
+		"race", "crit", "velo":
 			Iso.box(self, pos, size, h, col, 0.0, Season.roof(Color(0.92, 0.92, 0.92)))
 			for cy in int(size.y + 0.5):
 				for cx in int(size.x + 0.5):
@@ -4901,7 +4953,7 @@ func draw_minimap(ci: CanvasItem, rect: Rect2) -> void:
 			"pizza": col = Color(1.0, 0.3, 0.2)
 			"bike": col = Color(0.3, 0.6, 1.0)
 			"er": col = Color.WHITE
-			"race": col = Color(1.0, 0.9, 0.2)
+			"race", "crit", "velo": col = Color(1.0, 0.9, 0.2)
 			"townhall": col = Color(0.75, 0.5, 1.0)
 		if col.a > 0.0:
 			var mp := minimap_point(b["pos"] + b["size"] * 0.5, rect)

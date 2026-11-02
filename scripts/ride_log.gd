@@ -5,6 +5,7 @@ extends Node
 ## to disk until it is posted (then the screenshots go to user://rides/<activity>), so quitting without posting throws
 ## it away. It is written out as a TCX file for the upload.
 ## Power and cadence only come from a real trainer: keyboard riding logs speed and distance, never made-up watts.
+## Heart rate comes from a strap, or a trainer relaying one (see Trainer), whatever you pedal with.
 
 const OLD_DIR := "user://ride"   # where older versions kept the unposted ride on disk
 const MAX_SHOTS := 4
@@ -13,7 +14,7 @@ const START_ALT := 1250.0        # metres: Crankmore Village sits up in the moun
 const SCENIC_EVERY := 300.0      # seconds of riding between scenery screenshots (the first one at 90 s)
 const SHOT_PRIO := {"scenic": 0, "delivery": 1, "race": 2, "race_win": 3, "session": 99}   # (the session chart is never pushed out)
 
-var samples: Array = []          # [unix time, distance m, altitude m, speed m/s, watts or -1, rpm or -1]
+var samples: Array = []          # [unix time, distance m, altitude m, speed m/s, watts or -1, rpm or -1, bpm or -1]
 var distance := 0.0
 var altitude := START_ALT
 var pizzas := 0
@@ -58,7 +59,8 @@ func tick(delta: float, speed_mps: float, grade: float) -> void:
 		_last_sec = now
 		var live := Trainer.trainer_live
 		samples.append([now, snappedf(distance, 0.1), snappedf(altitude, 0.1), snappedf(v, 0.01),
-			roundi(Trainer.power()) if live else -1, roundi(Trainer.cadence()) if live else -1])
+			roundi(Trainer.power()) if live else -1, roundi(Trainer.cadence()) if live else -1,
+			Trainer.heart_rate if Trainer.hr_live else -1])
 
 
 ## Puts something that happened on the session's timeline (see `events`).
@@ -81,13 +83,17 @@ func can_post() -> bool:
 	return seconds() >= MIN_SECONDS
 
 
-## Session averages: power over every second a trainer reported (coasting included), cadence while pedalling, speed
-## over the time ridden. Power / cadence are -1 without a trainer.
+## Session averages: power over every second a trainer reported (coasting included), cadence while pedalling, heart
+## rate over every second a heart rate came in, speed over the time ridden. Power / cadence are -1 without a trainer,
+## heart rate (bpm, max_bpm) -1 without a heart rate monitor.
 func averages() -> Dictionary:
 	var pw := 0.0
 	var pw_n := 0
 	var rpm := 0.0
 	var rpm_n := 0
+	var bpm := 0.0
+	var bpm_n := 0
+	var bpm_max := -1
 	var vmax := 0.0
 	for s in samples:
 		if int(s[4]) >= 0:
@@ -96,8 +102,13 @@ func averages() -> Dictionary:
 		if int(s[5]) > 0:
 			rpm += float(s[5])
 			rpm_n += 1
+		if int(s[6]) > 0:
+			bpm += float(s[6])
+			bpm_n += 1
+			bpm_max = maxi(bpm_max, int(s[6]))
 		vmax = maxf(vmax, float(s[3]))
 	return {"watts": pw / pw_n if pw_n > 0 else -1.0, "rpm": rpm / rpm_n if rpm_n > 0 else -1.0,
+		"bpm": bpm / bpm_n if bpm_n > 0 else -1.0, "max_bpm": bpm_max,
 		"kmh": distance / _riding * 3.6 if _riding > 0.0 else 0.0, "max_kmh": vmax * 3.6}
 
 
@@ -136,6 +147,8 @@ func description() -> String:
 			notes += "\n" + str(e["text"])
 	if avg["watts"] >= 0.0:
 		notes += "\nAverage %d W, %d rpm" % [roundi(avg["watts"]), roundi(maxf(avg["rpm"], 0.0))]
+	if avg["bpm"] >= 0.0:
+		notes += "\nHeart rate: average %d bpm, max %d bpm" % [roundi(avg["bpm"]), avg["max_bpm"]]
 	return notes + "\n\nMt Crankmore - Pizza pays the bills, Cycling is life\nhttps://github.com/hermeslohin/mt-crankmore/releases"
 
 
@@ -199,20 +212,27 @@ func _iso(t: int) -> String:
 	return Time.get_datetime_string_from_unix_time(t) + "Z"
 
 
-## The ride as a Garmin TCX file (no GPS: Strava takes the distance, speed, power and cadence from it).
+## The ride as a Garmin TCX file (no GPS: Strava takes the distance, speed, heart rate, power and cadence from it).
 func to_tcx() -> String:
 	var t0 := int(samples[0][0])
 	var vmax := 0.0
 	for s in samples:
 		vmax = maxf(vmax, float(s[3]))
+	var avg := averages()
+	var hr := ""   # the lap's heart rate, between Calories and Intensity as the schema wants
+	if avg["bpm"] >= 0.0:
+		hr = "<AverageHeartRateBpm><Value>%d</Value></AverageHeartRateBpm><MaximumHeartRateBpm><Value>%d</Value></MaximumHeartRateBpm>" % [
+			roundi(avg["bpm"]), avg["max_bpm"]]
 	var out := PackedStringArray()
 	out.append('<?xml version="1.0" encoding="UTF-8"?>')
 	out.append('<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2">')
 	out.append('<Activities><Activity Sport="Biking"><Id>%s</Id>' % _iso(t0))
-	out.append('<Lap StartTime="%s"><TotalTimeSeconds>%d</TotalTimeSeconds><DistanceMeters>%.1f</DistanceMeters><MaximumSpeed>%.2f</MaximumSpeed><Calories>0</Calories><Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>' % [
-		_iso(t0), seconds(), float(samples[-1][1]), vmax])
+	out.append('<Lap StartTime="%s"><TotalTimeSeconds>%d</TotalTimeSeconds><DistanceMeters>%.1f</DistanceMeters><MaximumSpeed>%.2f</MaximumSpeed><Calories>0</Calories>%s<Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>' % [
+		_iso(t0), seconds(), float(samples[-1][1]), vmax, hr])
 	for s in samples:
 		var pt := "<Trackpoint><Time>%s</Time><AltitudeMeters>%.1f</AltitudeMeters><DistanceMeters>%.1f</DistanceMeters>" % [_iso(int(s[0])), float(s[2]), float(s[1])]
+		if int(s[6]) > 0:
+			pt += "<HeartRateBpm><Value>%d</Value></HeartRateBpm>" % int(s[6])
 		if int(s[5]) >= 0:
 			pt += "<Cadence>%d</Cadence>" % clampi(int(s[5]), 0, 254)
 		pt += "<Extensions><ns3:TPX><ns3:Speed>%.2f</ns3:Speed>" % float(s[3])

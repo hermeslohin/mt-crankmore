@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mt. Crankmore</title>
+<meta name="description" content="A 16-bit pizza-delivery racing game you ride on your bike trainer. Pizza pays the bills, cycling is life.">
+<meta property="og:title" content="Mt. Crankmore">
+<meta property="og:description" content="A 16-bit pizza-delivery racing game you ride on your bike trainer.">
+<meta property="og:image" content="https://hermeslohin.github.io/mt-crankmore/title.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍕</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #15133a;
+    --panel: #1f1c52;
+    --panel-2: #29256a;
+    --line: #3b3690;
+    --ink: #f3f1ff;
+    --muted: #b9b5e6;
+    --gold: #ffd84a;
+    --pizza: #ff8a3d;
+    --sauce: #e8473b;
+    --leaf: #59d18a;
+    --sky: #6fc3ff;
+    --pixel: "Press Start 2P", ui-monospace, monospace;
+    --body: "Nunito", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--ink);
+    font: 400 17px/1.6 var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  a { color: var(--gold); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  /* top bar */
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(21, 19, 58, 0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 3px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; }
+  .brand { font-family: var(--pixel); font-size: 13px; color: var(--gold); text-decoration: none; white-space: nowrap; }
+  nav ul { display: flex; gap: 20px; list-style: none; margin: 0; padding: 0; }
+  nav ul a { color: var(--muted); text-decoration: none; font-weight: 700; font-size: 15px; }
+  nav ul a:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { padding: 56px 0 40px; }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1.25fr; gap: 40px; align-items: center; }
+  h1 {
+    font-family: var(--pixel); font-weight: 400;
+    font-size: clamp(26px, 4.6vw, 46px); line-height: 1.25; margin: 0 0 18px;
+    color: var(--gold);
+    text-shadow: 4px 4px 0 var(--sauce), 8px 8px 0 rgba(0, 0, 0, 0.35);
+  }
+  .tagline { font-family: var(--pixel); font-size: 12px; line-height: 1.8; color: var(--pizza); margin: 0 0 18px; }
+  .lede { font-size: 19px; color: var(--ink); margin: 0 0 26px; max-width: 34em; }
+  .shot {
+    border: 4px solid var(--gold);
+    box-shadow: 8px 8px 0 var(--sauce), 0 20px 50px rgba(0, 0, 0, 0.5);
+    border-radius: 4px; overflow: hidden; background: #000;
+  }
+
+  /* buttons */
+  .downloads { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--pixel); font-size: 11px; line-height: 1;
+    padding: 15px 18px; text-decoration: none;
+    color: var(--night); background: var(--gold);
+    border: 3px solid var(--night); box-shadow: 4px 4px 0 var(--sauce);
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--sauce); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--sauce); }
+  .btn .arrow { font: 800 16px/1 var(--body); }
+  .small { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+
+  /* sections */
+  section { padding: 56px 0; }
+  section.band { background: var(--panel); border-top: 3px solid var(--line); border-bottom: 3px solid var(--line); }
+  h2 { font-family: var(--pixel); font-weight: 400; font-size: clamp(16px, 2.4vw, 22px); line-height: 1.5; color: var(--gold); margin: 0 0 10px; }
+  .intro { color: var(--muted); max-width: 46em; margin: 0 0 32px; font-size: 18px; }
+  h3 { font-size: 19px; font-weight: 800; margin: 0 0 6px; }
+
+  .gear { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card { background: var(--panel-2); border: 3px solid var(--line); padding: 20px; border-radius: 4px; }
+  .card p { margin: 0; color: var(--muted); }
+  .icon { font-size: 26px; line-height: 1; margin-bottom: 10px; }
+
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .features.three { grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0 12px; }
+  .level { background: var(--panel-2); border: 3px solid var(--line); border-radius: 4px; padding: 16px; }
+  .level b { display: block; font-family: var(--pixel); font-size: 11px; color: var(--gold); margin-bottom: 10px; }
+  .level span { color: var(--muted); font-size: 15px; }
+  .level .pct { display: block; font-size: 26px; font-weight: 800; color: var(--ink); margin-bottom: 4px; }
+  .challenges { list-style: none; margin: 18px 0 0; padding: 0; }
+  .challenges li { padding: 10px 0 10px 34px; position: relative; border-bottom: 2px dashed var(--line); }
+  .challenges li::before { content: "★"; position: absolute; left: 4px; color: var(--pizza); }
+  .challenges b { color: var(--ink); }
+  .pus { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin-top: 20px; }
+  .pu { background: var(--panel-2); border: 3px solid var(--line); border-radius: 4px; padding: 16px; display: grid; grid-template-columns: 64px 1fr; grid-template-rows: auto auto 1fr; gap: 4px 14px; align-items: start; }
+  .pu img { width: 64px; height: 64px; image-rendering: pixelated; grid-row: span 3; }
+  .pu h3 { margin: 0; font-size: 17px; }
+  .pu .where { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gold); }
+  .pu p { margin: 0; color: var(--muted); font-size: 14px; }
+  .challenges span { color: var(--muted); }
+  figure { margin: 0; }
+  figure img { border: 3px solid var(--line); border-radius: 4px; }
+  figcaption { margin-top: 12px; }
+  figcaption p { margin: 0; color: var(--muted); }
+
+  .races { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 28px; }
+  .race { border-left: 4px solid var(--pizza); padding: 4px 0 4px 14px; }
+  .race b { display: block; }
+  .race span { color: var(--muted); font-size: 15px; }
+
+  .next { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; align-items: center; }
+  .next ul { margin: 0; padding: 0; list-style: none; }
+  .next li { padding: 10px 0 10px 34px; position: relative; border-bottom: 2px dashed var(--line); }
+  .next li::before { content: "▶"; position: absolute; left: 4px; color: var(--leaf); }
+  .badge { font-family: var(--pixel); font-size: 9px; color: var(--night); background: var(--leaf); padding: 5px 7px; vertical-align: middle; margin-left: 6px; }
+
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .step { counter-increment: s; background: var(--panel-2); border: 3px solid var(--line); padding: 20px 20px 20px 66px; position: relative; border-radius: 4px; }
+  .step::before { content: counter(s); position: absolute; left: 18px; top: 18px; font-family: var(--pixel); font-size: 18px; color: var(--gold); }
+  .step p { margin: 0; color: var(--muted); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em; background: rgba(0, 0, 0, 0.35); padding: 2px 6px; border-radius: 3px; color: var(--ink); word-break: break-all; }
+
+  /* bikes, riders and courses */
+  .bikes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+  .bike { background: var(--panel-2); border: 3px solid var(--line); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; }
+  .bike .pic { height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; background: rgba(0, 0, 0, 0.18); border-radius: 3px; }
+  .bike .pic img { max-height: 140px; width: auto; max-width: 100%; }
+  .bike .price { font-family: var(--pixel); font-size: 10px; color: var(--gold); margin: 0 0 8px; }
+  .bike .blurb { color: var(--muted); font-style: italic; margin: 0 0 10px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; color: var(--muted); margin: 0 0 10px; }
+  .stats b { color: var(--ink); }
+  .pro, .con { margin: 4px 0 0; font-size: 15px; padding-left: 22px; position: relative; color: var(--ink); }
+  .pro::before, .con::before { position: absolute; left: 0; font-weight: 800; }
+  .pro::before { content: "+"; color: var(--leaf); }
+  .con::before { content: "−"; color: var(--sauce); }
+
+  .riders { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+  .rider { background: var(--panel-2); border: 3px solid var(--line); border-top: 6px solid var(--c, var(--line)); border-radius: 4px; padding: 16px; }
+  .rider .faces { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
+  .rider .face { width: 96px; height: 96px; border: 3px solid var(--c, var(--line)); border-radius: 4px; background: rgba(0, 0, 0, 0.25); }
+  .rider .ride { height: 96px; width: auto; }
+  .rider h3 { color: var(--c, var(--ink)); }
+  .rider p { margin: 0 0 8px; color: var(--muted); font-size: 15px; }
+  .rider q { display: block; color: var(--ink); font-style: italic; font-size: 15px; }
+  .meter { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .meter i { flex: 1; height: 8px; background: rgba(0, 0, 0, 0.35); border-radius: 2px; overflow: hidden; }
+  .meter i::after { content: ""; display: block; height: 100%; width: var(--v); background: var(--c, var(--gold)); }
+  .meter span { width: 74px; }
+  .champs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+  .champs .rider { padding: 20px; }
+  .champs .face { width: 128px; height: 128px; }
+  .champs .ride { height: 128px; }
+  h3.sub { font-family: var(--pixel); font-weight: 400; font-size: 13px; color: var(--gold); margin: 40px 0 6px; }
+
+  .course { display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; align-items: center; padding: 28px 0; border-bottom: 2px dashed var(--line); }
+  .course:last-child { border-bottom: 0; }
+  .course:nth-child(even) figure { order: 2; }
+  .course p { color: var(--muted); margin: 0 0 12px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 0 0 12px; }
+  .fact { background: var(--panel-2); border: 2px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .fact b { display: block; font-size: 18px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+  .fact span { font-size: 13px; color: var(--muted); }
+  .course ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  .course li { margin: 2px 0; }
+
+  .statlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 18px 0 0; }
+  .statlist div { border-left: 4px solid var(--sky); padding: 2px 0 2px 12px; }
+  .statlist b { display: block; }
+  .statlist span { color: var(--muted); font-size: 15px; }
+  .shot.wide { margin: 28px 0 0; }
+
+  footer { padding: 40px 0 56px; text-align: center; color: var(--muted); font-size: 15px; }
+  footer .tagline { margin-bottom: 10px; }
+
+  @media (max-width: 860px) {
+    .hero .wrap, .next, .features, .features.three, .champs, .course { grid-template-columns: 1fr; }
+    .course:nth-child(even) figure { order: 0; }
+    .levels { grid-template-columns: repeat(2, 1fr); }
+    .hero { padding-top: 32px; }
+    nav ul { display: none; }
+  }
+  @media (max-width: 420px) {
+    .btn { font-size: 10px; padding: 13px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#">MT. CRANKMORE</a>
+    <ul>
+      <li><a href="#ride">Ride it</a></li>
+      <li><a href="#level">Your level</a></li>
+      <li><a href="#powerups">Power-ups</a></li>
+      <li><a href="#bikes">Bikes</a></li>
+      <li><a href="#rivals">Rivals</a></li>
+      <li><a href="#courses">Courses</a></li>
+      <li><a href="#stats">Stats</a></li>
+      <li><a href="#next">Coming next</a></li>
+      <li><a href="#download">Download</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Mt.<br>Crankmore</h1>
+      <p class="tagline">Pizza pays the bills,<br>cycling is life.</p>
+      <p class="lede">A 16-bit pizza-delivery racing game you ride on your real bike. Pedal your smart trainer through a little 90s mountain town, beat rival couriers to the orders, and race up Mt. Crankmore when the shift is over.</p>
+      <div class="downloads" id="download">
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-windows-x86_64.zip"><span class="arrow" aria-hidden="true">↓</span>Windows</a>
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-macos.zip"><span class="arrow" aria-hidden="true">↓</span>macOS</a>
+        <a class="btn" href="https://github.com/hermeslohin/mt-crankmore/releases/latest/download/MtCrankmore-linux-x86_64.tar.gz"><span class="arrow" aria-hidden="true">↓</span>Linux</a>
+      </div>
+      <p class="small">Free. Works with just a keyboard, too. <a href="https://github.com/hermeslohin/mt-crankmore/releases">All releases</a></p>
+    </div>
+    <div class="shot"><img src="title.png" alt="The Mt. Crankmore title screen: a pixel-art mountain village" width="1280" height="720"></div>
+  </div>
+</header>
+
+<section class="band" id="ride">
+  <div class="wrap">
+    <h2>Your bike is the controller</h2>
+    <p class="intro">Your watts move your rider. Hills in the game make the trainer push back, and every pizza you deliver is a real effort.</p>
+    <div class="gear">
+      <div class="card"><div class="icon">🚴</div><h3>Smart trainers</h3><p>Any FTMS trainer over Bluetooth, and Wahoo KICKRs over Wi-Fi with Direct Connect. The game sets the resistance for every climb and descent.</p></div>
+      <div class="card"><div class="icon">⚡</div><h3>Power meters</h3><p>No smart trainer? A Bluetooth power meter on pedals, cranks or a spider works too.</p></div>
+      <div class="card"><div class="icon">🎮</div><h3>Handlebar controllers</h3><p>Steer at junctions, shift through 21 virtual gears and fire power-ups without letting go of the bars.</p></div>
+      <div class="card"><div class="icon">📈</div><h3>Strava</h3><p>Every session is logged and posts to Strava as a Virtual Ride, with power, cadence, distance, climbing and your pizza count.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="level">
+  <div class="wrap">
+    <h2>Ride at your level</h2>
+    <p class="intro">Tell the game your <b>FTP</b> (the power you can hold for about an hour) and your weight, once, in Rider setup. Then pick a <b>difficulty</b> for how you feel today: it sets how hard the other riders go, as a share of what you can do. Fresh legs? Turn it up. Tired, or just spinning? Turn it down. Every rival, race and challenge in town follows it, so a race is a race whatever your FTP.</p>
+    <div class="levels">
+      <div class="level"><b>Easy</b><span class="pct">50%</span><span>A recovery spin</span></div>
+      <div class="level"><b>Medium</b><span class="pct">65%</span><span>A solid ride</span></div>
+      <div class="level"><b>Hard</b><span class="pct">80%</span><span>A proper workout</span></div>
+      <div class="level"><b>Ludicrous</b><span class="pct">100%</span><span>Race day legs</span></div>
+    </div>
+    <p class="small">Want the details? The <a href="https://github.com/hermeslohin/mt-crankmore/blob/dev/docs/difficulty.md">difficulty guide</a> has the formulas and what it takes to win each race.</p>
+  </div>
+</section>
+
+<section class="band" id="town">
+  <div class="wrap">
+    <h2>A town that keeps busy</h2>
+    <p class="intro">Day turns to night, the seasons change and there's always something going on: parades, fireworks, runaway dogs and robberies to break up.</p>
+    <div class="features">
+      <figure>
+        <img src="delivery.png" alt="Delivering a pizza through town, steam rising off the box" width="1280" height="720" loading="lazy">
+        <figcaption><h3>Deliver hot</h3><p>Grab an order from a glowing pizza window and get it there before it goes cold. The other couriers want it too.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="night.png" alt="The village at night with the street lamps on" width="1280" height="720" loading="lazy">
+        <figcaption><h3>Day, night and four seasons</h3><p>An hour-long day, street lamps at dusk, rain from spring to fall and snow all winter.</p></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="challenges">
+  <div class="wrap">
+    <div class="features">
+      <div>
+        <h2>Town challenges</h2>
+        <p class="intro" style="margin-bottom:0">While you deliver, the town throws in efforts that pay. Each one asks for a share of your FTP, so it's a real interval whatever your level. A few of them:</p>
+        <ul class="challenges">
+          <li><b>Catch the thief</b> <span>(110% of FTP): chase down a robber running from a shop.</span></li>
+          <li><b>Stop the bike thief</b> <span>(130%): he's off on a brand-new bike. Catch him for $300.</span></li>
+          <li><b>Beat the hot rod</b> <span>(120%): a drag race to a chequered line through town.</span></li>
+          <li><b>Race the kid</b> <span>(60%): a kid on a BMX wants a race. Don't lose.</span></li>
+          <li><b>Hill sprint</b> <span>(105%): beat the clock up one of the town's named hills.</span></li>
+          <li><b>Pizza rush</b> <span>(80%): five deliveries back to back, for a bonus.</span></li>
+          <li><b>Catch the dog</b> <span>(80%): a runaway dog has slipped its lead.</span></li>
+          <li><b>Seagulls!</b> <span>(90%): they want your pizza. Get away.</span></li>
+        </ul>
+      </div>
+      <figure>
+        <img src="race_arrow.png" alt="Racing the hot rod through town, a big red arrow painted on the road at the turn" width="1280" height="720" loading="lazy">
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="powerups">
+  <div class="wrap">
+    <h2>Power-ups</h2>
+    <p class="intro">About one in eight townsfolk, and the fans along every race course, hold up a power-up. Ride past empty-handed and they toss it to you. You carry one at a time, it shows on the WEEHOO, and <b>Y</b> or your controller's power-up button uses it. The rivals grab them too, and they will use them on you.</p>
+    <div class="pus">
+      <div class="pu"><img src="img/pu_frisbee.png" alt="" width="64" height="64" loading="lazy"><h3>Pizza Frisbee</h3><p class="where">Town and races</p><p>Knocks a rival within 15 m off their bike for 5 seconds. Out of range, you keep it.</p></div>
+      <div class="pu"><img src="img/pu_mitt.png" alt="" width="64" height="64" loading="lazy"><h3>Oven Mitt</h3><p class="where">Town and races</p><p>Snatches from the nearest rider within 10 m: the pizza they're delivering in town, their power-up in a race.</p></div>
+      <div class="pu"><img src="img/pu_socks.png" alt="" width="64" height="64" loading="lazy"><h3>Fire Socks</h3><p class="where">Town and races</p><p>30% faster for 15 seconds.</p></div>
+      <div class="pu"><img src="img/pu_breadsticks.png" alt="" width="64" height="64" loading="lazy"><h3>Breadsticks</h3><p class="where">Town and races</p><p>You grow huge for 12 seconds, and anyone you ride into falls over.</p></div>
+      <div class="pu"><img src="img/pu_roller.png" alt="" width="64" height="64" loading="lazy"><h3>Dough Roller</h3><p class="where">Town and races</p><p>Rolls the hills flat for 15 seconds: climbs feel like flat road, on your trainer too. Descents still count.</p></div>
+      <div class="pu"><img src="img/pu_portal.png" alt="" width="64" height="64" loading="lazy"><h3>Pepperoni Portal</h3><p class="where">Town only</p><p>Warps you to the nearest pizza shop with a pizza waiting.</p></div>
+      <div class="pu"><img src="img/pu_wrench.png" alt="" width="64" height="64" loading="lazy"><h3>Bike Wrench</h3><p class="where">Town only</p><p>Fixes your bike back to full HP.</p></div>
+      <div class="pu"><img src="img/pu_walkie.png" alt="" width="64" height="64" loading="lazy"><h3>Walkie Talkie</h3><p class="where">Town only, rare</p><p>Summons a dancing pizza mascot that blocks the nearest rival for 12 seconds.</p></div>
+    </div>
+    <p class="small" style="margin-top:20px">Getting knocked off by a rival's power-up costs your bike 5 HP: the only way a race wears your bike. The Velodoughm has none: just legs.</p>
+  </div>
+</section>
+
+<section id="races">
+  <div class="wrap">
+    <div class="features">
+      <figure>
+        <img src="switchbacks.png" alt="Climbing the switchbacks on Mt. Crankmore past cliffs" width="1280" height="720" loading="lazy">
+      </figure>
+      <div>
+        <h2>Race the bunch</h2>
+        <p class="intro" style="margin-bottom:0">Rivals draft each other, take turns on the front and attack in the last two kilometres. They ride at a share of <em>your</em> power, so a race is a race whatever your FTP.</p>
+        <p class="small" style="margin-top:20px">Six courses, from a meadow loop to the summit: <a href="#courses">see them all</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="bikes">
+  <div class="wrap">
+    <h2>Pick your bike</h2>
+    <p class="intro">You start on whatever was behind the dumpster. Deliver pizza, win races and save up at Spokes &amp; Stuff. A bike changes how fast your watts take you: lighter climbs better, more aero flies on the flat, and some love gravel more than others. Crash too often and its HP runs out. Every rival rides the same middle-of-the-road Club Racer, so a better bike makes <em>you</em> faster and nobody else. Own a few and you pick one from the garage every time you head into town or line up for a race.</p>
+    <div class="bikes">
+      <div class="bike">
+        <div class="pic"><img src="img/bike_rusty.png" alt="The Rusty Trash Bike" loading="lazy"></div>
+        <h3>Rusty Trash Bike</h3>
+        <p class="price">Your first bike</p>
+        <p class="blurb">Found behind a dumpster. Squeaks in three keys.</p>
+        <p class="stats"><span><b>11.8 kg</b></span><span><b>60</b> HP</span></p>
+        <p class="pro">Free, and the mechanic fixes it for nothing</p><p class="pro">Can't be destroyed: you just tape it back together</p><p class="con">The heaviest, slowest and wobbliest bike in town</p><p class="con">Thunder Thighs McGee won't race you on it</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_commuter.png" alt="The Garage Sale Commuter" loading="lazy"></div>
+        <h3>Garage Sale Commuter</h3>
+        <p class="price">$250</p>
+        <p class="blurb">Comes with a bell and a mysterious stain.</p>
+        <p class="stats"><span><b>9.7 kg</b></span><span><b>85</b> HP</span></p>
+        <p class="pro">Cheap, and a big step up from the trash bike</p><p class="con">Still heavy, upright and draggy: not much of a racer</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_fixie.png" alt="The Fixie" loading="lazy"></div>
+        <h3>Fixie</h3>
+        <p class="price">$2,000</p>
+        <p class="blurb">Completely impractical, but utterly awesome.</p>
+        <p class="stats"><span><b>7.5 kg</b></span><span><b>95</b> HP</span></p>
+        <p class="pro">Light and quick on the flat</p><p class="pro">Made for the Velodoughm and the Crusty Crit</p><p class="con">One gear and no brakes: a grind up the mountain</p><p class="con">The worst bike on gravel</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_carbon.png" alt="The Carbon Crit Machine" loading="lazy"></div>
+        <h3>Carbon Crit Machine</h3>
+        <p class="price">$2,600</p>
+        <p class="blurb">Light as a thin crust. Costs like a stuffed one.</p>
+        <p class="stats"><span><b>7.2 kg</b></span><span><b>130</b> HP</span></p>
+        <p class="pro">Light, slippery and sharp in the corners</p><p class="pro">Quick round town and in the Crusty Crit</p><p class="con">Only so-so on gravel</p><p class="con">The Golden Pepperoni Pro beats it everywhere</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_gravel.png" alt="The Gravel Grinder" loading="lazy"></div>
+        <h3>Gravel Grinder</h3>
+        <p class="price">$3,000</p>
+        <p class="blurb">Eats curbs for breakfast.</p>
+        <p class="stats"><span><b>8.3 kg</b></span><span><b>110</b> HP</span></p>
+        <p class="pro">The best bike on gravel by far</p><p class="pro">Built for the Mt. Crankmore races</p><p class="con">Heavier than the race bikes</p><p class="con">On tarmac, only as quick as the rivals' bikes</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_golden.png" alt="The Golden Pepperoni Pro" loading="lazy"></div>
+        <h3>Golden Pepperoni Pro</h3>
+        <p class="price">$7,500</p>
+        <p class="blurb">Legendary. Smells faintly of mozzarella.</p>
+        <p class="stats"><span><b>6.6 kg</b></span><span><b>150</b> HP</span></p>
+        <p class="pro">The fastest bike you can buy, and the toughest</p><p class="pro">Great on every course</p><p class="con">Pricey</p><p class="con">The Gravel Grinder is still better in the dirt</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_hoofy.png" alt="The Hoofy Bike" loading="lazy"></div>
+        <h3>Hoofy Bike</h3>
+        <p class="price">A gift from Santa</p>
+        <p class="blurb">A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump.</p>
+        <p class="stats"><span><b>11.1 kg</b></span><span><b>70</b> HP</span></p>
+        <p class="pro">Free, festive, and it jingles</p><p class="pro">Sturdier than the trash bike</p><p class="con">Nearly as heavy and slow as the trash bike</p><p class="con">Only turns up on a winter night</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_champion.png" alt="The Champion's Bike" loading="lazy"></div>
+        <h3>Champion's Bike</h3>
+        <p class="price">Beat Maillot Max</p>
+        <p class="blurb">Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.</p>
+        <p class="stats"><span><b>6.5 kg</b></span><span><b>160</b> HP</span></p>
+        <p class="pro">The lightest and toughest bike in the game</p><p class="pro">Great on every course</p><p class="con">There's only one: you have to beat Maillot Max to get it</p>
+      </div>
+      <div class="bike">
+        <div class="pic"><img src="img/bike_tri.png" alt="The Baguette Blade, a golden tri bike with aero bars and a disc wheel" loading="lazy"></div>
+        <h3>Baguette Blade <span class="badge">COMING NEXT</span></h3>
+        <p class="price">Beat Yellow Jersey Yolanda</p>
+        <p class="blurb">Yolanda's tri bike, aero bars and all. Long, pointy and golden, like the best baguette.</p>
+        <p class="stats"><span><b>7.6 kg</b></span><span><b>120</b> HP</span></p>
+        <p class="pro">The most aero bike in the game: the fastest on tarmac</p><p class="pro">Made for Baguette Boulevard, the Crusty Crit and town</p><p class="con">Hates gravel, and twitchy in the corners</p><p class="con">The only way to get it is to beat Yolanda</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="rivals">
+  <div class="wrap">
+    <h2>The rivals</h2>
+    <p class="intro">Eight couriers want your orders and your podium. Pick how many ride with you (one to eight) in Rider setup. They all trash-talk, steal orders, throw power-ups and race at a share of your power, but each has a style: some attack again and again, some sit in and wait.</p>
+    <div class="riders">
+      <div class="rider" style="--c:#9a59e6">
+        <div class="faces"><img class="face" src="img/face_carl.png" alt="Cryptic Carl's face" loading="lazy"><img class="ride" src="img/rider_carl.png" alt="Cryptic Carl riding" loading="lazy"></div>
+        <h3>Cryptic Carl</h3>
+        <p>Conspiracy theorist. Every pothole is a cover-up and the Mothman is real, and it delivers faster than you. Picks the moment to go in a race.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:50%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:85%"></i></div>
+        <q>Mothman delivers faster than you. Just saying.</q>
+      </div>
+      <div class="rider" style="--c:#e63340">
+        <div class="faces"><img class="face" src="img/face_sarah.png" alt="Super Sarah's face" loading="lazy"><img class="ride" src="img/rider_sarah.png" alt="Super Sarah riding" loading="lazy"></div>
+        <h3>Super Sarah</h3>
+        <p>A self-made superhero in a cape that's "scientifically" worth 12%. With a city to save and pizzas to deliver, Sarah attacks to do both.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:60%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:15%"></i></div>
+        <q>Have no fear, Super Sarah is here!</q>
+      </div>
+      <div class="rider" style="--c:#1abfbf">
+        <div class="faces"><img class="face" src="img/face_carla.png" alt="Cadence Carla's face" loading="lazy"><img class="ride" src="img/rider_carla.png" alt="Cadence Carla riding" loading="lazy"></div>
+        <h3>Cadence Carla</h3>
+        <p>The numbers nerd. Carla knows the cadence (92), yours (a rumour) and your odds (a rounding error). Rides steady and rarely attacks.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:20%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:6%"></i></div>
+        <q>Statistically, you're losing.</q>
+      </div>
+      <div class="rider" style="--c:#ff66b3">
+        <div class="faces"><img class="face" src="img/face_wanda.png" alt="Wheelie Wanda's face" loading="lazy"><img class="ride" src="img/rider_wanda.png" alt="Wheelie Wanda riding" loading="lazy"></div>
+        <h3>Wheelie Wanda</h3>
+        <p>The show-off. Every ride is a highlight reel and every straight is a chance for a wheelie. Attacks more than anyone.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:85%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:55%"></i></div>
+        <q>Watch this wheelie! ...Did you watch? Rewind!</q>
+      </div>
+      <div class="rider" style="--c:#80664d">
+        <div class="faces"><img class="face" src="img/face_gus.png" alt="Gear Grinder Gus's face" loading="lazy"><img class="ride" src="img/rider_gus.png" alt="Gear Grinder Gus riding" loading="lazy"></div>
+        <h3>Gear Grinder Gus</h3>
+        <p>The old-timer who delivered uphill both ways and still doesn't trust derailleurs. The strongest engine in town: a diesel who wears you down rather than attacks.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:30%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:100%"></i></div>
+        <q>Back in my day we delivered uphill both ways.</q>
+      </div>
+      <div class="rider" style="--c:#59cc59">
+        <div class="faces"><img class="face" src="img/face_maya.png" alt="Margherita Maya's face" loading="lazy"><img class="ride" src="img/rider_maya.png" alt="Margherita Maya riding" loading="lazy"></div>
+        <h3>Margherita Maya</h3>
+        <p>Sweet as can be, and every word is a dig. Bless your little pedals. An all-rounder who makes a move when you least expect it.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:45%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:70%"></i></div>
+        <q>Aw, sweetie, bless your little pedals.</q>
+      </div>
+      <div class="rider" style="--c:#f2d933">
+        <div class="faces"><img class="face" src="img/face_tony.png" alt="Tubeless Tony's face" loading="lazy"><img class="ride" src="img/rider_tony.png" alt="Tubeless Tony riding" loading="lazy"></div>
+        <h3>Tubeless Tony</h3>
+        <p>Dude. Chill. Tony is just vibing and thinking about his nap. The most laid-back rider in town, and he almost never attacks.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:10%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:6%"></i></div>
+        <q>Is it already over? I was vibing.</q>
+      </div>
+      <div class="rider" style="--c:#d9d9e6">
+        <div class="faces"><img class="face" src="img/face_kim.png" alt="Karate Kim's face" loading="lazy"><img class="ride" src="img/rider_kim.png" alt="Karate Kim riding" loading="lazy"></div>
+        <h3>Karate Kim</h3>
+        <p>Black belt, in pedalling too. Focused, strong and quick to strike: when Kim goes, you hear the Hi-YAH on the way past.</p>
+        <div class="meter"><span>Attacks</span><i style="--v:75%"></i></div>
+        <div class="meter"><span>Engine</span><i style="--v:80%"></i></div>
+        <q>Hi-YAH! That was me passing you.</q>
+      </div>
+    </div>
+
+    <h3 class="sub">The champions</h3>
+    <div class="champs">
+      <div class="rider" style="--c:#ffdb1a">
+        <div class="faces"><img class="face" src="img/face_max.png" alt="Maillot Max's face" loading="lazy"><img class="ride" src="img/rider_max.png" alt="Maillot Max in the yellow jersey" loading="lazy"></div>
+        <h3>Maillot Max</h3>
+        <p>Three-time winner of the Tour de Crankmore, and he'll tell you about it. About once an hour of riding he's announced as visiting town: get to Race HQ within five minutes and you can take him on in a mountain race, with all the rivals too. He rides 10% harder than the strongest of them and attacks often.</p>
+        <p>Finish ahead of him for a $500 bonus, and he hands over his own bike.</p>
+        <q>Is that a pizza bike? Adorable.</q>
+      </div>
+      <div class="rider" style="--c:#ffb82e">
+        <div class="faces"><img class="face" src="img/face_yolanda.png" alt="Yellow Jersey Yolanda's face" loading="lazy"><img class="ride" src="img/rider_yolanda.png" alt="Yellow Jersey Yolanda riding in her yellow jersey" loading="lazy"></div>
+        <h3>Yellow Jersey Yolanda <span class="badge">COMING NEXT</span></h3>
+        <p>Three-time winner of the Tour de French Bread, and the best climber on tarmac you'll ever chase. About once an hour of riding she's announced as visiting town: get to Race HQ within five minutes and race her on Baguette Boulevard, with all the rivals too. She rides 10% harder than the strongest of them and loves to attack on the climbs.</p>
+        <p>Finish ahead of her for a $500 bonus, and she hands over her tri bike, the Baguette Blade: the only way to get it.</p>
+        <q>Stay on my wheel if you can. Nobody can.</q>
+      </div>
+      <div class="rider" style="--c:#f2383a">
+        <div class="faces"><img class="face" src="img/face_mcgee.png" alt="Thunder Thighs McGee's face" loading="lazy"><img class="ride" src="img/rider_mcgee.png" alt="Thunder Thighs McGee riding" loading="lazy"></div>
+        <h3>Thunder Thighs McGee <span class="badge">COMING NEXT</span></h3>
+        <p>The sprinter who owns the Velodoughm. His quads have their own postcode. One flying lap, just you and him: he puts out 150% of your FTP, so it's a flat-out effort to beat him, and the better your bike the less it takes. He won't even line up against the Rusty Trash Bike.</p>
+        <q>These quads have their own postcode.</q>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="courses">
+  <div class="wrap">
+    <h2>The courses</h2>
+    <p class="intro">Four races start from Mt. Crankmore Race HQ in town and head out through the village, into the valley and up the mountain. The Crusty Crit and the Velodoughm have their own buildings on the edges of town. Payouts on the bunch races: the winner takes the prize, 2nd half of it, 3rd 30% and 4th 15%.</p>
+
+    <div class="course">
+      <figure><img src="img/course_flour.png" alt="The Flour Run: the bunch splashing through a creek between flower meadows" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Flour Run</h3>
+        <p>The gentle one. A loop through the flower meadows at the foot of Mt. Crankmore, with easy climbs, short dips and flat stretches, finishing back where you started. Good for a first race, or a recovery day.</p>
+        <div class="facts">
+          <div class="fact"><b>3 km</b><span>about 10 min</span></div>
+          <div class="fact"><b>+4%</b><span>steepest climb</span></div>
+          <div class="fact"><b>$20</b><span>entry</span></div>
+          <div class="fact"><b>$250</b><span>prize</span></div>
+        </div>
+        <ul><li>Wide sweeping bends instead of hairpins</li><li>Creek fords, jumps and fallen logs</li><li>Wildlife on the road, the odd bear included</li></ul>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_foothill.png" alt="The Foothill Gravel Grind: the bunch on autumn gravel switchbacks while a moose watches" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Foothill Gravel Grind</h3>
+        <p>Six kilometres of rolling gravel switchbacks up the lower slopes. Lots of short ups and downs, so it pays to stay in the draft and pick your moment.</p>
+        <div class="facts">
+          <div class="fact"><b>6 km</b><span>about 20 min</span></div>
+          <div class="fact"><b>~230 m</b><span>of climbing</span></div>
+          <div class="fact"><b>12%</b><span>steepest ramp</span></div>
+          <div class="fact"><b>14</b><span>hairpins</span></div>
+          <div class="fact"><b>$40</b><span>entry</span></div>
+          <div class="fact"><b>$500</b><span>prize</span></div>
+        </div>
+        <ul><li>Jumps, creek crossings and fallen trees</li><li>A dark tunnel and level crossings on the mountain railway</li><li>Squirrels, deer, moose and a bear or two</li><li>Skiers and a chairlift once you're above the snow line</li></ul>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_summit.png" alt="The Summit Gravel Showdown: climbing a snowy hairpin under the chairlift" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Summit Gravel Showdown</h3>
+        <p>Straight up Mt. Crankmore. Hairpin after hairpin stacked up the face like the Alpe d'Huez, with ramps up to 12% and short plunges in between, all the way to the snow at the top. Legends are made here. So are blisters.</p>
+        <div class="facts">
+          <div class="fact"><b>4.4 km</b><span>about 20 min</span></div>
+          <div class="fact"><b>~260 m</b><span>of climbing</span></div>
+          <div class="fact"><b>12%</b><span>steepest ramp</span></div>
+          <div class="fact"><b>17</b><span>hairpins</span></div>
+          <div class="fact"><b>$100</b><span>entry</span></div>
+          <div class="fact"><b>$1,200</b><span>prize</span></div>
+        </div>
+        <ul><li>Two tunnels and the railway to cross</li><li>Logs, creeks and bears on the way up</li><li>Snow, skiers and groomers near the summit</li><li>Where Maillot Max likes to be raced, along with the Foothill</li></ul>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_road.png" alt="Baguette Boulevard: the bunch strung out down a gentle descent past the houses of Lower Crankmore, the rolling hills on the bike computer" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Baguette Boulevard <span class="badge">COMING NEXT</span></h3>
+        <p>A proper road race. Five kilometres of tarmac through the houses of Lower Crankmore, with front gardens, mailboxes and half the street out cheering. Gentle rounded hills all the way, finishing back level with the start. No gravel, so your road bike finally gets to shine.</p>
+        <div class="facts">
+          <div class="fact"><b>5 km</b><span>about 13 min</span></div>
+          <div class="fact"><b>~80 m</b><span>of climbing</span></div>
+          <div class="fact"><b>5</b><span>rolling hills</span></div>
+          <div class="fact"><b>6%</b><span>steepest climb</span></div>
+          <div class="fact"><b>$60</b><span>entry</span></div>
+          <div class="fact"><b>$900</b><span>prize</span></div>
+        </div>
+        <ul><li>Asphalt the whole way: every bike rolls on its own tyres</li><li>Houses, lamp posts and mailboxes along the road</li><li>Squirrels, foxes and rabbits darting out of the gardens</li><li>Where Yellow Jersey Yolanda races on her visits, and gives away her tri bike if you beat her</li></ul>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_crit.png" alt="The Crusty Crit: the bunch riding under the red, white, blue and yellow balloon arch over the start/finish line, fans along the barriers" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>Crusty Crit <span class="badge">COMING NEXT</span></h3>
+        <p>A flat criterium round the park on the west edge of town, with half the village lining the barriers. Race as many laps as you can in 25 minutes, then everyone gets two more. All eight rivals sign on, so it's a big bunch, fast corners and a sprint under the balloon arch.</p>
+        <div class="facts">
+          <div class="fact"><b>750 m</b><span>a lap, on tarmac</span></div>
+          <div class="fact"><b>25 min</b><span>+ 2 laps</span></div>
+          <div class="fact"><b>Flat</b><span>no climbing</span></div>
+          <div class="fact"><b>$60</b><span>entry</span></div>
+          <div class="fact"><b>$900</b><span>prize</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="course">
+      <figure><img src="img/course_velodoughm.png" alt="The Velodoughm: Thunder Thighs McGee leads into the banked turn" width="1280" height="720" loading="lazy"></figure>
+      <div>
+        <h3>The Velodoughm <span class="badge">COMING NEXT</span></h3>
+        <p>An indoor wooden track on the east edge of town, banked steep in the turns round two basketball courts. One flying lap against Thunder Thighs McGee. No drafting and no power-ups: just legs. Track tyres on smooth boards roll almost for free, whatever you ride.</p>
+        <div class="facts">
+          <div class="fact"><b>750 m</b><span>one lap</span></div>
+          <div class="fact"><b>150%</b><span>of your FTP to match McGee</span></div>
+          <div class="fact"><b>$50</b><span>entry</span></div>
+          <div class="fact"><b>$600</b><span>winner takes all</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stats">
+  <div class="wrap">
+    <h2>Track your stats</h2>
+    <p class="intro">Every ride counts. The game logs your session from the moment you hit New game or Continue until you quit to the title, and shows you exactly what you rode.</p>
+
+    <div class="features">
+      <figure>
+        <img src="bear.png" alt="The Weehoo bike computer in a race: elevation profile, speed, watts, position and grade, beside a crashed rider and a bear" width="1280" height="720" loading="lazy">
+      </figure>
+      <div>
+        <h3>On the bike: the Weehoo</h3>
+        <p style="color:var(--muted);margin:0">A little bike computer rides in the corner of the screen the whole time, like the one on your bars.</p>
+        <div class="statlist">
+          <div><b>Speed and watts</b><span>Your live speed and power, with a strip of lights across the top that climbs through the power zones as you push towards your FTP and past it.</span></div>
+          <div><b>Grade and gear</b><span>The slope under your wheels, and which of the 21 gears you're in.</span></div>
+          <div><b>The course map</b><span>In a race, the elevation profile with every rider on it, the distance left and the clock.</span></div>
+          <div><b>Race position</b><span>Your place, with the time gaps to every rival in the standings.</span></div>
+          <div><b>Cadence and HP</b><span>Your rpm, and how much life your bike has left (or, riding on the keyboard, how much is left in your legs).</span></div>
+          <div><b>Power-up</b><span>Whatever you're carrying, ready to fire.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shot wide"><img src="session.png" alt="The Session over screen: 25.3 km in 39:59, 3 pizzas, challenges and race placings, with power, cadence, heart rate and speed charts and their averages (the heart rate chart is coming next)" width="1280" height="720" loading="lazy"></div>
+
+    <div class="features" style="margin-top:28px">
+      <div>
+        <h3>When you stop: Session over</h3>
+        <p style="color:var(--muted);margin:0 0 10px">Quit to the title and you get the whole session on one screen.</p>
+        <div class="statlist">
+          <div><b>The headline</b><span>Distance and time, pizzas delivered, challenges won and lost, and where you placed in every race.</span></div>
+          <div><b>Four charts</b><span>Power, cadence, speed and (coming next) heart rate over the session, each with its max and a dashed average line.</span></div>
+          <div><b>A timeline</b><span>Markers along the top for every pizza, challenge and race result, so you can see which effort was which.</span></div>
+          <div><b>Honest numbers</b><span>Pauses leave a gap rather than a flat line, and riding on the keyboard never makes up watts.</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Then: Strava</h3>
+        <p style="color:var(--muted);margin:0 0 10px">Link your account once and post the session from the same screen.</p>
+        <div class="statlist">
+          <div><b>A Virtual Ride</b><span>With distance, speed, climbing, power and cadence, and heart rate from the next update.</span></div>
+          <div><b>A title and notes</b><span>Like "Mt. Crankmore: 3 pizzas and 1 race win", with your challenges, race results and averages in the description.</span></div>
+          <div><b>Screenshots</b><span>Up to four from the ride (scenery, deliveries, races and the session chart), saved in a folder ready to drag onto the activity.</span></div>
+          <div><b>No rush</b><span>The session stays postable from the title screen until you start the next one.</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="small" style="margin-top:20px">Heart rate, coming next, comes from a Bluetooth strap, or ANT+ through a Wahoo trainer. The pause menu keeps your all-time totals: money, deliveries and races won.</p>
+  </div>
+</section>
+
+<section class="band" id="next">
+  <div class="wrap next">
+    <div>
+      <h2>Coming next</h2>
+      <p class="intro">Already being tested for the next update:</p>
+      <ul>
+        <li><b><a href="#courses">Baguette Boulevard</a></b> <span class="badge">NEW</span><br><span style="color:var(--muted)">A 5 km road race on tarmac from Race HQ, over gentle hills and past the houses of Lower Crankmore.</span></li>
+        <li><b><a href="#rivals">Yellow Jersey Yolanda</a></b> <span class="badge">NEW</span><br><span style="color:var(--muted)">The Tour de French Bread champion visits about once an hour. Beat her on Baguette Boulevard for her tri bike, the Baguette Blade.</span></li>
+        <li><b>The Velodoughm</b> <span class="badge">NEW</span><br><span style="color:var(--muted)">One flying lap of an indoor wooden track against Thunder Thighs McGee.</span></li>
+        <li><b>The Crusty Crit</b><br><span style="color:var(--muted)">25 minutes round the park, then two more laps.</span></li>
+        <li><b>Heart rate</b><br><span style="color:var(--muted)">From Bluetooth straps, or ANT+ through your Wahoo trainer. Logged and sent to Strava.</span></li>
+        <li><b>A look for every bike</b><br><span style="color:var(--muted)">From the Rusty Trash Bike to the Golden Pepperoni Pro.</span></li>
+      </ul>
+    </div>
+    <div class="shot"><img src="img/course_road.png" alt="The bunch racing down Baguette Boulevard past the houses of Lower Crankmore" width="1280" height="720" loading="lazy"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Getting started</h2>
+    <p class="intro">Download the build for your computer and you're riding in a minute.</p>
+    <div class="steps">
+      <div class="step"><h3>Download and run</h3><p>Windows: unzip and run <code>MtCrankmore.exe</code>. Linux: extract and run the binary. macOS: see the next step.</p></div>
+      <div class="step"><h3>First launch on a Mac</h3><p>Right-click the app and choose Open. If macOS says it's damaged, run <code>xattr -cr "Mt. Crankmore.app"</code> once.</p></div>
+      <div class="step"><h3>Connect your trainer</h3><p>Choose Connect Trainer on the title screen. Installing the Bluetooth helper the first time needs Python 3 and an internet connection.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p class="tagline">Pizza pays the bills, cycling is life.</p>
+    <p>Made with <a href="https://godotengine.org">Godot</a>. Pixel art made with PixelLab. <a href="https://github.com/hermeslohin/mt-crankmore">Source on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

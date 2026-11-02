@@ -4,7 +4,8 @@ extends RefCounted
 ## up in user://art/ first (drop-in testing, mods), then res://art/.
 ##
 ## One rider = a set of sheets named after them: bike_<rider>.png ("bike_carla", "bike_rookie_girl", ...; the player
-## is bike_rookie_boy or bike_rookie_girl, see player_sheet).
+## is bike_rookie_boy or bike_rookie_girl, see player_sheet, or on a bike with its own art bike_rookie_boy_<art>, the
+## bike's "art" in Game.bikes: bike_rookie_girl_fixie_pizza.png, winter_bike_rookie_boy_rusty_fall_boxed.png ...).
 ##   * Columns = animation frames, 8 rows = directions of travel:
 ##     down-right, down, down-left, left, up-left, up, up-right, right (the first is world +x, then turning 45 degrees
 ##     at a time; in the isometric view the diagonals are the ones you see on the roads).
@@ -253,9 +254,18 @@ static func dir_row(w: Vector2) -> int:
 	return posmod(roundi(w.angle() / (PI / 4.0)), DIRS)
 
 
-## The sheet name for a rider: "YOU" is the player's chosen character, anyone else their short name ("Carla").
+## The sheet name for a rider: "YOU" is the player's chosen character on the bike they're riding (the plain sheets
+## when that bike has no art of its own yet), anyone else their short name ("Carla").
 static func sheet_name(who: String) -> String:
-	return "bike_" + (player_sheet if who == "YOU" else who.to_lower())
+	if who != "YOU":
+		return "bike_" + who.to_lower()
+	var base := "bike_" + player_sheet
+	# (looked up, not named: tools run Sprites without the game's autoloads)
+	var game := (Engine.get_main_loop() as SceneTree).root.get_node_or_null("Game") if Engine.get_main_loop() is SceneTree else null
+	var art: String = game.bike().get("art", "") if game != null else ""
+	if art != "" and sheet(base + "_" + art) != null:
+		return base + "_" + art
+	return base
 
 
 const THROW_FPS := 14.0   # the pizza-frisbee throw (art/bike_<rider>_throw[_boxed].png), played once
@@ -567,6 +577,14 @@ const TURN_LAG := 0.12    # radians, about 7 degrees
 const TURN_FADE := 0.2    # seconds (a turn clip's 4 frames play over this too)
 const TURN_SETTLE := 0.35 # seconds a heading must stay in another view's range to turn to it inside the lag
 static var _rider_turns := {}
+
+
+## Forgets the riders' turns drawn on `ci` (a race starting over: nobody turns round from where the last one ended).
+static func forget_turns(ci: CanvasItem) -> void:
+	var prefix := "%d/" % ci.get_instance_id()
+	for key in _rider_turns.keys():
+		if str(key).begins_with(prefix):
+			_rider_turns.erase(key)
 
 
 ## A lasting turn dictionary for something drawn by name with nowhere of its own to keep it (one of a kind in a

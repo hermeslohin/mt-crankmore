@@ -18,54 +18,123 @@ const SAVE_PATH := "user://pizza_city_save.json"
 const SLOGAN := "Pizza pays the bills, cycling is life"
 const LB_PER_KG := 2.20462
 
-## The share of YOUR FTP (as W/kg, at their own weight) rivals ride at, in town and in races alike ("share"), and how
-## good their bikes are (offset on their usual bike tier).
+## The share of YOUR W/kg (FTP / weight from the menu, at their own weight) rivals ride at, in town and in races alike ("share").
+## Their bikes don't change with it (see RIVAL_BIKE).
 const DIFFICULTIES := {
-	"easy": {"label": "Easy", "share": 0.5, "tier": -1, "blurb": "Rivals ride at about 50% of your FTP. Relaxed spins and big tips."},
-	"medium": {"label": "Medium", "share": 0.65, "tier": 0, "blurb": "Rivals ride at about 65% of your FTP. Push a bit and you'll win."},
-	"hard": {"label": "Hard", "share": 0.8, "tier": 1, "blurb": "Rivals ride at about 80% of your FTP on better bikes. Good luck."},
-	"ludicrous": {"label": "Ludicrous", "share": 1.0, "tier": 2, "blurb": "Rivals ride at 100% of your FTP on their best bikes. Bring snacks."},
+	"easy": {"label": "Easy", "share": 0.5, "blurb": "Rivals ride at about 50% of your W/kg. Relaxed spins and big tips."},
+	"medium": {"label": "Medium", "share": 0.65, "blurb": "Rivals ride at about 65% of your W/kg. Push a bit and you'll win."},
+	"hard": {"label": "Hard", "share": 0.8, "blurb": "Rivals ride at about 80% of your W/kg. Good luck."},
+	"ludicrous": {"label": "Ludicrous", "share": 1.0, "blurb": "Rivals ride at 100% of your W/kg. Bring snacks."},
 }
 const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 
 ## The reigning Tour de Crankmore champion. About once an hour of riding in town he's announced as visiting
 ## (City._update_champion); get to Race HQ within CHAMPION_WAIT and you can race him and the rivals. He rides 10%
 ## harder than the strongest of them (Race._build_riders). Art: bike_max.png / bike_max_fall.png.
-const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "tier": 3, "speed": 4.4,
+const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "speed": 4.4, "attack": 0.6,
 	"sig": ["The yellow jersey doesn't wear itself.", "I've won this town's tour three times. Keep up.", "Is that a pizza bike? Adorable.",
 		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels."]}
 const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
 const CHAMPION_BONUS := 500                # cash for finishing ahead of him (and his bike, CHAMPION_BIKE)
+## Yellow Jersey Yolanda, three-time winner of the Tour de French Bread. Like Maillot Max she's announced about once an
+## hour of riding in town (City._update_yolanda) and waits CHAMPION_WAIT at Race HQ, rides CHAMPION_EDGE harder than the
+## strongest rival, and finishing ahead of her pays her "bonus"; but she only races the road race (Race course
+## "road"); beat her and she hands over her tri bike, the Baguette Blade (TRI_BIKE). Art: bike_yolanda.png / bike_yolanda_fall.png, face_yolanda.png.
+const YOLANDA := {"name": "Yellow Jersey Yolanda", "short": "Yolanda", "color": Color(1.0, 0.72, 0.18), "ftp": 268.0, "speed": 4.3, "attack": 0.7,
+	"title": "three-time winner of the Tour de French Bread", "bonus": 500, "course": "Baguette Boulevard",
+	"sig": ["Three Tours de French Bread. Ask me about the baguette stage.", "I've eaten tougher climbs than this for breakfast. With butter.",
+		"Stay on my wheel if you can, {n}. Nobody can.", "This jersey is yellow because I keep winning in it.",
+		"Rise and shine, {n}. Like good dough."],
+	"lines": {
+		"race_start": ["Five kilometres of tarmac. I'll see you at the top, {n}. Probably from the podium.", "Bread is proved in the oven. Riders are proved on the climbs.",
+			"Ready, {n}? I've been ready since the Tour de French Bread."],
+		"race_pass_player": ["Coming through, {n}! Mind the crumbs.", "That's how we climb in the Tour de French Bread!", "Don't look so crusty, {n}. Grab my wheel!"],
+		"race_player_pass": ["Ooh, {n}! Now we've got a bake-off!", "Enjoy the view up front. It won't last.", "Well, butter my baguette!"],
+		"race_win_rival": ["Another day, another yellow jersey.", "Good ride, {n}. Come back when you've risen a little more.", "Fresh out of the oven: me, first."],
+		"race_lose_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Well done, {n}. That's a ride they'll write about in the bakeries.",
+			"I'm toast. Golden-brown, well-earned toast."],
+		"race_win_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Respect, {n}. Next time I'm bringing the sourdough legs."],
+	}}
+## Thunder Thighs McGee, who rides the Velodoughm (Race course "velo"): one lap, just you and him. He puts out THUNDER_PACE
+## of your FTP on his own bike (RIVAL_BIKE, like everyone else) at his own weight (THUNDER_MASS), so only your FTP sets his speed: a
+## better bike or a lighter you makes you faster, not him (see thunder_speed, thunder_watts). Art:
+## bike_mcgee.png / bike_mcgee_fall.png, face_mcgee.png. "lines": what he says for each Talk category ("sig" otherwise).
+const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "attack": 0.0,
+	"sig": ["These quads have their own postcode.", "I don't skip leg day. Leg day skips everything else.", "Do you even squat, bro?",
+		"My thighs have thighs.", "I warm up by leg-pressing the Zamboni."],
+	"lines": {
+		"race_start": ["One lap. One chance. One pair of LEGENDARY THIGHS.", "Hope you ate your pasta, {n}. All of it.",
+			"Feel that rumble? That's my quads warming up.", "750 metres of pain, {n}. Mostly yours."],
+		"race_pass_player": ["THUNDER COMING THROUGH!", "Hear that, {n}? That's thunder. From my THIGHS.", "Out of the sprinter's lane, small legs!",
+			"Was that a breeze? No, that was me."],
+		"race_player_pass": ["WHAT?! Who taught those little legs to do that?", "Impossible! I did 900 squats this morning!",
+			"Enjoy it, {n}. The thunder always comes back.", "Hey! My calves weren't ready!"],
+		"race_win_rival": ["THUNDER THIGHS WINS AGAIN! Flex for the crowd!", "Go home and do some lunges, {n}.",
+			"The Velodoughm belongs to the THIGHS!"],
+		"race_lose_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too.",
+			"My quads... they've never felt this way before."],
+		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
+	}}
+const THUNDER_PACE := 1.5    # his watts, as a share of YOUR FTP
+const THUNDER_MASS := 75.0   # kg
 const MAX_RIVALS := 8
 
+## Each bike: physics ("mass" kg, "cda", "crr", "gravel" drag factor, "turn" handling), "hp", the shop's "blurb", and
+## "good" / "bad": what it's good and bad at, in a line each (the bike shop, My bikes, and the website). Its picture in
+## the shop is art/shop_bike_<art>.png.
 var bikes: Array = [
-	{"name": "Rusty Trash Bike", "price": 0, "mass": 18.0, "cda": 0.52, "crr": 0.013, "hp": 60.0, "gravel": 1.0, "turn": 0.85,
-		"color": Color(0.6, 0.45, 0.3), "blurb": "Found behind a dumpster. Squeaks in three keys."},
-	{"name": "Garage Sale Commuter", "price": 250, "mass": 13.5, "cda": 0.45, "crr": 0.009, "hp": 85.0, "gravel": 1.0, "turn": 0.95,
-		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain."},
-	{"name": "Gravel Grinder", "price": 8000, "mass": 10.5, "cda": 0.38, "crr": 0.007, "hp": 110.0, "gravel": 0.35, "turn": 1.05,
-		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast."},
-	{"name": "Carbon Crit Machine", "price": 2600, "mass": 8.0, "cda": 0.32, "crr": 0.005, "hp": 130.0, "gravel": 0.9, "turn": 1.15,
-		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one."},
-	{"name": "Golden Pepperoni Pro", "price": 7500, "mass": 6.8, "cda": 0.28, "crr": 0.004, "hp": 150.0, "gravel": 0.6, "turn": 1.25,
-		"color": Color(1.0, 0.8, 0.15), "blurb": "Legendary. Smells faintly of mozzarella."},
+	{"name": "Rusty Trash Bike", "art": "rusty", "price": 0, "mass": 11.8, "cda": 0.384, "crr": 0.0084, "hp": 60.0, "gravel": 0.73, "turn": 0.85,
+		"color": Color(0.6, 0.45, 0.3), "blurb": "Found behind a dumpster. Squeaks in three keys.",
+		"good": "Free, and the mechanic fixes it for nothing. It can't be destroyed: you just tape it back together.",
+		"bad": "The heaviest, slowest and wobbliest bike in town. Thunder Thighs McGee won't race you on it."},
+	{"name": "Garage Sale Commuter", "art": "commuter", "price": 250, "mass": 9.7, "cda": 0.352, "crr": 0.0066, "hp": 85.0, "gravel": 0.73, "turn": 0.95,
+		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain.",
+		"good": "Cheap, and a big step up from the trash bike.",
+		"bad": "Still heavy, upright and draggy. Not much of a racer."},
+	{"name": "Gravel Grinder", "art": "gravel", "price": 3000, "mass": 8.3, "cda": 0.32, "crr": 0.0056, "hp": 110.0, "gravel": 0.43, "turn": 1.05,
+		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast.",
+		"good": "The best bike on gravel by far, so the mountain races are its home.",
+		"bad": "Heavier than the race bikes, and on tarmac only as quick as the rivals' bikes."},
+	{"name": "Carbon Crit Machine", "art": "carbon", "price": 2600, "mass": 7.2, "cda": 0.293, "crr": 0.0047, "hp": 130.0, "gravel": 0.68, "turn": 1.15,
+		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one.",
+		"good": "Light, slippery and sharp in the corners. Quick round town and in the Crusty Crit.",
+		"bad": "Only so-so on gravel, and the Golden Pepperoni Pro beats it everywhere."},
+	{"name": "Golden Pepperoni Pro", "art": "golden", "price": 7500, "mass": 6.6, "cda": 0.275, "crr": 0.0043, "hp": 150.0, "gravel": 0.55, "turn": 1.25,
+		"color": Color(1.0, 0.8, 0.15), "blurb": "Legendary. Smells faintly of mozzarella.",
+		"good": "The fastest bike you can buy, and the toughest. Great everywhere.",
+		"bad": "Pricey. The Gravel Grinder is still better in the dirt."},
 	# "fixed": one gear (Trainer.FIXED_GEAR), no shifting and no brakes
-	{"name": "Fixie", "price": 2000, "mass": 8.6, "cda": 0.36, "crr": 0.006, "hp": 95.0, "gravel": 1.1, "turn": 1.1, "fixed": true,
-		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome."},
+	{"name": "Fixie", "art": "fixie", "price": 2000, "mass": 7.5, "cda": 0.311, "crr": 0.0052, "hp": 95.0, "gravel": 0.77, "turn": 1.1, "fixed": true,
+		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome.",
+		"good": "Light and quick on the flat: made for the Velodoughm and the Crusty Crit.",
+		"bad": "One gear and no brakes: a grind up the mountain, and the worst bike on gravel."},
 	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
-	{"name": "Hoofy Bike", "price": 0, "gift": true, "mass": 16.5, "cda": 0.49, "crr": 0.0115, "hp": 70.0, "gravel": 0.95, "turn": 0.9,
-		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
+	{"name": "Hoofy Bike", "art": "hoofy", "price": 0, "gift": true, "mass": 11.1, "cda": 0.371, "crr": 0.0077, "hp": 70.0, "gravel": 0.71, "turn": 0.9,
+		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump.",
+		"good": "Free, festive, and it jingles. Sturdier than the trash bike.",
+		"bad": "Nearly as heavy and slow as the trash bike."},
 	# "gift": not for sale; yours for beating the Tour de Crankmore champion (see Race._end_race)
-	{"name": "Champion's Bike", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
-		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube."},
+	{"name": "Champion's Bike", "art": "champion", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
+		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.",
+		"good": "The lightest and toughest bike in the game, and great on every course.",
+		"bad": "There's only one: you have to beat Maillot Max to get it."},
+	# "gift": not for sale; yours for beating Yellow Jersey Yolanda on Baguette Boulevard (see Race._end_race). A tri bike
+	# with aero bars: the most aero bike there is, so the fastest on tarmac, but poor on gravel and twitchy in the corners
+	{"name": "Baguette Blade", "art": "tri", "price": 0, "gift": true, "mass": 7.6, "cda": 0.25, "crr": 0.0042, "hp": 120.0, "gravel": 0.95, "turn": 0.95,
+		"color": Color(1.0, 0.72, 0.18), "blurb": "Yellow Jersey Yolanda's tri bike, aero bars and all. Long, pointy and golden, like the best baguette.",
+		"good": "The most aero bike in the game: the fastest on tarmac, in town, the Crusty Crit and Baguette Boulevard.",
+		"bad": "Hates gravel, twitchy in the corners, and the only way to get it is to beat Yolanda."},
 ]
 const HOOFY := 6   # the Hoofy Bike's place in `bikes`
 const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
+const TRI_BIKE := 8   # the Baguette Blade's place in `bikes`: Yellow Jersey Yolanda's prize
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
+const VELO_CRR := 0.002      # the Velodoughm's wooden boards: track tyres on smooth wood roll almost for free, any bike
+const KNOCK_DAMAGE := 5.0   # bike HP you lose when a rival knocks you off (Pizza Frisbee, breadstick power), in town or a race
 
 const START_MONEY := 100
 var money := START_MONEY
@@ -90,6 +159,15 @@ var setup_done := false       # the rider has seen the setup screen at least onc
 
 func _ready() -> void:
 	load_game()
+	_dev_money()
+
+
+## Dev helper: PIZZA_MONEY=<dollars> sets your money when the game starts (whatever the save says) and for a New game,
+## so you can buy bikes and enter races without riding for it. Saved like any other money unless PIZZA_NO_SAVE is set.
+func _dev_money() -> void:
+	if OS.has_environment("PIZZA_MONEY"):
+		money = maxi(0, OS.get_environment("PIZZA_MONEY").to_int())
+		money_changed.emit()
 
 
 # ---- bikes -------------------------------------------------------------
@@ -102,8 +180,16 @@ func bike_hp() -> float:
 	return hp.get(equipped, 0.0)
 
 
-func hp_ratio() -> float:
-	return clampf(bike_hp() / float(bike()["hp"]), 0.0, 1.0)
+## The share of its HP a bike has left: the one you're riding, or bike `i`.
+func hp_ratio(i: int = -1) -> float:
+	if i < 0:
+		i = equipped
+	return clampf(hp.get(i, 0.0) / float(bikes[i]["hp"]), 0.0, 1.0)
+
+
+## Whether any bike in the garage is fit to race (more than 10% HP left).
+func can_race() -> bool:
+	return owned.any(func(i): return hp_ratio(i) > 0.1)
 
 
 ## Returns true if the bike was destroyed by this damage.
@@ -201,12 +287,12 @@ func weight_text() -> String:
 
 const RIVAL_SPREAD := 0.05   # the strongest / weakest rival is 5% above / below the base
 
-## A rival's FTP in watts: the player's FTP from the menu (not W/kg), spread 5% either way per rival. They ride at
-## rival_share() of it, by difficulty.
+## A rival's FTP in watts: the player's W/kg from the menu (FTP / weight), spread 5% either way per rival, times the
+## rival's own weight `rider_mass`, so they climb like you would. They ride at rival_share() of it, by difficulty.
 func rival_ftp(info: Dictionary, rider_mass: float) -> float:
-	# the roster ftp (215-275) maps onto a personal spread of -5% .. +5% around the menu FTP
+	# the roster ftp (215-275) maps onto a personal spread of -5% .. +5% around the menu W/kg
 	var spread := clampf((float(info["ftp"]) - 245.0) / 30.0, -1.0, 1.0) * RIVAL_SPREAD
-	return ftp * (1.0 + spread) * float(info.get("ftp_pct", 1.0))   # "ftp_pct" trims a rival further
+	return wkg() * rider_mass * (1.0 + spread) * float(info.get("ftp_pct", 1.0))   # "ftp_pct" trims a rival further
 
 
 ## The share of their FTP rivals ride at, by difficulty: the same in town and in a race.
@@ -218,10 +304,15 @@ func rival_mass(i: int) -> float:
 	return 68.0 + (i % 3) * 3.0
 
 
-## Rivals stick to geared bikes.
-func rival_bike(info: Dictionary) -> Dictionary:
-	var geared := bikes.filter(func(b): return not b.get("fixed", false))
-	return geared[clampi(int(info["tier"]) + int(DIFFICULTIES[difficulty]["tier"]), 0, geared.size() - 1)]
+## What every rival rides, in town and in races (Maillot Max and Thunder Thighs McGee too): a middle-of-the-road bike,
+## the middle of the five bikes for sale on every count, whatever the difficulty. Only your bike changes with what you
+## buy, so a better bike makes you faster and nobody else.
+const RIVAL_BIKE := {"name": "Club Racer", "mass": 8.3, "cda": 0.32, "crr": 0.0056, "hp": 110.0, "gravel": 0.68, "turn": 1.05,
+	"color": Color(0.55, 0.6, 0.7)}
+
+
+func rival_bike() -> Dictionary:
+	return RIVAL_BIKE
 
 
 ## True while riding a fixed-gear bike: no shifting, no brakes.
@@ -242,6 +333,26 @@ func set_rival_count(n: int) -> void:
 # ---- physics -----------------------------------------------------------
 
 ## Steady-state speed (m/s) for a given power and grade (fraction, 0.05 = 5%). Rider mass defaults to the player's weight.
+## How fast McGee goes on flat smooth boards (m/s): THUNDER_PACE of your FTP on RIVAL_BIKE, at THUNDER_MASS.
+func thunder_speed() -> float:
+	var b := rival_bike()
+	return speed_from_power(ftp * THUNDER_PACE, b["mass"], b["cda"], VELO_CRR, 0.0, THUNDER_MASS)
+
+
+## The watts it takes you to match McGee on your current bike (flat, smooth boards): beat this to beat him.
+func thunder_watts() -> float:
+	return power_for_speed(thunder_speed(), bike()["mass"], bike()["cda"], VELO_CRR, 0.0)
+
+
+## The other way round from speed_from_power: the watts that hold `v` m/s.
+func power_for_speed(v: float, bike_mass: float, cda: float, crr: float, grade: float, rider_mass: float = -1.0) -> float:
+	if rider_mass < 0.0:
+		rider_mass = weight_kg
+	var m := rider_mass + bike_mass
+	var theta := atan(grade)
+	return v * (m * GRAVITY * (sin(theta) + crr * cos(theta)) + 0.5 * AIR_RHO * cda * v * v) / 0.975
+
+
 func speed_from_power(power: float, bike_mass: float, cda: float, crr: float, grade: float, rider_mass: float = -1.0) -> float:
 	if rider_mass < 0.0:
 		rider_mass = weight_kg
@@ -269,7 +380,8 @@ func has_save() -> bool:
 
 ## Wipes the save and resets progress (money, garage, stats). Rider settings (FTP, weight, rivals) are kept.
 func new_game() -> void:
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	if not no_save:   # (a test run's New game leaves the player's save alone)
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	money = START_MONEY
 	owned = [0]
 	hp = {0: bikes[0]["hp"]}
@@ -282,6 +394,7 @@ func new_game() -> void:
 	rival_order.shuffle()   # a new game gets a random field
 	Talk.set_count(rival_count)
 	money_changed.emit()
+	_dev_money()
 
 
 var no_save := OS.has_environment("PIZZA_NO_SAVE")

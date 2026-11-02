@@ -1,11 +1,12 @@
 extends Control
-## The end-of-session timeline: power, cadence and speed lanes over the session (each with its average as a dashed
-## line), and markers along the top for pizzas delivered, challenges won or lost and race placings.
-## Built from Ride.snapshot(); power and cadence lanes say so when no trainer was connected.
+## The end-of-session timeline: power, cadence, heart rate and speed lanes over the session (each with its average as
+## a dashed line), and markers along the top for pizzas delivered, challenges won or lost and race placings.
+## Built from Ride.snapshot(); the power and cadence lanes say so when no trainer was connected, the heart rate lane
+## when no heart rate monitor was.
 
 const W := 440
 const STRIP := 16          # px, the event markers along the top
-const LANE := 32
+const LANE := 26
 const GAP := 3
 const INK := Color(0.1, 0.08, 0.16)
 const LANE_BG := Color(0.04, 0.05, 0.16)
@@ -13,6 +14,7 @@ const GAP_S := 3           # seconds without a sample that break the line (pause
 const LANES := [
 	{"key": 4, "name": "POWER", "unit": "W", "avg": "watts", "color": Color(1.0, 0.72, 0.25)},
 	{"key": 5, "name": "CADENCE", "unit": "rpm", "avg": "rpm", "color": Color(0.4, 0.85, 1.0)},
+	{"key": 6, "name": "HEART RATE", "unit": "bpm", "avg": "bpm", "color": Color(1.0, 0.4, 0.5), "none": "no heart rate monitor connected"},
 	{"key": 3, "name": "SPEED", "unit": "km/h", "avg": "kmh", "color": Color(0.5, 1.0, 0.5)},
 ]
 const EVENT_COL := {"pizza": Color(1.0, 0.6, 0.2), "won": Color(0.4, 1.0, 0.5), "lost": Color(1.0, 0.4, 0.35), "race": Color(1.0, 0.85, 0.3)}
@@ -29,7 +31,7 @@ var events: Array = []
 
 func setup(snap: Dictionary) -> void:
 	font = ThemeDB.fallback_font
-	custom_minimum_size = Vector2(W, STRIP + 3 * LANE + 2 * GAP + 24)
+	custom_minimum_size = Vector2(W, STRIP + LANES.size() * (LANE + GAP) - GAP + 24)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var samples: Array = snap["samples"]
 	avg = snap["avg"]
@@ -111,7 +113,7 @@ func _draw() -> void:
 			_text("avg %s %s" % [("%.1f" % a) if lane["key"] == 3 else str(roundi(a)), lane["unit"]], Vector2(0, y + 9), Color(1, 1, 1), HORIZONTAL_ALIGNMENT_RIGHT, W - 3)
 		else:
 			_text(lane["name"], Vector2(3, y + 9), Color(lane["color"], 0.9))
-			_text("no trainer connected", Vector2(0, y + LANE * 0.5 + 4), Color(0.6, 0.62, 0.8), HORIZONTAL_ALIGNMENT_CENTER, W)
+			_text(lane.get("none", "no trainer connected"), Vector2(0, y + LANE * 0.5 + 4), Color(0.6, 0.62, 0.8), HORIZONTAL_ALIGNMENT_CENTER, W)
 		y += LANE + GAP
 	var bottom := y - GAP
 	# events: a faint line down through the lanes and a marker in the strip on top (stacked when they bunch up)

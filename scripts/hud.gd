@@ -102,7 +102,8 @@ func _push_feed(who: String, text: String, col: Color) -> void:
 # Menus
 # ======================================================================
 
-## builder() -> {"title": String, "sub": String, "chart": Ride.snapshot() (optional), "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "adjust": Callable}]}
+## builder() -> {"title": String, "sub": String, "chart": Ride.snapshot() (optional), "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "image": String, "adjust": Callable}]}
+## An item's "image" (a texture path, optional) is shown beside its detail while it's selected: the bike shop's bikes.
 ## An item with "adjust" is a setting: LEFT / RIGHT call adjust(-1 / +1), and holding the button repeats, faster over time.
 func open_menu(builder: Callable, is_title: bool = false) -> void:
 	menu_builder = builder
@@ -151,12 +152,28 @@ func _rebuild_menu() -> void:
 			label = ("< %s >" if sel else "  %s  ") % label
 		menu_box.add_child(_mk_label(("> " if sel else "  ") + label, 12, col))
 	var detail: String = items[menu_index].get("detail", "") if not items.is_empty() else ""
+	var image: String = items[menu_index].get("image", "") if not items.is_empty() else ""
 	if detail != "":
 		menu_box.add_child(_rule())
 		var d := _mk_label(detail, 9, Color(0.75, 0.85, 1.0))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size = Vector2(330, 0)
-		menu_box.add_child(d)
+		if image != "":
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var pic := TextureRect.new()
+			pic.texture = load(image)
+			pic.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+			pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			pic.custom_minimum_size = Vector2(112, 72)
+			pic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(pic)
+			d.custom_minimum_size = Vector2(330, 0)   # the picture widens the menu rather than squeezing the text into more lines
+			d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(d)
+			menu_box.add_child(row)
+		else:
+			menu_box.add_child(d)
 	if not menu_note.is_empty():
 		var n := _mk_label(menu_note["text"], 9, menu_note["color"])
 		n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -437,6 +454,14 @@ func _draw_city_hud(w: float, h: float) -> void:
 		var left := int(ceil(city.champion_left))
 		_text("Race %s at Race HQ:  %d:%02d" % [Game.CHAMPION["short"], left / 60, left % 60], r.position + Vector2(6, 22), 8,
 			Color.WHITE if left > 60 or int(Time.get_ticks_msec() / 400) % 2 == 0 else Color(1.0, 0.5, 0.4))
+		below += 36
+	if city.yolanda_left > 0.0:   # Yellow Jersey Yolanda's in town (City._update_yolanda)
+		var r := Rect2(w - 214, below, 210, 30)
+		_panel(r)
+		_text("YELLOW JERSEY YOLANDA IN TOWN!", r.position + Vector2(6, 10), 8, Game.YOLANDA["color"])
+		var left := int(ceil(city.yolanda_left))
+		_text("Race her at Race HQ:  %d:%02d" % [left / 60, left % 60], r.position + Vector2(6, 22), 8,
+			Color.WHITE if left > 60 or int(Time.get_ticks_msec() / 400) % 2 == 0 else Color(1.0, 0.5, 0.4))
 	_panel(Rect2(w - 214, 4, 210, 16 + lines.size() * 10))
 	_text("PIZZA ORDERS", Vector2(w - 208, 14), 8, Color(1.0, 0.85, 0.3))
 	for i in lines.size():
@@ -530,7 +555,8 @@ func _zone_col(frac: float) -> Color:
 
 
 ## The WEEHOO bike computer in the top-left corner: LED power strip, map page on top,
-## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence.
+## a 2x2 field grid (speed / watts / `cell` / grade), then two bars and cadence, and heart rate once a heart rate
+## monitor (a strap, or one relayed by the trainer) has been heard from.
 ## `map_fn` draws into the map window; `cell` is [label, text, colour]; bars are [label, frac, colour].
 ## What the WEEHOO's power-up row shows: the item you're carrying, or a running Fire Socks / Breadsticks / Dough Roller timer.
 func _pu_slot(kind: String, socks: float, bread: float, roller: float) -> Dictionary:
@@ -602,7 +628,8 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 	draw_rect(Rect2(x + sc.size.x - 19, y + 4, 9, 2), Color(0.4, 1.0, 0.5))
 	draw_string(font, Vector2(x, y + 8), _gear_text(), HORIZONTAL_ALIGNMENT_CENTER, sc.size.x, 8, Color(1.0, 0.85, 0.3))
 	# map page: everything the fields and bars below don't need
-	var map_h := sc.size.y - 12.0 - 2.0 - 49.0 - 28.0
+	var hr_row := 12.0 if Trainer.hr_seen else 0.0   # (taken from the map, and kept once it's there so nothing jumps)
+	var map_h := sc.size.y - 12.0 - 2.0 - 49.0 - 28.0 - hr_row
 	var mr := Rect2(x + 2, y + 12, sc.size.x - 4, map_h)
 	map_fn.call(mr)
 	y += map_h + 14.0
@@ -648,6 +675,31 @@ func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn
 		draw_rect(Rect2(br.position, Vector2(floorf(bw * clampf(bar[1], 0.0, 1.0)), 5)), bar[2])
 	draw_string(font, Vector2(x + sc.size.x - 32, y + 10), "%d" % int(Trainer.cadence()), HORIZONTAL_ALIGNMENT_RIGHT, 18, 8, dark)
 	draw_string(font, Vector2(x + sc.size.x - 13, y + 10), "rpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+	if hr_row > 0.0:
+		var hy := y + 34.0
+		draw_rect(Rect2(x, hy - 9, sc.size.x, 1), Color(0.7, 0.72, 0.7))
+		draw_string(font, Vector2(x + 3, hy), "HEART", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.4, 0.42, 0.45))
+		var red := Color(0.85, 0.15, 0.2)
+		if Trainer.hr_live:
+			# beats at your heart rate: a quick swell at the start of every beat
+			var phase := fmod(Time.get_ticks_msec() / 1000.0 * Trainer.heart_rate / 60.0, 1.0)
+			_heart(Vector2(x + 44, hy - 3), 1.0 + 0.35 * maxf(0.0, 1.0 - phase * 5.0), red)
+			draw_string(font, Vector2(x + 52, hy), "%d" % Trainer.heart_rate, HORIZONTAL_ALIGNMENT_RIGHT, 24, 8, dark)
+			draw_string(font, Vector2(x + 78, hy), "bpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+			if Trainer.hr_source == "trainer":   # relayed by the trainer (a strap paired to it, like ANT+ on a KICKR)
+				draw_string(font, Vector2(x, hy), "TRNR", HORIZONTAL_ALIGNMENT_RIGHT, sc.size.x - 3, 6, Color(0.4, 0.42, 0.45))
+		else:
+			_heart(Vector2(x + 44, hy - 3), 1.0, Color(0.6, 0.62, 0.65))
+			draw_string(font, Vector2(x + 52, hy), "--", HORIZONTAL_ALIGNMENT_RIGHT, 24, 8, Color(0.55, 0.57, 0.6))
+			draw_string(font, Vector2(x + 78, hy), "bpm", HORIZONTAL_ALIGNMENT_LEFT, -1, 6, Color(0.4, 0.42, 0.45))
+
+
+## A little pixel heart centred on `p`, `k` times its 7x6 size.
+func _heart(p: Vector2, k: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for v in [Vector2(-3.5, -1.5), Vector2(-2, -3), Vector2(0, -1.5), Vector2(2, -3), Vector2(3.5, -1.5), Vector2(3.5, 0), Vector2(0, 3), Vector2(-3.5, 0)]:
+		pts.append(p + v * k)
+	draw_colored_polygon(pts, col)
 
 
 func _fmt_time(sec: float) -> String:
@@ -682,16 +734,68 @@ func _draw_race_hud(w: float, h: float) -> void:
 
 
 ## Race map page: the course elevation profile with every rider on it, distance left and clock.
+## A crit on the WEEHOO: the loop as seen from above with everyone on it, your lap, and the clock counting down
+## (then the laps to go once time's up).
+func _draw_crit_map(mr: Rect2) -> void:
+	var race = main.race
+	var me: Dictionary = race.riders[0]
+	var pr := Rect2(mr.position + Vector2(4, 14), mr.size - Vector2(8, 18))
+	var lo := Vector2(INF, INF)
+	var hi := -lo
+	var loop := PackedVector2Array()
+	for i in range(0, race.M, 4):
+		var q := Iso.to_screen(race.pts[i])
+		loop.append(q)
+		lo = lo.min(q)
+		hi = hi.max(q)
+	loop.append(Iso.to_screen(race.pts[0]))
+	var k := minf(pr.size.x / maxf(hi.x - lo.x, 1.0), pr.size.y / maxf(hi.y - lo.y, 1.0))
+	var off := pr.position + (pr.size - (hi - lo) * k) * 0.5
+	var fit := func(q: Vector2) -> Vector2: return off + (q - lo) * k
+	var line := PackedVector2Array()
+	for q in loop:
+		line.append(fit.call(q))
+	draw_polyline(line, Color(0.45, 0.42, 0.4), 3.0)
+	var start: Vector2 = fit.call(Iso.to_screen(race.pts[0]))
+	draw_rect(Rect2(start - Vector2(1, 3), Vector2(2, 6)), Color(0.12, 0.12, 0.15))
+	for j in range(race.riders.size() - 1, -1, -1):
+		var r: Dictionary = race.riders[j]
+		var p: Vector2 = (fit.call(Iso.to_screen(race._pose(r["s"], 0.0)["pos"])) as Vector2).round()
+		var sz := 3.0 if r["player"] else 2.0
+		draw_rect(Rect2(p - Vector2(sz, sz), Vector2(sz * 2, sz * 2)), INK)
+		draw_rect(Rect2(p - Vector2(sz - 1, sz - 1), Vector2(sz * 2 - 2, sz * 2 - 2)), Color(1, 1, 1) if r["player"] else r["color"])
+	var dark := Color(0.12, 0.12, 0.15)
+	var left := "LAP %d" % (race.laps_done(me) + 1)
+	var right := ""
+	if me["done"]:
+		left = "%d LAPS" % int(me.get("laps", race.laps_done(me)))
+		right = "FIN"
+	elif race.course.has("laps"):   # the Velodoughm: a set distance, no clock
+		left = "VS " + String(race.guest.get("short", "")).to_upper()
+		right = "%dM" % maxi(0, ceili(race.crit_end_s - float(me["s"])))
+	elif race.crit_end_s > 0.0:
+		var to_go := ceili((race.crit_end_s - float(me["s"])) / race.lap - 0.001)
+		right = "BELL" if to_go <= 1 else "%d TO GO" % to_go
+	else:
+		right = _fmt_time(maxf(0.0, race.crit_left()))
+	draw_string(font, Vector2(mr.position.x + 1, mr.position.y + 8), left, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, dark)
+	draw_string(font, Vector2(mr.position.x, mr.position.y + 8), right, HORIZONTAL_ALIGNMENT_RIGHT, mr.size.x - 1, 8, dark)
+
+
 func _draw_race_profile(mr: Rect2) -> void:
 	var race = main.race
 	var me: Dictionary = race.riders[0]
+	if race.lap > 0.0:
+		_draw_crit_map(mr)
+		return
 	var length: float = race.course["length"]
+	var top: float = race.chart_top()
 	var pr := Rect2(mr.position + Vector2(0, 12), mr.size - Vector2(0, 12))
 	var pts := PackedVector2Array([pr.position + Vector2(0, pr.size.y)])
 	for i in range(0, race.M, 5):
 		if race.s_m[i] > length:   # the run-out past the finish stays off the map
 			break
-		pts.append(pr.position + Vector2(race.s_m[i] / length * pr.size.x, pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0)))
+		pts.append(pr.position + Vector2(race.s_m[i] / length * pr.size.x, pr.size.y - race.elev[i] / top * (pr.size.y - 4.0)))
 	pts.append(pr.position + pr.size)
 	draw_colored_polygon(pts, Color(0.72, 0.62, 0.45))
 	# the snowy stretches get a white cap, tunnels a dark bar, hairpins a yellow tick
@@ -699,7 +803,7 @@ func _draw_race_profile(mr: Rect2) -> void:
 		if race.s_m[i] > length:
 			break
 		if race._snow_cover(race.pts[i].x, race.pts[i].y, race.elev[i] * race.vz / race.peak) > 0.5:
-			draw_rect(Rect2(floorf(pr.position.x + race.s_m[i] / length * pr.size.x), pr.position.y + pr.size.y - race.elev[i] / race.gain * (pr.size.y - 4.0) - 1.0, 2, 2), Color(1, 1, 1))
+			draw_rect(Rect2(floorf(pr.position.x + race.s_m[i] / length * pr.size.x), pr.position.y + pr.size.y - race.elev[i] / top * (pr.size.y - 4.0) - 1.0, 2, 2), Color(1, 1, 1))
 	if race.rescue:   # where the injured skier is: a red cross on the profile
 		var rx: float = floorf(pr.position.x + race.rescue_s / length * pr.size.x)
 		draw_rect(Rect2(rx - 1, pr.position.y - 2, 3, 9), Color(0.9, 0.15, 0.15))
@@ -719,7 +823,7 @@ func _draw_race_profile(mr: Rect2) -> void:
 	for k in range(race.riders.size() - 1, -1, -1):
 		var r: Dictionary = race.riders[k]
 		var f := clampf(r["s"] / length, 0.0, 1.0)
-		var fy: float = race._elev_at_t(race._t_of_s(r["s"])) / race.gain
+		var fy: float = race._elev_at_t(race._t_of_s(r["s"])) / top
 		var p := (pr.position + Vector2(f * pr.size.x, pr.size.y - fy * (pr.size.y - 4.0))).round()
 		var sz := 3.0 if r["player"] else 2.0
 		draw_rect(Rect2(p - Vector2(sz, sz), Vector2(sz * 2, sz * 2)), INK)

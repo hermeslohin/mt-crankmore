@@ -197,6 +197,42 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## How far the rider's sprite reaches from where it stands on the ground (world px, at normal size; measured over
+## every rider sheet, falls included), and the gap kept between it and the WEEHOO.
+const RIDER_HALF_W := 34.0
+const RIDER_UP := 68.0
+const RIDER_DOWN := 12.0
+const WEEHOO_CLEAR := 10.0
+
+
+## Slides the camera (never the rider) so the rider is never under the WEEHOO in the top-left corner: riding right,
+## the city camera looks ahead and puts you left of centre, towards it. Keeps at least WEEHOO_CLEAR px between them.
+func _keep_rider_clear() -> void:
+	if shot_at != Vector2.INF:
+		return
+	var foot: Vector2
+	var k := 1.0
+	if mode == Mode.CITY and city.active:
+		foot = Iso.to_screen(city.p_pos)
+		k = city._bread_k(city.bread_t)
+	elif mode == Mode.RACE and race.active and not race.riders.is_empty():
+		var p: Dictionary = race._pose(race.riders[0]["s"], race.riders[0]["lat"])
+		foot = Iso.to_screen(p["pos"], p["z"])
+	else:
+		return
+	var z := cam.zoom.x
+	var half := get_viewport().get_visible_rect().size * 0.5
+	var box: Rect2 = hud.weehoo_case().grow(WEEHOO_CLEAR)
+	var on := half + (foot - cam.position) * z   # where the rider stands on screen
+	var top := on.y - RIDER_UP * k * z
+	var bot := on.y + RIDER_DOWN * k * z
+	if bot < box.position.y or top > box.end.y:
+		return
+	var push := box.end.x - (on.x - RIDER_HALF_W * k * z)
+	if push > 0.0:
+		cam.position.x -= push / z
+
+
 func _process(delta: float) -> void:
 	title_t += delta
 	if OS.has_environment("PIZZA_FPS") and Engine.get_process_frames() % 60 == 0:   # dev helper: print the frame rate
@@ -210,6 +246,7 @@ func _process(delta: float) -> void:
 		_:
 			target = race.cam_target()
 	cam.position = cam.position.lerp(target, 1.0 - exp(-6.0 * delta))
+	call_deferred("_keep_rider_clear")   # after the city / race have moved the rider this frame
 	for l in outdoors:
 		l.visible = not (mode == Mode.RACE and race.velo)
 	# flat road on the trainer whenever you're not riding (title, menus, the bike shop, the ER)

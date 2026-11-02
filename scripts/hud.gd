@@ -583,6 +583,13 @@ func weehoo_rect() -> Rect2:
 	return Rect2(WEEHOO_POS, WEEHOO_SIZE)
 
 
+## The WEEHOO's case itself on screen (the shell art's opaque part), which nothing in the world should hide under.
+func weehoo_case() -> Rect2:
+	if Sprites.sheet("ui_weehoo_shell") != null:
+		return Rect2(WEEHOO_POS + Vector2(21, 20), Vector2(150, 249))
+	return weehoo_rect()
+
+
 func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn: Callable, cell: Array, bar1: Array, pu: Dictionary) -> void:
 	var d := weehoo_rect()
 	var shell := Sprites.sheet("ui_weehoo_shell")

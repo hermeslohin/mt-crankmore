@@ -2953,6 +2953,13 @@ func _draw() -> void:
 			if not buckets.has(d):
 				buckets[d] = []
 			buckets[d].append([3, mv[1]])
+	if velo:   # the flags at the line, sorted with the riders like anything standing up
+		var spots := _velo_flag_spots()
+		for k in spots.size():
+			var d := _diag(spots[k][0])
+			if not buckets.has(d):
+				buckets[d] = []
+			buckets[d].append([3, _draw_velo_flag.bind(spots[k], k)])
 	for ring in balloon_rings:   # after the riders, so a rider in the same row is under the balloons
 		var fp: Vector2 = ring["foot"]
 		if absf(fp.x - me_pos.x) > VIEW_R + 4 or absf(fp.y - me_pos.y) > VIEW_R + 4:
@@ -3193,17 +3200,40 @@ func _draw_rail(seg: Dictionary) -> void:
 
 
 ## The finish line across the boards (where the lap starts): a white band with a black line down the middle.
+## The Velodoughm's start/finish line: a chequered band across the boards, two squares deep, following the banking
+## (its flags: _velo_flag_spots, drawn with the riders).
+const LINE_ACROSS := 10   # squares across the track
+const LINE_DEEP := 2      # squares along it
+
 func _draw_finish_line() -> void:
-	var f0 := 0.0
 	var f1 := 1.3 / ds_m   # (about a metre and a bit)
 	var hw := ROAD_HW
-	for q in 5:
-		var l0 := -velo_out * hw + velo_out * 2.0 * hw * q / 5.0
-		var l1 := -velo_out * hw + velo_out * 2.0 * hw * (q + 1) / 5.0
-		draw_colored_polygon(PackedVector2Array([_vp(f0, l0, _bank_z(f0, l0) + 1.6), _vp(f1, l0, _bank_z(f1, l0) + 1.6),
-			_vp(f1, l1, _bank_z(f1, l1) + 1.6), _vp(f0, l1, _bank_z(f0, l1) + 1.6)]), Color(0.97, 0.97, 0.97))
-	var fm := f1 * 0.5
-	draw_line(_vp(fm, -velo_out * hw, 1.8), _vp(fm, velo_out * hw, _bank_z(fm, velo_out * hw) + 1.8), Color(0.08, 0.08, 0.1), 2.0)
+	for q in LINE_ACROSS:
+		var l0 := -velo_out * hw + velo_out * 2.0 * hw * q / LINE_ACROSS
+		var l1 := -velo_out * hw + velo_out * 2.0 * hw * (q + 1) / LINE_ACROSS
+		for k in LINE_DEEP:
+			var a := f1 * k / LINE_DEEP
+			var b := f1 * (k + 1) / LINE_DEEP
+			draw_colored_polygon(PackedVector2Array([_vp(a, l0, _bank_z(a, l0) + 1.6), _vp(b, l0, _bank_z(b, l0) + 1.6),
+				_vp(b, l1, _bank_z(b, l1) + 1.6), _vp(a, l1, _bank_z(a, l1) + 1.6)]),
+				Color(0.97, 0.97, 0.97) if (q + k) % 2 == 0 else Color(0.08, 0.08, 0.1))
+
+
+## Where the Velodoughm's two chequered flags stand (art/race_flag_checkered_wave.png): either end of the line, just off
+## the boards (the outside one up on the banking) and just past it, flying away from it. [world spot, height] each.
+func _velo_flag_spots() -> Array:
+	var out := []
+	for side in [-1.0, 1.0]:
+		var lat: float = side * velo_out * (ROAD_HW + 0.35)
+		var pz := _pose(1.5, lat)   # just past the line, so the flag flies clear of it
+		out.append([pz["pos"], pz["z"]])
+	return out
+
+
+func _draw_velo_flag(spot: Array, k: int) -> void:
+	var at := Iso.to_screen(spot[0], spot[1])
+	if not Sprites.draw_strip(self, "race_flag_checkered_wave", at, t_ + k * 0.37, 9.0):
+		Sprites.draw_image(self, "race_flag_checkered", at)
 
 
 ## The two basketball courts in the middle: maple boards, painted keys, lines, centre circles and three-point arcs.

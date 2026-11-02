@@ -1809,6 +1809,7 @@ func _build_riders() -> void:
 		else:
 			Game.toast.emit("%s lines up beside you in the yellow jersey!" % guest["name"], guest["color"])
 	_grid_up()
+	Sprites.forget_turns(self)   # each race starts with everyone facing their grid spot, not turning from the last race
 	for r in riders:   # the group riding (see _step_riders)
 		if not r["player"]:
 			r.merge({"home": r["lane"], "tired_m": 0.0, "attack": 0.0, "pull_t": 0.0, "pull_len": randf_range(PULL_TIME[0], PULL_TIME[1]),
@@ -3703,8 +3704,11 @@ func _crowded(k: int) -> bool:
 func _draw_rider(k: int, pz: Dictionary) -> void:
 	var r: Dictionary = riders[k]
 	var s: float = r["s"]
-	var pa := _pose(s - 1.5, r["lat"])
-	var pb := _pose(s + 1.5, r["lat"])
+	# on the grid, waiting for GO, everyone faces down the road at the start line: a grid on a bend would otherwise
+	# split one pair of riders across two of the eight views
+	var sd := start_s() if countdown > 0.0 and not rescue else s
+	var pa := _pose(sd - 1.5, r["lat"])
+	var pb := _pose(sd + 1.5, r["lat"])
 	var sa := Iso.to_screen(pa["pos"], pa["z"])
 	var sb := Iso.to_screen(pb["pos"], pb["z"])
 	var ds := (sb - sa)

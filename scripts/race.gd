@@ -1268,6 +1268,7 @@ func _build_features(rng: RandomNumberGenerator) -> void:
 		_put_fan(rng.randf_range(0.0, 30.0) if k < 9 else length - rng.randf_range(0.0, 30.0),
 			(1.0 if rng.randf() < 0.5 else -1.0) * (rng.randf_range(1.1, 2.4) + ROAD_GROW), rng)
 	house_lots.clear()
+	house_cover.clear()
 	if paved():
 		_build_houses(rng)
 
@@ -1285,6 +1286,7 @@ func paved() -> bool:
 
 
 var house_lots: Array = []   # the road race's houses (Rect2, tiles, grown by a garden's width): no trees in them
+var house_cover: Array = []  # ...and what each covers on screen: [screen Rect2, depth (x + y of its near corner)]
 
 ## The road race's houses (the town's chalets, 2x2 tiles like in town): one every HOUSE_EVERY m or so on each side,
 ## set back from the road, some with a mailbox at the end of the drive, a lamp post here and there, and now and then
@@ -1300,32 +1302,76 @@ func _build_houses(rng: RandomNumberGenerator) -> void:
 	for side in [-1.0, 1.0]:
 		var s := 70.0 + rng.randf_range(0.0, 20.0)
 		while s < length - 60.0:
+			# set back from the road; on the side facing the camera, further back until the house hides nobody on the road
+			var name := "building_chalet_%02d" % (1 + rng.randi() % designs)
 			var back := ROAD_HW + rng.randf_range(2.0, 2.9)   # tiles from the middle of the road to the lot's middle
-			var pz := _pose(s, side * back)
-			var c: Vector2 = pz["pos"]
-			var lot := Rect2(c - Vector2.ONE, Vector2(2, 2))
-			var ok := true
-			for q in [lot.position, lot.end, Vector2(lot.position.x, lot.end.y), Vector2(lot.end.x, lot.position.y), c]:
-				ok = ok and _rd(q) > ROAD_HW + 0.9
-			for o in house_lots:
-				ok = ok and not (o as Rect2).intersects(lot)
-			if ok:
-				house_lots.append(lot.grow(0.6))
+			var placed := {}
+			while back < ROAD_HW + 9.0 and placed.is_empty():
+				var c: Vector2 = _pose(s, side * back)["pos"]
+				var lot := Rect2(c - Vector2.ONE, Vector2(2, 2))
+				var ok := true
+				for q in [lot.position, lot.end, Vector2(lot.position.x, lot.end.y), Vector2(lot.end.x, lot.position.y), c]:
+					ok = ok and _rd(q) > ROAD_HW + 0.9
+				for o in house_lots:
+					ok = ok and not (o as Rect2).intersects(lot)
+				if not ok:
+					break
 				var z := minf(minf(_tz(lot.position), _tz(lot.end)), minf(_tz(Vector2(lot.position.x, lot.end.y)), _tz(Vector2(lot.end.x, lot.position.y))))
+				var cover := _house_rect(name, lot, z)
+				if not _covers_road(cover, lot):
+					placed = {"lot": lot, "z": z, "c": c, "cover": cover}
+				back += 0.5
+			if not placed.is_empty():
+				var lot: Rect2 = placed["lot"]
+				house_lots.append(lot.grow(0.6))
+				house_cover.append([placed["cover"], lot.end.x + lot.end.y])
 				# the door's on the right-hand wall (+x) or, mirrored, the left (+y): whichever looks at the road
-				var to_road: Vector2 = _pose(s, 0.0)["pos"] - c
-				_put_static(2, {"kind": "sprite", "name": "building_chalet_%02d" % (1 + rng.randi() % designs), "pos": lot.end, "z": z,
-					"flip": to_road.y > to_road.x}, [])
+				var to_road: Vector2 = _pose(s, 0.0)["pos"] - (placed["c"] as Vector2)
+				_put_static(2, {"kind": "sprite", "name": name, "pos": lot.end, "z": placed["z"], "flip": to_road.y > to_road.x}, [])
 				if rng.randf() < 0.4:
 					var box: Vector2 = _pose(s + rng.randf_range(-1.5, 1.5), side * (ROAD_HW + 0.7))["pos"]
-					_put_static(2, {"kind": "sprite", "name": "scenery_90s_mailbox_blue", "pos": box, "z": _tz(box), "flip": side < 0.0}, [])
+					if not behind_house(box, _tz(box), 40.0):
+						_put_static(2, {"kind": "sprite", "name": "scenery_90s_mailbox_blue", "pos": box, "z": _tz(box), "flip": side < 0.0}, [])
 				if rng.randf() < 0.3:
 					_put_fan(s + rng.randf_range(-2.0, 2.0), side * (ROAD_HW + rng.randf_range(1.0, 1.4)), rng)
 			if rng.randf() < 0.25:
 				var lamp: Vector2 = _pose(s + 10.0, side * (ROAD_HW + 0.55))["pos"]
-				if _rd(lamp) > ROAD_HW + 0.3:
+				if _rd(lamp) > ROAD_HW + 0.3 and not behind_house(lamp, _tz(lamp), 60.0):
 					_put_static(2, {"kind": "sprite", "name": "scenery_lamp_post", "pos": lamp, "z": _tz(lamp)}, [])
 			s += rng.randf_range(HOUSE_EVERY[0], HOUSE_EVERY[1])
+
+
+## Where house picture `name` on `lot` at height `z` lands on screen (a little bigger, to be safe).
+func _house_rect(name: String, lot: Rect2, z: float) -> Rect2:
+	var tex := Sprites.sheet(name)
+	var size := Vector2(tex.get_width(), tex.get_height()) if tex != null else Vector2(128, 112)
+	return Rect2(Iso.to_screen(lot.end, z) - Vector2(size.x * 0.5, size.y), size).grow(4.0)
+
+
+## True if a house covering `cover` on screen on `lot` would hide any of the road behind it, or a rider on it.
+func _covers_road(cover: Rect2, lot: Rect2) -> bool:
+	var c := lot.get_center()
+	var depth := lot.end.x + lot.end.y
+	for k in range(0, M, 2):
+		if pts[k].distance_squared_to(c) > 225.0:
+			continue
+		for lat in [-ROAD_HW - 0.4, 0.0, ROAD_HW + 0.4]:
+			var q: Vector2 = pts[k] + nrm[k] * lat
+			if q.x + q.y < depth and cover.intersects(Rect2(Iso.to_screen(q, elev[k] * vz) - Vector2(10, RIDER_TALL), Vector2(20, RIDER_TALL))):
+				return true
+	return false
+
+
+const RIDER_TALL := 50.0   # px a rider (or a fan) stands above the road
+## True if someone `h` px tall standing at `p` (height `z` px) would be hidden behind one of the road race's houses.
+func behind_house(p: Vector2, z: float, h: float = RIDER_TALL) -> bool:
+	if house_cover.is_empty():
+		return false
+	var me := Rect2(Iso.to_screen(p, z) - Vector2(9, h), Vector2(18, h))
+	for hc in house_cover:
+		if p.x + p.y < float(hc[1]) and (hc[0] as Rect2).intersects(me):
+			return true
+	return false
 
 
 ## Tunnels bored through the hillside along a straight stretch of a few of the middle legs.
@@ -1558,6 +1604,8 @@ func _draw_chevron(e: Dictionary) -> void:
 
 func _put_fan(s: float, off: float, rng: RandomNumberGenerator) -> void:
 	var p: Vector2 = _pose(s, off)["pos"]
+	if behind_house(p, _tz(p)):
+		return   # (nobody stands where a house would hide them)
 	_put_static(2, {"kind": "fan", "s": s, "pos": p, "z": _tz(p), "col": Color.from_hsv(rng.randf(), 0.7, 0.95)}, [])
 
 

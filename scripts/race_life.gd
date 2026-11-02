@@ -108,11 +108,15 @@ func _sprite(name: String, s: float, lat: float, flip := false) -> void:
 	if Sprites.sheet(name) == null:
 		return
 	var p: Vector2 = race._pose(s, lat)["pos"]
+	if race.behind_house(p, race._tz(p)):
+		return   # (nothing goes where one of the road race's houses would hide it)
 	race._put_static(2, {"kind": "sprite", "name": name, "pos": p, "z": race._tz(p), "flip": flip}, [])
 
 
 func _fan(s: float, lat: float, rng: RandomNumberGenerator, design := "") -> void:
 	var p: Vector2 = race._pose(s, lat)["pos"]
+	if race.behind_house(p, race._tz(p)):
+		return
 	var e := {"kind": "fan", "s": s, "lat": lat, "pos": p, "z": race._tz(p), "design": design if design != "" else _fan_design(rng),
 		"col": Color.from_hsv(rng.randf(), 0.7, 0.95)}
 	race._put_static(2, e, [])

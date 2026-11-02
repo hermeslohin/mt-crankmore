@@ -2211,9 +2211,13 @@ func _pop_at(p: Vector2, text: String, col: Color) -> void:
 	pops.append({"pos": p, "text": text, "col": col, "t": 1.4})
 
 
+## Rolling resistance on this course: the gravel courses add GRAVEL_EXTRA_CRR (less on a bike made for it), the
+## Crusty Crit is town tarmac (the bike's own), and the Velodoughm's boards roll like a velodrome's whatever you ride.
 func _crr(b: Dictionary) -> float:
 	if velo:
-		return float(b["crr"])   # smooth boards: no gravel here
+		return Game.VELO_CRR
+	if lap > 0.0:
+		return float(b["crr"])
 	return float(b["crr"]) + Game.GRAVEL_EXTRA_CRR * float(b.get("gravel", 1.0))
 
 

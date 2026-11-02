@@ -88,6 +88,7 @@ const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`
 
 ## Extra rolling resistance on Mt. Crankmore gravel, scaled by each bike's "gravel" factor.
 const GRAVEL_EXTRA_CRR := 0.014
+const VELO_CRR := 0.002      # the Velodoughm's wooden boards: track tyres on smooth wood roll almost for free, any bike
 const KNOCK_DAMAGE := 5.0   # bike HP you lose when a rival knocks you off (Pizza Frisbee, breadstick power), in town or a race
 
 const START_MONEY := 100
@@ -273,12 +274,12 @@ func set_rival_count(n: int) -> void:
 ## How fast McGee goes on flat smooth boards (m/s): THUNDER_PACE of your FTP on RIVAL_BIKE, at THUNDER_MASS.
 func thunder_speed() -> float:
 	var b := rival_bike()
-	return speed_from_power(ftp * THUNDER_PACE, b["mass"], b["cda"], b["crr"], 0.0, THUNDER_MASS)
+	return speed_from_power(ftp * THUNDER_PACE, b["mass"], b["cda"], VELO_CRR, 0.0, THUNDER_MASS)
 
 
 ## The watts it takes you to match McGee on your current bike (flat, smooth boards): beat this to beat him.
 func thunder_watts() -> float:
-	return power_for_speed(thunder_speed(), bike()["mass"], bike()["cda"], bike()["crr"], 0.0)
+	return power_for_speed(thunder_speed(), bike()["mass"], bike()["cda"], VELO_CRR, 0.0)
 
 
 ## The other way round from speed_from_power: the watts that hold `v` m/s.

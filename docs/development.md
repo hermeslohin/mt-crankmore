@@ -156,6 +156,8 @@ A rider is a set of sheets named `bike_<rider>*.png`: 8 rows of directions (down
 
 The player's sheets are `bike_rookie_boy*` and `bike_rookie_girl*`; with a bike of its own art they're `bike_rookie_<boy|girl>_<art>*`, where `<art>` is the bike's `"art"` in `Game.bikes` (`rusty`, `commuter`, `gravel`, `carbon`, `golden`, `fixie`, `hoofy`, `champion`). A missing sheet falls back: pizza to bag to plain, a bike's own sheets to the plain ones, a missing turn sheet to a cross-fade.
 
+Each bike also has a picture on its own, `art/shop_bike_<art>.png` (side view, trimmed, drawn at 1x), shown beside its details in the bike shop and My bikes. The website uses the same pictures at 3x (`docs/img/bike_<art>.png`). They were made with PixelLab's `create-image-pixflux` (128x96, `no_background`, side view, "no rider, isolated, no ground, 16-bit SNES style").
+
 To make a rider in PixelLab:
 
 1. Create the character (8 directions, 48 px, high top-down view), or make a **state** of an existing one with `create-character-state` and an edit description ("replace only the bicycle with...", "add a red delivery box...", "dress the rider for winter...") so it stays the same person.

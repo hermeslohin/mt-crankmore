@@ -62,26 +62,45 @@ const THUNDER_PACE := 1.5    # his watts, as a share of YOUR FTP
 const THUNDER_MASS := 75.0   # kg
 const MAX_RIVALS := 8
 
+## Each bike: physics ("mass" kg, "cda", "crr", "gravel" drag factor, "turn" handling), "hp", the shop's "blurb", and
+## "good" / "bad": what it's good and bad at, in a line each (the bike shop, My bikes, and the website). Its picture in
+## the shop is art/shop_bike_<art>.png.
 var bikes: Array = [
 	{"name": "Rusty Trash Bike", "art": "rusty", "price": 0, "mass": 11.8, "cda": 0.384, "crr": 0.0084, "hp": 60.0, "gravel": 0.73, "turn": 0.85,
-		"color": Color(0.6, 0.45, 0.3), "blurb": "Found behind a dumpster. Squeaks in three keys."},
+		"color": Color(0.6, 0.45, 0.3), "blurb": "Found behind a dumpster. Squeaks in three keys.",
+		"good": "Free, and the mechanic fixes it for nothing. It can't be destroyed: you just tape it back together.",
+		"bad": "The heaviest, slowest and wobbliest bike in town. Thunder Thighs McGee won't race you on it."},
 	{"name": "Garage Sale Commuter", "art": "commuter", "price": 250, "mass": 9.7, "cda": 0.352, "crr": 0.0066, "hp": 85.0, "gravel": 0.73, "turn": 0.95,
-		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain."},
+		"color": Color(0.25, 0.65, 0.9), "blurb": "Comes with a bell and a mysterious stain.",
+		"good": "Cheap, and a big step up from the trash bike.",
+		"bad": "Still heavy, upright and draggy. Not much of a racer."},
 	{"name": "Gravel Grinder", "art": "gravel", "price": 8000, "mass": 8.3, "cda": 0.32, "crr": 0.0056, "hp": 110.0, "gravel": 0.43, "turn": 1.05,
-		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast."},
+		"color": Color(0.35, 0.75, 0.35), "blurb": "Eats curbs for breakfast.",
+		"good": "The best bike on gravel by far, so the mountain races are its home.",
+		"bad": "Costs the most, and on tarmac it's only as quick as the rivals' bikes."},
 	{"name": "Carbon Crit Machine", "art": "carbon", "price": 2600, "mass": 7.2, "cda": 0.293, "crr": 0.0047, "hp": 130.0, "gravel": 0.68, "turn": 1.15,
-		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one."},
+		"color": Color(0.85, 0.2, 0.3), "blurb": "Light as a thin crust. Costs like a stuffed one.",
+		"good": "Light, slippery and sharp in the corners. Quick round town and in the Crusty Crit.",
+		"bad": "Only so-so on gravel, and the Golden Pepperoni Pro beats it everywhere."},
 	{"name": "Golden Pepperoni Pro", "art": "golden", "price": 7500, "mass": 6.6, "cda": 0.275, "crr": 0.0043, "hp": 150.0, "gravel": 0.55, "turn": 1.25,
-		"color": Color(1.0, 0.8, 0.15), "blurb": "Legendary. Smells faintly of mozzarella."},
+		"color": Color(1.0, 0.8, 0.15), "blurb": "Legendary. Smells faintly of mozzarella.",
+		"good": "The fastest bike you can buy, and the toughest. Great everywhere.",
+		"bad": "Pricey. The Gravel Grinder is still better in the dirt."},
 	# "fixed": one gear (Trainer.FIXED_GEAR), no shifting and no brakes
 	{"name": "Fixie", "art": "fixie", "price": 2000, "mass": 7.5, "cda": 0.311, "crr": 0.0052, "hp": 95.0, "gravel": 0.77, "turn": 1.1, "fixed": true,
-		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome."},
+		"color": Color(0.95, 0.3, 0.75), "blurb": "Completely impractical, but utterly awesome.",
+		"good": "Light and quick on the flat: made for the Velodoughm and the Crusty Crit.",
+		"bad": "One gear and no brakes: a grind up the mountain, and the worst bike on gravel."},
 	# "gift": not for sale; Santa drops it on a winter night (see TownHappenings "santa")
 	{"name": "Hoofy Bike", "art": "hoofy", "price": 0, "gift": true, "mass": 11.1, "cda": 0.371, "crr": 0.0077, "hp": 70.0, "gravel": 0.71, "turn": 0.9,
-		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump."},
+		"color": Color(0.85, 0.15, 0.2), "blurb": "A present from Santa: bells on the bars, antlers on the stem. Jingles over every bump.",
+		"good": "Free, festive, and it jingles. Sturdier than the trash bike.",
+		"bad": "Nearly as heavy and slow as the trash bike."},
 	# "gift": not for sale; yours for beating the Tour de Crankmore champion (see Race._end_race)
 	{"name": "Champion's Bike", "art": "champion", "price": 0, "gift": true, "mass": 6.5, "cda": 0.27, "crr": 0.0045, "hp": 160.0, "gravel": 0.5, "turn": 1.25,
-		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube."},
+		"color": Color(1.0, 0.86, 0.1), "blurb": "Maillot Max's own yellow race bike, handed over after you beat him. Signed on the top tube.",
+		"good": "The lightest, most aero and toughest bike in the game.",
+		"bad": "There's only one: you have to beat Maillot Max to get it."},
 ]
 const HOOFY := 6   # the Hoofy Bike's place in `bikes`
 const CHAMPION_BIKE := 7   # the Champion's Bike's place in `bikes`

@@ -615,8 +615,9 @@ func _open_garage() -> void:
 					Game.save_game()
 					Game.toast.emit("Now riding the %s" % b["name"], Color(0.5, 1.0, 0.6))
 					_open_garage(),
-				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"],
-					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"]]})
+				"image": _bike_image(b),
+				"detail": "%s%s\n%.1f kg  |  HP %d / %d  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"],
+					"  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], int(hp_now), int(b["hp"]), at_ftp, b["turn"], b["gravel"], _bike_good_bad(b)]})
 		items.append({"label": "Back", "fn": _open_pause, "detail": ""})
 		return {"title": "My bikes", "sub": "%d bike%s in the garage. Riding: %s" % [Game.owned.size(), "" if Game.owned.size() == 1 else "s", Game.bike()["name"]], "items": items})
 
@@ -749,8 +750,8 @@ func _bike_shop_menu() -> Dictionary:
 						"Ooh, the %s. Ride it like you stole it. But you didn't. You paid." % b["name"]].pick_random(), "happy")
 					Talk.say_random("new_bike", true)
 		var at_ftp: float = Game.speed_from_power(Game.ftp, b["mass"], b["cda"], b["crr"], 0.0) * 3.6
-		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"]]
-		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail})
+		var detail := "%s%s\n%.1f kg  |  %.0f HP  |  ~%.0f km/h at your FTP  |  handling x%.2f  |  gravel drag x%.2f%s" % [b["blurb"], "  One gear, no brakes." if b.get("fixed", false) else "", b["mass"], b["hp"], at_ftp, b["turn"], b["gravel"], _bike_good_bad(b)]
+		items.append({"label": label, "fn": fn, "enabled": enabled, "detail": detail, "image": _bike_image(b)})
 	var hurt := Game.needs_repair()
 	var rc := Game.repair_cost()
 	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
@@ -766,6 +767,17 @@ func _bike_shop_menu() -> Dictionary:
 			else "Fresh tape, fresh grease. Bike HP %d / %d.") % [int(Game.bike_hp()), int(Game.bike()["hp"])]})
 	items.append({"label": "Leave", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Spokes & Stuff Bike Shop", "sub": "Cash: $%d.   \"Careful out there. The cars don't brake for dreams.\"" % Game.money, "items": items}
+
+
+## A bike's picture for the shop and My bikes (art/shop_bike_<art>.png), or "" if it has none.
+func _bike_image(b: Dictionary) -> String:
+	var path := "res://art/shop_bike_%s.png" % b.get("art", "")
+	return path if ResourceLoader.exists(path) else ""
+
+
+## What a bike is good and bad at, as two lines to add to its details.
+func _bike_good_bad(b: Dictionary) -> String:
+	return "\nGood: %s\nBad: %s" % [b["good"], b["bad"]] if b.has("good") else ""
 
 
 func _race_menu() -> Dictionary:

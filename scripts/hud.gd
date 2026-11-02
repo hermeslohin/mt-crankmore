@@ -102,7 +102,8 @@ func _push_feed(who: String, text: String, col: Color) -> void:
 # Menus
 # ======================================================================
 
-## builder() -> {"title": String, "sub": String, "chart": Ride.snapshot() (optional), "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "adjust": Callable}]}
+## builder() -> {"title": String, "sub": String, "chart": Ride.snapshot() (optional), "items": [{"label", "fn": Callable, "enabled": bool, "detail": String, "image": String, "adjust": Callable}]}
+## An item's "image" (a texture path, optional) is shown beside its detail while it's selected: the bike shop's bikes.
 ## An item with "adjust" is a setting: LEFT / RIGHT call adjust(-1 / +1), and holding the button repeats, faster over time.
 func open_menu(builder: Callable, is_title: bool = false) -> void:
 	menu_builder = builder
@@ -151,12 +152,28 @@ func _rebuild_menu() -> void:
 			label = ("< %s >" if sel else "  %s  ") % label
 		menu_box.add_child(_mk_label(("> " if sel else "  ") + label, 12, col))
 	var detail: String = items[menu_index].get("detail", "") if not items.is_empty() else ""
+	var image: String = items[menu_index].get("image", "") if not items.is_empty() else ""
 	if detail != "":
 		menu_box.add_child(_rule())
 		var d := _mk_label(detail, 9, Color(0.75, 0.85, 1.0))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		d.custom_minimum_size = Vector2(330, 0)
-		menu_box.add_child(d)
+		if image != "":
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var pic := TextureRect.new()
+			pic.texture = load(image)
+			pic.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+			pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			pic.custom_minimum_size = Vector2(112, 72)
+			pic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(pic)
+			d.custom_minimum_size = Vector2(330, 0)   # the picture widens the menu rather than squeezing the text into more lines
+			d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(d)
+			menu_box.add_child(row)
+		else:
+			menu_box.add_child(d)
 	if not menu_note.is_empty():
 		var n := _mk_label(menu_note["text"], 9, menu_note["color"])
 		n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

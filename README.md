@@ -230,6 +230,8 @@ show the grade (blue downhill, then green, yellow, orange and red; double red fr
 
 ## Layout
 
+For working on the game (running and testing it, the debug modes, the art pipeline, the trainer bridge, the race simulator and releasing), see [docs/development.md](docs/development.md).
+
 ```
 project.godot
 export_presets.cfg        Windows / Linux / macOS export presets

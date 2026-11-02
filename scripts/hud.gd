@@ -401,8 +401,6 @@ func _draw() -> void:
 
 
 func _draw_title(w: float, h: float) -> void:
-	for k in 3:
-		_text("MT. CRANKMORE", Vector2(k - 1, 58 + (k % 2)), 48, [Color(0.9, 0.25, 0.2), Color(1.0, 0.85, 0.25), Color(0.9, 0.25, 0.2)][k], w, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(Game.SLOGAN, Vector2(0, 80), 12, Color(1, 1, 1), w, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(Trainer.status_text(), Vector2(0, h - 8), 9, Color(0.6, 1.0, 0.7) if Trainer.bridge_live else Color(1.0, 0.85, 0.5), w, HORIZONTAL_ALIGNMENT_CENTER)
 

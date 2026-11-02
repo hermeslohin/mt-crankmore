@@ -32,7 +32,7 @@ const COURSES := [
 	# over "laps" laps against its guest (Game.THUNDER) alone. Entered from its own building in town (main._velo_menu).
 	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],
 		"entry": 50, "prize": 600, "seed": 61,
-		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He rides as fast as you would at 250% of your FTP. No drafting, no power-ups: just legs."},
+		"blurb": "One flying lap of the Velodoughm's 750 m wooden track, banked steep in the turns, against Thunder Thighs McGee. He rides as fast as you would at 150% of your FTP. No drafting, no power-ups: just legs."},
 ]
 const MAX_GRADE := 0.12
 const MIN_GRADE := -0.09
@@ -46,7 +46,6 @@ const ROAD_HW := 0.64 * ROAD_W  # half the road's width (tiles)
 const ROAD_GROW := ROAD_HW - 0.64   # how much further out everything beside the road stands
 const VIEW_R := 17            # terrain cells drawn around the player
 const MAX_SPEED := 16.0       # m/s cap on the descents
-const VELO_MAX_SPEED := 25.0  # m/s: the Velodoughm is flat, so the cap only has to stay out of the way of you and McGee
 const RUNOUT := 400.0         # metres of cool-down road past the finish arch
 const COOL_SPEED := 5.0       # m/s finished rivals soft-pedal at
 const IDLE_END := 15.0        # seconds stopped past the finish before the results come up anyway
@@ -1922,7 +1921,7 @@ func _step_riders(delta: float) -> void:
 		mvt = 0.0
 		me["v"] = move_toward(me["v"], 0.0, 14.0 * delta)
 	if float(me["air"]) <= 0.0:   # no traction in the air
-		me["v"] += (minf(mvt, _max_speed()) - me["v"]) * (1.0 - exp(-1.5 * delta))
+		me["v"] += (minf(mvt, MAX_SPEED) - me["v"]) * (1.0 - exp(-1.5 * delta))
 	var steer := clampf(Input.get_axis("steer_left", "steer_right") + Input.get_axis("lane_left", "lane_right"), -1.0, 1.0)
 	if not patrol.is_empty() and float(me["down"]) > 0.0:
 		steer = 0.0   # lying in the road while the ski patrol sees to you
@@ -2015,7 +2014,7 @@ func _step_riders(delta: float) -> void:
 			vt = 0.0
 			r["v"] = move_toward(r["v"], 0.0, 14.0 * delta)
 		if float(r["air"]) <= 0.0:
-			r["v"] += (minf(vt, _max_speed()) - r["v"]) * (1.0 - exp(-1.5 * delta))
+			r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
 		var s0: float = r["s"]
 		r["s"] += r["v"] * delta
 		r["lat"] = r["lane"] + sin(clock * 0.6 + r["wiggle"]) * 0.03 * ROAD_W
@@ -2043,12 +2042,6 @@ func _step_riders(delta: float) -> void:
 		_end_race()
 
 
-## The speed cap: MAX_SPEED keeps the descents sane; on the Velodoughm it's higher, or with a big FTP on a fast bike
-## Thunder Thighs (THUNDER_PACE of your FTP) would sit on the cap and you could never get past him.
-func _max_speed() -> float:
-	return VELO_MAX_SPEED if velo else MAX_SPEED
-
-
 ## A pace rider (Thunder Thighs McGee): goes as fast as you would on your bike at r["pace"] times your FTP, so to beat
 ## him you have to hold more than that. No drafting, no fatigue, no attacks.
 func _step_pacer(k: int, delta: float) -> void:
@@ -2060,7 +2053,7 @@ func _step_pacer(k: int, delta: float) -> void:
 	var vt := Game.speed_from_power(Game.ftp * float(r["pace"]), b["mass"], b["cda"], _crr(b), _grade_at(r["s"]))
 	if float(r["down"]) > 0.0:
 		vt = 0.0
-	r["v"] += (minf(vt, _max_speed()) - r["v"]) * (1.0 - exp(-1.5 * delta))
+	r["v"] += (minf(vt, MAX_SPEED) - r["v"]) * (1.0 - exp(-1.5 * delta))
 	var s0: float = r["s"]
 	r["s"] += r["v"] * delta
 	r["lane"] = move_toward(float(r["lane"]), r["home"], 0.3 * ROAD_W * delta)

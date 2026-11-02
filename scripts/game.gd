@@ -57,7 +57,7 @@ const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Col
 			"My quads... they've never felt this way before."],
 		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
 	}}
-const THUNDER_PACE := 2.5    # the share of YOUR FTP his speed matches
+const THUNDER_PACE := 1.5    # the share of YOUR FTP his speed matches
 const MAX_RIVALS := 8
 
 var bikes: Array = [

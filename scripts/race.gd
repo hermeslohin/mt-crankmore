@@ -1762,6 +1762,8 @@ func _build_riders() -> void:
 ## A rider says something: one of your usual rivals through Talk; the guest champion, or a rival who only came out for
 ## his race, one of their own lines over their head.
 func _say(r: Dictionary, cat: String, force := false) -> void:
+	if not riders.has(r):
+		return   # a line timed for a race that's since been left
 	if int(r["idx"]) >= 0:
 		Talk.say(int(r["idx"]), cat, force)
 	elif force or randf() < 0.5:
@@ -3614,11 +3616,13 @@ func _swipe_fps() -> float:
 	return float(tex.get_width() / tex.get_height()) / BEAR_SWIPE * 0.999
 
 
-## A pair of eagles circling high over the course, seen from above and facing the way they fly
+## A pair of eagles circling high over the course (not indoors at the Velodoughm), seen from above and facing the way they fly
 ## (art/animal_eagle_fly8.png; the old side-on art/animal_eagle_fly.png if that's missing).
 var _eagle_turns: Array = [{}, {}]
 
 func _draw_birds(me_pos: Vector2) -> void:
+	if velo:
+		return   # under the Velodoughm's roof
 	for q in 2:
 		var ang := t_ * (0.35 + q * 0.12) + q * PI
 		var p := me_pos + Vector2(4.0 + q * 3.0, -5.0) + Vector2(cos(ang), sin(ang)) * (3.5 + q)

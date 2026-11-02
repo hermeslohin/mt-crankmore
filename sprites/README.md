@@ -61,7 +61,10 @@ State ids, in the order `Idle` / `With_pizza` / `No_bag` (Rookie Boy: `Idle` / `
 
 Maillot Max (`Champion`, `119017b2-3d3d-4384-8e6c-887688149c1c`) and Thunder Thighs McGee (`Thunder Thighs`,
 `45804065-977d-416a-a869-d847194f1bc6`) are extra states of Tubeless Tony's PixelLab character, so they share his
-build and bike; only their packed sheets are kept (`art/bike_max*.png`, `art/bike_mcgee*.png`).
+build and bike; only their packed sheets are kept (`art/bike_max*.png`, `art/bike_mcgee*.png`). Yellow Jersey Yolanda
+(`Yolanda`, `cf01bac9-60da-4326-895a-4832f2f83d16`) is a state of the same character made from Maillot Max's, with her own
+look and a green bike: `art/bike_yolanda.png` and `art/bike_yolanda_fall.png` were packed with the Rookies' `rows=`. Her
+face strip (`art/face_yolanda.png`) is PixelLab's `edit-image` of Max's, laid out 4x2.
 
 ## Notes
 

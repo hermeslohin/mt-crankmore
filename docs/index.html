@@ -175,6 +175,12 @@
   .course ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
   .course li { margin: 2px 0; }
 
+  .statlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 18px 0 0; }
+  .statlist div { border-left: 4px solid var(--sky); padding: 2px 0 2px 12px; }
+  .statlist b { display: block; }
+  .statlist span { color: var(--muted); font-size: 15px; }
+  .shot.wide { margin: 28px 0 0; }
+
   footer { padding: 40px 0 56px; text-align: center; color: var(--muted); font-size: 15px; }
   footer .tagline { margin-bottom: 10px; }
 
@@ -201,6 +207,7 @@
       <li><a href="#bikes">Bikes</a></li>
       <li><a href="#rivals">Rivals</a></li>
       <li><a href="#courses">Courses</a></li>
+      <li><a href="#stats">Stats</a></li>
       <li><a href="#next">Coming next</a></li>
       <li><a href="#download">Download</a></li>
     </ul>
@@ -255,7 +262,7 @@
   <div class="wrap">
     <h2>A town that keeps busy</h2>
     <p class="intro">Day turns to night, the seasons change and there's always something going on: parades, fireworks, runaway dogs and robberies to break up.</p>
-    <div class="features three">
+    <div class="features">
       <figure>
         <img src="delivery.png" alt="Delivering a pizza through town, steam rising off the box" width="1280" height="720" loading="lazy">
         <figcaption><h3>Deliver hot</h3><p>Grab an order from a glowing pizza window and get it there before it goes cold. The other couriers want it too.</p></figcaption>
@@ -263,10 +270,6 @@
       <figure>
         <img src="night.png" alt="The village at night with the street lamps on" width="1280" height="720" loading="lazy">
         <figcaption><h3>Day, night and four seasons</h3><p>An hour-long day, street lamps at dusk, rain from spring to fall and snow all winter.</p></figcaption>
-      </figure>
-      <figure>
-        <img src="session.png" alt="The Session over screen: power, cadence, heart rate and speed charts with markers for pizzas and races" width="1280" height="720" loading="lazy">
-        <figcaption><h3>See what you rode</h3><p>When you finish, a timeline shows your power, cadence and speed, with every pizza, challenge and race result marked on it.</p></figcaption>
       </figure>
     </div>
   </div>
@@ -559,7 +562,58 @@
   </div>
 </section>
 
-<section class="band" id="next">
+<section class="band" id="stats">
+  <div class="wrap">
+    <h2>Track your stats</h2>
+    <p class="intro">Every ride counts. The game logs your session from the moment you hit New game or Continue until you quit to the title, and shows you exactly what you rode.</p>
+
+    <div class="features">
+      <figure>
+        <img src="bear.png" alt="The Weehoo bike computer in a race: elevation profile, speed, watts, position and grade, beside a crashed rider and a bear" width="1280" height="720" loading="lazy">
+      </figure>
+      <div>
+        <h3>On the bike: the Weehoo</h3>
+        <p style="color:var(--muted);margin:0">A little bike computer rides in the corner of the screen the whole time, like the one on your bars.</p>
+        <div class="statlist">
+          <div><b>Speed and watts</b><span>Your live speed and power, with a strip of lights across the top that climbs through the power zones as you push towards your FTP and past it.</span></div>
+          <div><b>Grade and gear</b><span>The slope under your wheels, and which of the 21 gears you're in.</span></div>
+          <div><b>The course map</b><span>In a race, the elevation profile with every rider on it, the distance left and the clock.</span></div>
+          <div><b>Race position</b><span>Your place, with the time gaps to every rival in the standings.</span></div>
+          <div><b>Cadence and HP</b><span>Your rpm, and how much life your bike has left (or, riding on the keyboard, how much is left in your legs).</span></div>
+          <div><b>Power-up</b><span>Whatever you're carrying, ready to fire.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shot wide"><img src="session.png" alt="The Session over screen: 25.3 km in 39:59, 3 pizzas, challenges and race placings, with power, cadence, heart rate and speed charts and their averages (the heart rate chart is coming next)" width="1280" height="720" loading="lazy"></div>
+
+    <div class="features" style="margin-top:28px">
+      <div>
+        <h3>When you stop: Session over</h3>
+        <p style="color:var(--muted);margin:0 0 10px">Quit to the title and you get the whole session on one screen.</p>
+        <div class="statlist">
+          <div><b>The headline</b><span>Distance and time, pizzas delivered, challenges won and lost, and where you placed in every race.</span></div>
+          <div><b>Four charts</b><span>Power, cadence, speed and (coming next) heart rate over the session, each with its max and a dashed average line.</span></div>
+          <div><b>A timeline</b><span>Markers along the top for every pizza, challenge and race result, so you can see which effort was which.</span></div>
+          <div><b>Honest numbers</b><span>Pauses leave a gap rather than a flat line, and riding on the keyboard never makes up watts.</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Then: Strava</h3>
+        <p style="color:var(--muted);margin:0 0 10px">Link your account once and post the session from the same screen.</p>
+        <div class="statlist">
+          <div><b>A Virtual Ride</b><span>With distance, speed, climbing, power and cadence, and heart rate from the next update.</span></div>
+          <div><b>A title and notes</b><span>Like "Mt. Crankmore: 3 pizzas and 1 race win", with your challenges, race results and averages in the description.</span></div>
+          <div><b>Screenshots</b><span>Up to four from the ride (scenery, deliveries, races and the session chart), saved in a folder ready to drag onto the activity.</span></div>
+          <div><b>No rush</b><span>The session stays postable from the title screen until you start the next one.</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="small" style="margin-top:20px">Heart rate, coming next, comes from a Bluetooth strap, or ANT+ through a Wahoo trainer. The pause menu keeps your all-time totals: money, deliveries and races won.</p>
+  </div>
+</section>
+
+<section id="next">
   <div class="wrap next">
     <div>
       <h2>Coming next</h2>
@@ -575,7 +629,7 @@
   </div>
 </section>
 
-<section>
+<section class="band">
   <div class="wrap">
     <h2>Getting started</h2>
     <p class="intro">Download the build for your computer and you're riding in a minute.</p>

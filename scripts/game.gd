@@ -155,7 +155,6 @@ var difficulty := "medium"
 var rival_count := 3
 var rival_order: Array = []    # roster short names in this game's lineup order; the first rival_count ride (shuffled by New game)
 var setup_done := false       # the rider has seen the setup screen at least once
-var sfx_volume := 80          # sound effects, 0-100 (Sfx.apply_volume)
 
 
 func _ready() -> void:
@@ -413,7 +412,7 @@ func save_game() -> void:
 		hp_out[str(k)] = hp[k]
 	f.store_string(JSON.stringify({"money": money, "owned": owned, "hp": hp_out, "equipped": equipped,
 		"deliveries": deliveries, "race_wins": race_wins,
-		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "rival_order": rival_order, "setup_done": setup_done, "rider": rider, "sfx_volume": sfx_volume,
+		"ftp": ftp, "weight_kg": weight_kg, "units": units, "difficulty": difficulty, "rival_count": rival_count, "rival_order": rival_order, "setup_done": setup_done, "rider": rider,
 		"season": Season.choice}))
 
 
@@ -448,7 +447,6 @@ func load_game() -> void:
 	rival_count = clampi(int(d.get("rival_count", rival_count)), 1, MAX_RIVALS)
 	rival_order = Array(d.get("rival_order", []))
 	setup_done = bool(d.get("setup_done", false))
-	sfx_volume = clampi(int(d.get("sfx_volume", sfx_volume)), 0, 100)
 	set_rider(str(d.get("rider", "boy")))
 	Season.set_choice(str(d.get("season", "auto")))
 	if not owned.has(equipped):

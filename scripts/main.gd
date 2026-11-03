@@ -552,11 +552,6 @@ func _setup_menu(finish: Callable) -> Dictionary:
 		{"label": "Rival bikers: %d" % Game.rival_count, "fn": func(): pass,
 			"adjust": func(d: int): Game.set_rival_count(Game.rival_count + d),
 			"detail": "Riding against you in town: %s. Every race has all %d racers." % [", ".join(names), Talk.roster.size()]},
-		{"label": "Sound effects: %s" % ("off" if Game.sfx_volume == 0 else "%d%%" % Game.sfx_volume), "fn": func(): pass,
-			"adjust": func(d: int):
-				Game.sfx_volume = clampi(Game.sfx_volume + d * 10, 0, 100)
-				Sfx.apply_volume(),
-			"detail": "How loud the sound effects are: bells, deliveries, crashes, races and menus."},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
 	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}

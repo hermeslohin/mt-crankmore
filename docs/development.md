@@ -62,7 +62,7 @@ Global objects Godot creates at start-up (`project.godot`, `[autoload]`):
 | `Controls` | `controls.gd` | Key and handlebar-button bindings for every action |
 | `Season` | `season.gd` | The current season ("auto" follows the date) |
 | `Game` | `game.gd` | Money, garage and bikes, rider settings (FTP, weight, difficulty, rivals), the physics helpers, save and load |
-| `Sfx` | `sfx.gd` | Sound effects: `Sfx.play("deliver")`, the freewheel ticking while you coast, the SFX volume |
+| `Sfx` | `sfx.gd` | Sound effects: `Sfx.play("deliver")`, the freewheel ticking while you coast |
 | `Trainer` | `trainer_link.gd` | The link to the trainer bridge: power, cadence, heart rate, gears, controller buttons |
 | `Talk` | `trash_talk.gd` | The rival roster and their trash talk |
 | `Ride` | `ride_log.gd` | The session being recorded for Strava |
@@ -238,7 +238,7 @@ godot --headless --path . -s tools/import_rider.gd -- <export> \
 
 Every sound is synthesised by `tools/make_sfx.py` (plain Python, chiptune style) into `sounds/<name>.wav`: `python3 tools/make_sfx.py` remakes them all, `python3 tools/make_sfx.py bell cheer` just those. Each sound is one function in that file. To use a recording instead, drop a `.wav` (or replace one) with the same name into `sounds/`. Either way, run `godot --headless --path . --import` afterwards.
 
-The game plays them with `Sfx.play(name, volume_db, pitch, vary)`, on their own `SFX` bus; the level is `Game.sfx_volume` (0-100, saved, set under Rider setup). `Sfx.coast()` runs the looping freewheel tick; `main.gd` turns it on while you roll without pedalling.
+The game plays them with `Sfx.play(name, volume_db, pitch, vary)`, on their own `SFX` bus at full level (there's no volume setting in the game: the system volume sets how loud they are). `Sfx.coast()` runs the looping freewheel tick; `main.gd` turns it on while you roll without pedalling.
 
 ## The trainer bridge
 

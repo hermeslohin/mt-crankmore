@@ -197,7 +197,7 @@ A rider is a set of sheets named `bike_<rider>*.png`: 8 rows of directions (down
 | `bike_<rider>_pizza.png` | Carrying a pizza |
 | `..._fall*.png` | The same three wiping out (frame 0 is the riding pose) |
 | `..._throw.png`, `..._throw_boxed.png` | Flinging a pizza frisbee |
-| `..._turn.png` | In-between frames for turning (4 per pair of neighbouring rows) |
+| `..._turn.png` | In-between frames for turning (2 or 4 per pair of neighbouring rows: row k turns from view k to k+1) |
 | `winter_...` | The same in winter clothes |
 
 The player's sheets are `bike_rookie_boy*` and `bike_rookie_girl*`; with a bike of its own art they're `bike_rookie_<boy|girl>_<art>*`, where `<art>` is the bike's `"art"` in `Game.bikes` (`rusty`, `commuter`, `gravel`, `carbon`, `golden`, `fixie`, `hoofy`, `champion`, `tri`). A missing sheet falls back: pizza to bag to plain, a bike's own sheets to the plain ones, a missing turn sheet to a cross-fade.

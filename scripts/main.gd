@@ -258,6 +258,14 @@ func _process(delta: float) -> void:
 			Ride.tick(delta, city.p_speed / (city.TILES_PER_MS * city.PACE), city.grade)
 		elif mode == Mode.RACE and race.active and not race.over:
 			Ride.tick(delta, race.riders[0]["v"], race._grade_at(race.riders[0]["s"]))
+	# the freewheel ticks while you roll along without pedalling
+	var coast_v := 0.0
+	if not hud.menu_open and Trainer.power() < 20.0:
+		if mode == Mode.CITY and city.active and city.er_timer <= 0.0 and city.p_down <= 0.0:
+			coast_v = city.p_speed / (city.TILES_PER_MS * city.PACE)
+		elif mode == Mode.RACE and race.active and not race.over and race.countdown <= 0.0 and not race.riders.is_empty() and float(race.riders[0]["down"]) <= 0.0:
+			coast_v = float(race.riders[0]["v"])
+	Sfx.coast(coast_v > 1.5, coast_v)
 	var z := 1.0 if mode == Mode.TITLE else (1.8 if mode == Mode.RACE else 1.75)
 	if OS.has_environment("PIZZA_ZOOM"):  # dev helper for overview screenshots
 		z = OS.get_environment("PIZZA_ZOOM").to_float()
@@ -544,6 +552,11 @@ func _setup_menu(finish: Callable) -> Dictionary:
 		{"label": "Rival bikers: %d" % Game.rival_count, "fn": func(): pass,
 			"adjust": func(d: int): Game.set_rival_count(Game.rival_count + d),
 			"detail": "Riding against you in town: %s. Every race has all %d racers." % [", ".join(names), Talk.roster.size()]},
+		{"label": "Sound effects: %s" % ("off" if Game.sfx_volume == 0 else "%d%%" % Game.sfx_volume), "fn": func(): pass,
+			"adjust": func(d: int):
+				Game.sfx_volume = clampi(Game.sfx_volume + d * 10, 0, 100)
+				Sfx.apply_volume(),
+			"detail": "How loud the sound effects are: bells, deliveries, crashes, races and menus."},
 		{"label": "Done", "fn": finish, "detail": ""},
 	]
 	return {"title": "Rider setup", "sub": "%.2f W/kg. Rivals ride at a share of your W/kg set by difficulty." % Game.wkg(), "items": items}

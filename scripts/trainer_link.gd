@@ -423,6 +423,7 @@ func shift(step: int) -> void:
 	if g == gear:
 		return
 	gear = g
+	Sfx.play("shift", -2.0)
 	_grade_clock = 2.0   # tell the trainer straight away
 	send_grade(_grade_sent if _grade_sent < 900.0 else 0.0)
 

@@ -45,6 +45,7 @@ Headless runs print a lot of harmless `keyboard_get_label_from_physical` errors;
 scenes/main.tscn     the one scene: Main, with the city, the race and the HUD under it
 scripts/             all the game code (below)
 art/                 the packed pictures the game loads (sheets, strips, single images)
+sounds/              the sound effects (.wav, made by tools/make_sfx.py)
 sprites/             the PixelLab exports the art is packed from (ignored by Godot, see sprites/README.md)
 bridge/              the Bluetooth / Wi-Fi trainer helper (Python)
 tools/               packers, the race simulator, the sprite viewer and other dev tools
@@ -61,6 +62,7 @@ Global objects Godot creates at start-up (`project.godot`, `[autoload]`):
 | `Controls` | `controls.gd` | Key and handlebar-button bindings for every action |
 | `Season` | `season.gd` | The current season ("auto" follows the date) |
 | `Game` | `game.gd` | Money, garage and bikes, rider settings (FTP, weight, difficulty, rivals), the physics helpers, save and load |
+| `Sfx` | `sfx.gd` | Sound effects: `Sfx.play("deliver")`, the freewheel ticking while you coast, the SFX volume |
 | `Trainer` | `trainer_link.gd` | The link to the trainer bridge: power, cadence, heart rate, gears, controller buttons |
 | `Talk` | `trash_talk.gd` | The rival roster and their trash talk |
 | `Ride` | `ride_log.gd` | The session being recorded for Strava |
@@ -231,6 +233,12 @@ godot --headless --path . -s tools/import_rider.gd -- <export> \
 | `rotations <dir> <out>` | 8 stills, one per direction |
 
 `tools/trim_images.gd` crops single pictures into `art/` so their bottom edge is where they stand, and `tools/recolor_vehicle.gd` makes the colour variants of the cars. After adding art, run `godot --headless --path . --import` so exported builds include it, and `godot --headless -s tools/build_sprite_viewer.gd` to refresh the sprite viewer (`tools/sprite_viewer/index.html`, open it in a browser).
+
+## Sound effects
+
+Every sound is synthesised by `tools/make_sfx.py` (plain Python, chiptune style) into `sounds/<name>.wav`: `python3 tools/make_sfx.py` remakes them all, `python3 tools/make_sfx.py bell cheer` just those. Each sound is one function in that file. To use a recording instead, drop a `.wav` (or replace one) with the same name into `sounds/`. Either way, run `godot --headless --path . --import` afterwards.
+
+The game plays them with `Sfx.play(name, volume_db, pitch, vary)`, on their own `SFX` bus; the level is `Game.sfx_volume` (0-100, saved, set under Rider setup). `Sfx.coast()` runs the looping freewheel tick; `main.gd` turns it on while you roll without pedalling.
 
 ## The trainer bridge
 

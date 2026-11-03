@@ -292,6 +292,7 @@ func on_menu_closed() -> void:
 
 func _show_title() -> void:
 	mode = Mode.TITLE
+	Music.play("title")
 	city.active = false
 	city.visible = true
 	race.visible = false
@@ -562,6 +563,7 @@ func _start_game() -> void:
 	Ride.reset()
 	hud.close_menu()
 	mode = Mode.CITY
+	Music.town()
 	city.reset_player()
 	city.active = true
 	Game.toast.emit("Ride to a glowing pizza window to grab an order!", Color(1.0, 0.9, 0.4))
@@ -595,6 +597,7 @@ func _end_session() -> void:
 		Strava.state = "idle"
 		Strava.msg = ""
 	mode = Mode.TITLE
+	Music.play("title")
 	city.active = false
 	hud.open_menu(_session_menu, true)
 	Ride.add_session_shot(await _session_image())
@@ -958,6 +961,7 @@ func _start_rescue() -> void:
 	race.visible = true
 	race.rescue = true
 	race.setup(0)
+	Music.race(race.course)
 	race.active = true
 	cam.position = race.cam_target()
 
@@ -978,6 +982,7 @@ func _start_race(i: int, champ := {}) -> void:
 	city.visible = false
 	race.visible = true
 	race.setup(i)
+	Music.race(race.course)
 	race.active = true
 	cam.position = race.cam_target()
 
@@ -1042,6 +1047,7 @@ func _leave_race() -> void:
 	race.visible = false
 	city.visible = true
 	mode = Mode.CITY
+	Music.town()
 	city.active = true
 	var from := "crit" if race.course.get("crit", false) else ("velo" if race.course.get("velo", false) else "race")
 	city.place_on(rescue_from if race.rescue and not rescue_from.is_empty() else city.zone_anchor(from))

@@ -25,9 +25,9 @@ const COURSES := [
 		"blurb": "3 km through the flower meadows at the foot of Mt. Crankmore: gentle climbs, easy dips and flat stretches, finishing back where you started, about 10 minutes. Stop and smell the flowers. Or don't, and win."},
 	# "crit": a flat loop of "length" m (see _build_loop), raced for "minutes" and then "laps_after" more laps; the whole
 	# roster rides it. Entered from its own building in town (main._crit_menu), not Race HQ.
-	{"name": "Crusty Crit", "crit": true, "flowers": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "minutes": 25.0, "laps_after": 2,
+	{"name": "Crusty Crit", "crit": true, "flowers": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "minutes": 15.0, "laps_after": 2,
 		"entry": 60, "prize": 900, "seed": 51,
-		"blurb": "A flat 750 m criterium round the park on the west edge of town, lined with half the village cheering. Race as many laps as you can in 25 minutes, then everyone gets two more."},
+		"blurb": "A flat 750 m criterium round the park on the west edge of town, lined with half the village cheering. Race as many laps as you can in 15 minutes, then everyone gets two more."},
 	# "velo": the Velodoughm, an indoor wooden track (VELO_* below) with banked turns round two basketball courts, raced
 	# over "laps" laps against its guest (Game.THUNDER) alone. Entered from its own building in town (main._velo_menu).
 	{"name": "The Velodoughm", "velo": true, "length": 750.0, "grade": 0.0, "roll": 0.0, "laps": 1, "shares": [1.0, 0.0],

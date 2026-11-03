@@ -401,8 +401,6 @@ func _draw() -> void:
 
 
 func _draw_title(w: float, h: float) -> void:
-	for k in 3:
-		_text("MT. CRANKMORE", Vector2(k - 1, 58 + (k % 2)), 48, [Color(0.9, 0.25, 0.2), Color(1.0, 0.85, 0.25), Color(0.9, 0.25, 0.2)][k], w, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(Game.SLOGAN, Vector2(0, 80), 12, Color(1, 1, 1), w, HORIZONTAL_ALIGNMENT_CENTER)
 	_text(Trainer.status_text(), Vector2(0, h - 8), 9, Color(0.6, 1.0, 0.7) if Trainer.bridge_live else Color(1.0, 0.85, 0.5), w, HORIZONTAL_ALIGNMENT_CENTER)
 
@@ -583,6 +581,13 @@ const WEEHOO_SCREEN := Rect2(33, 46, 126, 176)
 
 func weehoo_rect() -> Rect2:
 	return Rect2(WEEHOO_POS, WEEHOO_SIZE)
+
+
+## The WEEHOO's case itself on screen (the shell art's opaque part), which nothing in the world should hide under.
+func weehoo_case() -> Rect2:
+	if Sprites.sheet("ui_weehoo_shell") != null:
+		return Rect2(WEEHOO_POS + Vector2(21, 20), Vector2(150, 249))
+	return weehoo_rect()
 
 
 func _draw_weehoo(w: float, h: float, speed_kmh: float, grade_pct: float, map_fn: Callable, cell: Array, bar1: Array, pu: Dictionary) -> void:

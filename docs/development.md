@@ -283,6 +283,7 @@ godot --headless --path . --export-release macOS
 
 4. **Package** with the same file names every time: `MtCrankmore-windows-x86_64.zip` (one .exe inside), `MtCrankmore-linux-x86_64.tar.gz` (one executable binary) and `MtCrankmore-macos.zip` (Godot's export as it is). The website's download buttons link to these names in the latest release.
 5. **Publish** a GitHub release `vX.Y.Z` titled "Mt. Crankmore X.Y.Z": a one-line summary, the downloads, then "What's in X.Y.Z".
+6. **Check the website** (`docs/index.html`) against the release: the "What's new" section lists the latest releases, nothing that has shipped is still marked as coming, and the bikes, rivals, courses, power-ups and stats sections match the game. Commit any fixes to `dev`.
 
 The macOS export needs `textures/vram_compression/import_s3tc_bptc=true` (already set). The macOS app is ad-hoc signed, not notarized.
 

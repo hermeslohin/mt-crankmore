@@ -1779,7 +1779,9 @@ func _update_player(delta: float) -> void:
 	if events != null and events.blocks_rider(p_pos, p_fwd):
 		target = 0.0   # a cow in the road: you can't ride through it, wait for it to wander off
 	if Input.is_action_just_pressed("powerup"):
-		_use_powerup(-1)
+		var used := pu
+		if _use_powerup(-1):
+			Sfx.play("boost" if used in ["socks", "breadsticks"] else "throw" if used == "frisbee" else "powerup_use")
 	# coast in gently when riding up to a pickup window or a delivery door
 	var obj := _objective()
 	if obj["has"] and p_pos.distance_to(obj["pos"]) < 4.0:
@@ -1866,6 +1868,7 @@ func _update_player(delta: float) -> void:
 				interact.emit("rescue")
 
 	if Input.is_action_just_pressed("honk"):
+		Sfx.play("bell", 0.0, 1.0, 0.03)
 		player_bubble = {"text": HONKS.pick_random(), "t": 2.2}
 		if randf() < 0.5:
 			Talk.say(randi() % Talk.rivals.size(), "banter", true)
@@ -2195,6 +2198,8 @@ const CAR_DAMAGE := [10, 30]
 
 
 func _hit_by_car(c: Dictionary) -> void:
+	Sfx.play("car_hit")
+	Sfx.play_later("siren", 1.0, -3.0)
 	p_fall = 0.0
 	p_fall_pizza = not carry.is_empty()
 	er_bill = ER_BILL[0] + roundi((ER_BILL[1] - ER_BILL[0]) * pow(randf(), 2.0))
@@ -2978,6 +2983,7 @@ func _take_order(o: Dictionary) -> void:
 	o["t_total"] = 15.0 + dist / (1.6 * PACE)
 	o["t_left"] = o["t_total"]
 	carry = o
+	Sfx.play("order_pickup")
 	Game.toast.emit("Got it! Deliver to %s in %ds or no pay!" % [spots[o["dest"]]["name"], int(o["t_total"])], Color(0.5, 1.0, 0.5))
 	chef_says(int(o["shop"]), "pickup")
 	if o.has("rush"):
@@ -3002,6 +3008,7 @@ func _deliver() -> void:
 	if carry.has("rush") and int(carry["leg"]) < carry["rush"].size() - 1:
 		var leg_pay: int = int(carry["pay"]) / int(carry["rush"].size())
 		Game.add_money(leg_pay)
+		Sfx.play("deliver")
 		carry["leg"] = int(carry["leg"]) + 1
 		var from: Vector2 = spots[carry["dest"]]["pos"]
 		carry["dest"] = carry["rush"][carry["leg"]]
@@ -3018,6 +3025,7 @@ func _deliver() -> void:
 	var tip := int(carry["pay"] * 0.6 * frac)
 	var base := int(carry["pay"] * carry["quality"])
 	Game.add_money(base + tip)
+	Sfx.play("deliver")
 	Game.deliveries += 1
 	Game.toast.emit("DELIVERED!  $%d + $%d tip" % [base, tip], Color(0.4, 1.0, 0.5))
 	if int(carry["dest"]) == site_spot and events != null:
@@ -3093,6 +3101,7 @@ func _nearest_order_shop(p: Vector2) -> int:
 
 func _knock_down(who: int, secs: float, by: int, how: String) -> void:
 	if who < 0:
+		Sfx.play("frisbee_hit" if how.containsn("frisbee") else "knocked")
 		p_down = secs
 		p_fall = 0.0
 		p_fall_pizza = not carry.is_empty()
@@ -3146,6 +3155,7 @@ func start_challenge(kind: String, extra := {}) -> bool:
 	challenge = (CHALLENGES[kind] as Dictionary).duplicate()
 	challenge.merge(extra, true)
 	challenge["kind"] = kind
+	Sfx.play("challenge")
 	challenge["t"] = 0.0
 	challenge["state"] = "count" if challenge.has("dist") else "armed" if kind == "climb" else "on"
 	challenge["me_m"] = 0.0
@@ -3281,6 +3291,8 @@ func _update_challenge(delta: float) -> void:
 				_end_challenge(false)
 		"race":
 			if c["state"] == "count":
+				if ceili(float(c["count"]) - delta) != ceili(float(c["count"])):
+					Sfx.play("go_beep" if float(c["count"]) - delta <= 0.0 else "count_beep")
 				c["count"] = float(c["count"]) - delta
 				if c["count"] <= 0.0:
 					c["state"] = "on"
@@ -3314,6 +3326,7 @@ func _update_challenge(delta: float) -> void:
 
 func _end_challenge(won: bool) -> void:
 	challenge["state"] = "won" if won else "lost"
+	Sfx.play("win" if won else "lose")
 	var what := str(challenge["title"]).capitalize().replace("!", "")
 	Ride.mark("won" if won else "lost", "%s: %s" % [what, challenge["name"]] if challenge.has("name") else what)
 	challenge["end"] = 3.0
@@ -3435,6 +3448,7 @@ func _update_climb(c: Dictionary) -> void:
 		if rr == int(c["road"]) and rdir == float(c["dir"]) and along >= 0.0 and along < 1.0:
 			c["state"] = "on"
 			c["t"] = 0.0
+			Sfx.play("go_beep")
 			Game.toast.emit("GO! %s" % c["name"], Color(1.0, 0.85, 0.3))
 		elif c["armed_t"] <= 0.0 or p_pos.distance_to(c["start"]) > 45.0:
 			challenge = {}   # you didn't go for it: it fades away
@@ -3637,6 +3651,7 @@ func _try_give(p: Dictionary, riding: bool) -> void:
 		p["gcool"] = 25.0
 		p["cheer"] = 1.5
 		p["shout"] = "Catch!"
+		Sfx.play("powerup_get")
 		Game.toast.emit("POWER-UP: %s! %s. Press Y." % [PowerUps.label(pu), PowerUps.DEFS[pu]["blurb"].capitalize()], PowerUps.col(pu))
 		return
 	for i in rival_state.size():

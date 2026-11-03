@@ -247,20 +247,25 @@ func _process(delta: float) -> void:
 		var items: Array = menu_cache["items"]
 		if Input.is_action_just_pressed("act_up"):
 			menu_index = (menu_index - 1 + items.size()) % items.size()
+			Sfx.play("menu_move")
 			_rebuild_menu()
 		elif Input.is_action_just_pressed("act_down"):
 			menu_index = (menu_index + 1) % items.size()
+			Sfx.play("menu_move")
 			_rebuild_menu()
 		elif not items.is_empty() and items[menu_index].has("adjust") and _adjust_step(items[menu_index], delta):
+			Sfx.play("menu_adjust")
 			_rebuild_menu()
 		elif Input.is_action_just_pressed("act_select"):
 			var it: Dictionary = items[menu_index]
+			Sfx.play("menu_select" if it.get("enabled", true) else "menu_back")
 			if it.get("enabled", true):
 				var fn: Callable = it["fn"]
 				fn.call()
 				if menu_open and menu_builder.is_valid():
 					_rebuild_menu()
 		elif Input.is_action_just_pressed("act_back") and not title_mode:
+			Sfx.play("menu_back")
 			close_menu()
 			main.on_menu_closed()
 	queue_redraw()

@@ -130,6 +130,7 @@ const RESCUE_AT := 0.25
 const RESCUE_PAY := 250
 var clock := 0.0
 var countdown := 0.0
+var _beep_n := -1    # the countdown number last beeped
 var over := false
 var over_clock := 0.0
 var finish_count := 0
@@ -2144,8 +2145,13 @@ func _process(delta: float) -> void:
 	if not active:
 		return
 	if countdown > 0.0:
+		var beep_n := maxi(0, int(ceilf(countdown)) - 1)
+		if beep_n != _beep_n:
+			_beep_n = beep_n
+			Sfx.play("count_beep" if beep_n > 0 else "go_beep")
 		countdown -= delta
 		if countdown <= 0.0:
+			_beep_n = -1
 			Game.toast.emit("GO GO GO!", Color(0.4, 1.0, 0.4))
 	else:
 		clock += delta
@@ -2198,7 +2204,9 @@ func _step_riders(delta: float) -> void:
 	if Game.hp_ratio() < 0.3:
 		mvt *= 0.92
 	if Input.is_action_just_pressed("powerup"):
-		_use_powerup(0)
+		var used: String = me["pu"]
+		if _use_powerup(0):
+			Sfx.play("boost" if used in ["socks", "breadsticks"] else "throw" if used == "frisbee" else "powerup_use")
 	if float(me["socks"]) > 0.0:
 		mvt *= PowerUps.SOCKS_BOOST
 	if float(me["down"]) > 0.0:
@@ -2489,6 +2497,8 @@ func _tick_powerups(k: int, delta: float) -> void:
 	if lap > 0.0 and laps_done(r) != int(r.get("lapn", 0)):   # a new lap: the givers hand out again
 		r["lapn"] = laps_done(r)
 		r["gv"] = 0
+		if r["player"] and countdown <= 0.0 and not r["done"]:
+			Sfx.play("lap_bell")
 	while int(r["gv"]) < givers.size() and _loop_s(float(r["s"])) >= float(givers[int(r["gv"])]["s"]):
 		var g: Dictionary = givers[int(r["gv"])]
 		r["gv"] = int(r["gv"]) + 1
@@ -2498,6 +2508,7 @@ func _tick_powerups(k: int, delta: float) -> void:
 			g["pu"] = PowerUps.pick(PowerUps.RACE, r["pu"])
 			r["pu_hold"] = 0.0
 			if r["player"]:
+				Sfx.play("powerup_get")
 				Game.toast.emit("POWER-UP: %s! Press Y." % PowerUps.label(r["pu"]), PowerUps.col(r["pu"]))
 
 
@@ -2606,6 +2617,7 @@ func _knock_down(k: int, secs: float, by: int, how: String) -> void:
 	r["fall"] = 0.0
 	_pop(k, "SPLAT!", Color(1.0, 0.5, 0.35))
 	if r["player"]:
+		Sfx.play("frisbee_hit" if how.containsn("frisbee") else "knocked")
 		Game.toast.emit("%s %s! Down for %d s. Bike -%d HP." % [riders[by]["short"], how, int(secs), int(Game.KNOCK_DAMAGE)], Color(1.0, 0.45, 0.35))
 		Game.damage_bike(Game.KNOCK_DAMAGE)
 		_say(riders[by], "pu_hit_player", true)
@@ -2913,6 +2925,9 @@ func _finish(i: int) -> void:
 		r["place"] = 1 + riders.filter(func(o): return o != r and o["done"] and int(o["laps"]) >= int(r["laps"])).size()
 	if i == 0:
 		player_finish_time = clock
+		Sfx.play("cheer")
+		if int(r["place"]) == 1:
+			Sfx.play("win")
 		Game.toast.emit("FINISHED!  Place #%d  -  keep rolling to cool down" % int(r["place"]), Color(1.0, 0.9, 0.3))
 		if int(r["place"]) == 1 and velo:
 			for o in riders:

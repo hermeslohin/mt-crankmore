@@ -49,8 +49,10 @@ The game works with just a keyboard. A trainer needs Python 3 and internet once 
 Or run it from source:
 
 ```
-godot --path .          # or open this folder in the Godot 4 editor and press F5
+tools/run.sh            # or open this folder in the Godot 4 editor and press F5
 ```
+
+`tools/run.sh` imports any new or changed assets and then runs `godot --path .` (extra arguments are passed on). Running `godot --path .` yourself skips the import, so a newly added sound or sprite won't load until the editor or `godot --headless --import --path .` imports it.
 
 To build the release packages yourself, install the Godot 4.7 export templates and run
 `godot --headless --export-release Windows|Linux|macOS` (presets are in `export_presets.cfg`; output goes to `dist/`).

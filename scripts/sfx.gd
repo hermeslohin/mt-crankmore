@@ -34,6 +34,8 @@ func _stream(sound: String) -> AudioStream:
 	if not _cache.has(sound):
 		var path := DIR + sound + ".wav"
 		_cache[sound] = load(path) if ResourceLoader.exists(path) else null
+		if _cache[sound] == null:   # once per sound; usually a .wav that hasn't been imported yet
+			push_warning("Sfx: can't load %s (not imported? run tools/run.sh or godot --headless --import --path .)" % path)
 	return _cache[sound]
 
 

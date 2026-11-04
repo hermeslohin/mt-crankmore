@@ -1,6 +1,7 @@
 extends Node
-## Sound effects (autoload Sfx). Sfx.play("deliver") plays sounds/deliver.wav on the SFX bus; Game.sfx_volume sets its
-## level. The sounds are synthesised by tools/make_sfx.py: drop in a .wav of the same name to replace one.
+## Sound effects (autoload Sfx). Sfx.play("deliver") plays sounds/deliver.wav on the SFX bus, at full level: how loud
+## is up to the system volume. The sounds are synthesised by tools/make_sfx.py: drop in a .wav of the same name to
+## replace one.
 
 const DIR := "res://sounds/"
 const VOICES := 10
@@ -27,20 +28,14 @@ func _ready() -> void:
 	_loop = AudioStreamPlayer.new()
 	_loop.bus = "SFX"
 	add_child(_loop)
-	apply_volume()
-
-
-## Sets the SFX bus from Game.sfx_volume (0-100).
-func apply_volume() -> void:
-	var v := Game.sfx_volume / 100.0
-	AudioServer.set_bus_mute(_bus, v <= 0.0)
-	AudioServer.set_bus_volume_db(_bus, linear_to_db(maxf(v, 0.001)))
 
 
 func _stream(sound: String) -> AudioStream:
 	if not _cache.has(sound):
 		var path := DIR + sound + ".wav"
 		_cache[sound] = load(path) if ResourceLoader.exists(path) else null
+		if _cache[sound] == null:   # once per sound; usually a .wav that hasn't been imported yet
+			push_warning("Sfx: can't load %s (not imported? run tools/run.sh or godot --headless --import --path .)" % path)
 	return _cache[sound]
 
 

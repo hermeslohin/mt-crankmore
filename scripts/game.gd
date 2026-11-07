@@ -246,6 +246,41 @@ const MECHANIC_PITY := ["Oh, you poor thing. You look like you need help. This o
 	"You look like you need a hug. I don't do hugs. I do free repairs."]
 
 
+## What the mechanic finds wrong with the bike, by how bad the damage is: a small job (a chain, a seat), a medium one
+## (a derailleur, pedals) or a huge one (a frame, wheels). "says" is the diagnosis, "done" the line after the repair.
+const REPAIR_JOBS := {
+	"small": [
+		{"part": "new chain", "says": "Your chain's so rusty it squeaks in Morse code. I think it's spelling 'help'.", "done": "New chain. It's stopped calling for help."},
+		{"part": "new seat", "says": "Your saddle's split right down the middle. No wonder you ride standing up.", "done": "New seat. Your bum's going to send me a thank-you card."},
+		{"part": "new brake pads", "says": "Brake pads are worn to the metal. You've been stopping on hope and sparks.", "done": "New pads. Now you stop with brakes, like a grown-up."},
+		{"part": "new inner tube", "says": "This tube has more patches than a pirate convention.", "done": "New tube. The patches have retired with full honours."},
+		{"part": "new bar tape", "says": "Your bar tape's unravelling like a mummy at the beach.", "done": "Fresh bar tape. Grippy as a cat on a curtain."},
+		{"part": "new bell", "says": "Your bell goes 'clunk'. Bells should never go 'clunk'.", "done": "New bell. Ding ding, baby."},
+	],
+	"medium": [
+		{"part": "new derailleur", "says": "Your derailleur's pointing at the ground. It's not a compass, it's meant to change gears.", "done": "New derailleur. Shifts like butter. Expensive butter."},
+		{"part": "new pedals", "says": "One pedal's bent and the other one is just... gone. Were you pedalling with your feelings?", "done": "New pedals. Both of them. Matching, even!"},
+		{"part": "new handlebars", "says": "Your handlebars are bent into a smile. At least something round here is happy.", "done": "Straight bars. The smile's gone, but so is the wobble."},
+		{"part": "new cranks", "says": "Your crank arm's bent like a banana. Very healthy. Very unrideable.", "done": "New cranks. The banana's in the bin."},
+		{"part": "new fork", "says": "Your fork's bent. Not the eating kind. Although... you could eat soup with it now.", "done": "New fork. Please don't use it for soup."},
+		{"part": "new brake levers", "says": "Your brake lever snapped clean off. How have you been stopping? Don't say feet.", "done": "New levers. Your shoes can finally rest."},
+	],
+	"huge": [
+		{"part": "new frame", "says": "Your frame's cracked in three places. It's less of a bike and more of a suggestion.", "done": "New frame. Technically that's a new bike with your old bell on it."},
+		{"part": "new wheels", "says": "Your wheels are tacos. Both of them. I'm hungry and horrified at the same time.", "done": "New wheels. Round ones! Like the inventor intended."},
+		{"part": "new frame AND wheels", "says": "I've seen car crashes with more bike left in them. I'm keeping the bell as a souvenir.", "done": "Rebuilt from the bell up. Well, I kept the bell. New one's on there."},
+		{"part": "new frame", "says": "Your frame's bent into a perfect 'L'. Even the L looks disappointed.", "done": "New frame. Straight lines, like nature intended. Nature doesn't do straight lines. You get it."},
+		{"part": "new front end", "says": "The front wheel's folded in half and the fork's in a different postcode.", "done": "New wheel, new fork. Found the old fork, by the way. It was in a tree."},
+	],
+}
+
+
+## How big a job the repair is, by the share of HP missing: "small", "medium" or "huge".
+func repair_tier() -> String:
+	var missing := clampf(1.0 - bike_hp() / float(bike()["hp"]), 0.0, 1.0)
+	return "small" if missing < 0.34 else ("medium" if missing < 0.67 else "huge")
+
+
 ## Whether the bike is short of full HP.
 func needs_repair() -> bool:
 	return bike_hp() < float(bike()["hp"]) - 0.01

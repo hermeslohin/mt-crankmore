@@ -17,7 +17,10 @@ extends RefCounted
 ## Static things go into the race's statics (drawn by Race._draw_deco); the moving ones come from movers() each frame.
 
 const RACE_FANS := ["fan_sign", "fan_flag", "fan_cowbell", "fan_highfive_kid"]
-const FAN_SHOUTS := ["ALLEZ!", "GO GO GO!", "Dig deep!", "Venga!", "Allez allez!", "You got this!", "Hup hup!", "Pedal!"]
+const FAN_SHOUTS := ["ALLEZ!", "GO GO GO!", "Dig deep!", "Venga!", "Allez allez!", "You got this!", "Hup hup!", "Pedal!",
+	"More cowbell!", "Cramp later!", "Up! Up! UP!", "Smile for mum!", "You look awful! GO!", "Free pizza up top!",
+	"Legs are lying!", "Suffer, darling!", "Eat the hill!", "Pain is weakness!", "Nice socks!", "Is that a cape?!",
+	"Pedal, pizza kid!", "Who needs knees?"]
 const RUN_CHANCE := 0.35      # share of the roadside fans who run along with you as you go by
 const RUN_MAX := 6.8          # m/s: a fan flat out
 const RUN_LAT := 1.7          # tiles from the middle of the road they run at, just off the gravel (plus Race.ROAD_GROW)

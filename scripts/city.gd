@@ -105,10 +105,17 @@ const ER_JOKES := [
 	"Billing: \"We accept cash, card, or a large pepperoni.\"",
 ]
 const CHEERS := ["Go {n}!", "Pizza hero!", "Woo-hoo!", "Pedal faster!", "Extra cheese!", "Allez allez!", "You got this!",
-	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
+	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!",
+	"Is that MY pizza?!", "Nice calves!", "Pedal like it's cold!", "Mind the pothole!", "My hero... and my lunch!",
+	"Slow down, I want a slice!", "Lycra is a choice!", "Are you lost?", "Is it free if it's late?", "Go, pizza person, go!",
+	"I can smell garlic from here!", "Who's chasing you?!", "Pineapple or riot!", "My grandma's faster!",
+	"Faster than my Wi-Fi!", "Tip: pedal more!", "Don't drop the pizza!", "Wheee! Oh, wrong way!"]
 const DOOR_FADE := 2.5     # 1/seconds: someone going in at a door (or coming out) fades out (in) over 0.4 s
 const SHOP_LINES := ["Bargain!", "Got snacks!", "Ooh, new socks!", "Best gelato ever.", "Back to work...", "Smells like pizza in there!",
-	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?"]
+	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?",
+	"I came for milk. I left with a kayak.", "Forgot my wallet. Again.", "Who needs rent money?", "They had ONE avocado.",
+	"Bought a hat for my dog.", "The receipt is longer than me.", "Retail therapy: done.", "I only went in to look.",
+	"Socks with pizzas on! Yes!", "Don't tell my wife.", "Don't tell my husband.", "The free samples are gone. Sorry."]
 const HONKS := ["Pizza coming through!", "Hot pizza, comin' atcha!", "On your left!", "Beep beep! Delivery!", "Move it or lose it!", "Ding ding!"]
 
 var active := false

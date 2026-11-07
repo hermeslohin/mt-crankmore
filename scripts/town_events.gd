@@ -30,7 +30,9 @@ var allow_in_view := false    # (the debug helpers start things right in front o
 const SIREN_KINDS := ["truck_firetruck", "van_ambulance", "sedan_police"]
 const DOGS := ["town_dog_corgi", "town_dog_dalmatian", "town_dog_poodle"]
 const BALLOON_COLS := [Color(1.0, 0.3, 0.35), Color(0.3, 0.6, 1.0), Color(1.0, 0.85, 0.2), Color(0.5, 0.9, 0.4), Color(0.95, 0.5, 0.95)]
-const CROWD_SHOUTS := ["Go {n}!", "PIZZA!", "Woooo!", "Faster!", "Legend!", "We love you!", "Ring the bell!", "Extra cheese!"]
+const CROWD_SHOUTS := ["Go {n}!", "PIZZA!", "Woooo!", "Faster!", "Legend!", "We love you!", "Ring the bell!", "Extra cheese!",
+	"Sign my pizza box!", "Marry me! Or just feed me!", "Do a wheelie!", "{n} for mayor!", "I named my cat after you!",
+	"Is that legal?!", "Crust is life!", "Do the thing!", "I skipped work for this!", "THE CHEESE IS LOOSE!"]
 
 var city                       # the City node (untyped: City has no class_name)
 var events: Array = []         # {kind, t (seconds left), actors: [...], ...}
@@ -41,7 +43,9 @@ var leaving: Array = []       # actors still in sight when they were done: makin
 var crew: Array = []          # the construction site's workers (see _step_crew)
 const CREW_SIZE := 4
 const CREW_LINES := ["*clang* *clang*", "Measure twice!", "Lunch yet?", "Watch your head!", "Hand me that wrench!",
-	"Pizza later?", "Easy... easy...", "Who ordered the anchovies?", "Hard hats on!", "BEEP BEEP BEEP"]
+	"Pizza later?", "Easy... easy...", "Who ordered the anchovies?", "Hard hats on!", "BEEP BEEP BEEP",
+	"Is it lunch? It's lunch.", "That's not my thumb. Is it?", "Five more minutes. Or weeks.", "Who glued my hammer?",
+	"This hole was here when I got here.", "We're digging a bigger hole.", "Coffee break number six!"]
 var parade_t := randf_range(60.0, 150.0) * RARITY   # seconds until the band next marches
 const PARADE_EVERY := [300.0, 540.0]
 const PARADE_SPEED := 0.75     # m/s, a brisk march
@@ -59,7 +63,9 @@ const PARADE := [
 	["drummer", "band_cymbals", "drummer"],
 	["band_sousaphone", "band_bass_drum", "band_sousaphone"],
 ]
-const PARADE_SHOUTS := ["Go band!", "Woo!", "76 trombones!", "Encore!", "Ba-dum-tss!", "Strike up the band!", "Bravo!"]
+const PARADE_SHOUTS := ["Go band!", "Woo!", "76 trombones!", "Encore!", "Ba-dum-tss!", "Strike up the band!", "Bravo!",
+	"The tuba guy's my dad!", "Play Free Bird!", "Louder! I'm still awake!", "Is that a kazoo?", "Nice hat, drummer!",
+	"Who let the goat march?", "My ears! Beautiful!", "Toot toot!"]
 const CRITTERS := ["squirrel", "squirrel", "rabbit", "rabbit", "chipmunk", "hedgehog", "raccoon", "skunk", "fox", "town_cat_ginger",
 	"town_dog_corgi", "town_pigeon", "town_pigeon", "marmot"]
 const CRITTER_COUNT := 18
@@ -1106,7 +1112,9 @@ const RIDE_LINES := ["On your left!", "Car back!", "Hold your line!", "Nice pull
 	"Easy on the climb!", "Hole!", "Sprint to the sign!", "Is that the pizza kid?"]
 const FW_COLS := [Color(1.0, 0.3, 0.35), Color(0.35, 0.65, 1.0), Color(1.0, 0.85, 0.3), Color(0.45, 1.0, 0.5),
 	Color(0.95, 0.5, 1.0), Color(1.0, 1.0, 1.0)]
-const FW_CROWD := ["Ooooh!", "Aaaah!", "Pretty!", "BOOM!", "Whoa!", "Did you see that one?!", "Encore!"]
+const FW_CROWD := ["Ooooh!", "Aaaah!", "Pretty!", "BOOM!", "Whoa!", "Did you see that one?!", "Encore!",
+	"That one looked like a pizza!", "My dog is NOT happy.", "Ooooh... aaaah... ooooh?", "Was that a dud?",
+	"My ears are ringing!", "Do another!", "That one was a slice!", "Somebody's mailbox just went up."]
 const PATIENTS := 4             # people the ambulance crew has to take in
 const CLUB := ["Carl", "Sarah", "Carla", "Wanda", "Gus", "Maya", "Tony", "Kim"]
 

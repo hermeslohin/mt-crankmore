@@ -105,10 +105,17 @@ const ER_JOKES := [
 	"Billing: \"We accept cash, card, or a large pepperoni.\"",
 ]
 const CHEERS := ["Go {n}!", "Pizza hero!", "Woo-hoo!", "Pedal faster!", "Extra cheese!", "Allez allez!", "You got this!",
-	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!"]
+	"Hot pizza!", "Beat Carl!", "Send it!", "Smell that crust!", "Go go go!", "Legend!",
+	"Is that MY pizza?!", "Nice calves!", "Pedal like it's cold!", "Mind the pothole!", "My hero... and my lunch!",
+	"Slow down, I want a slice!", "Lycra is a choice!", "Are you lost?", "Is it free if it's late?", "Go, pizza person, go!",
+	"I can smell garlic from here!", "Who's chasing you?!", "Pineapple or riot!", "My grandma's faster!",
+	"Faster than my Wi-Fi!", "Tip: pedal more!", "Don't drop the pizza!", "Wheee! Oh, wrong way!"]
 const DOOR_FADE := 2.5     # 1/seconds: someone going in at a door (or coming out) fades out (in) over 0.4 s
 const SHOP_LINES := ["Bargain!", "Got snacks!", "Ooh, new socks!", "Best gelato ever.", "Back to work...", "Smells like pizza in there!",
-	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?"]
+	"They were out of anchovies.", "Got a new helmet!", "Two for one!", "Treat yourself!", "Shopping is cardio, right?",
+	"I came for milk. I left with a kayak.", "Forgot my wallet. Again.", "Who needs rent money?", "They had ONE avocado.",
+	"Bought a hat for my dog.", "The receipt is longer than me.", "Retail therapy: done.", "I only went in to look.",
+	"Socks with pizzas on! Yes!", "Don't tell my wife.", "Don't tell my husband.", "The free samples are gone. Sorry."]
 const HONKS := ["Pizza coming through!", "Hot pizza, comin' atcha!", "On your left!", "Beep beep! Delivery!", "Move it or lose it!", "Ding ding!"]
 
 var active := false
@@ -2957,12 +2964,31 @@ func _update_pickups(delta: float) -> void:
 
 ## What the pizza shops' bakers say (in the message box, with their faces: art/face_chef_<shop>.png).
 const CHEF_LINES := {
-	"ring": ["Order up! Who's riding?", "Ring ring! Hot one going out!", "Pizza's in the oven, I need a rider!", "Fresh order! Don't let the others grab it!"],
-	"rush": ["A PARTY ORDER! Five pizzas! Hurry!", "Big one! Party pizzas, all over town!", "Mamma mia, look at this order!"],
-	"crew": ["The builders are hungry! Extra cheese for the crew!", "Lunch for the whole site! Don't drop it!"],
-	"pickup": ["Hot and fresh! Go go go!", "Mind the potholes!", "Don't you dare let it go cold!", "Fastest rider in town, eh? Prove it!"],
-	"cold": ["You let it go COLD?!", "Cold pizza! In MY town?!", "That was a beautiful pie. Was."],
-	"flying": ["My pizza! On the ROAD!", "Was that... my pizza flying?!", "Noooo! The pizza!"],
+	"ring": ["Order up! Who's riding?", "Ring ring! Hot one going out!", "Pizza's in the oven, I need a rider!", "Fresh order! Don't let the others grab it!",
+		"Somebody ordered pineapple again. I'm not judging. I'm judging.", "Pie's out! It's not getting any hotter, and neither am I.",
+		"New order! The customer said 'no rush'. That's a lie. Rush.", "Hot pizza needs a home! Be its taxi!",
+		"Another order! I'm so good at this it's scary.", "Ding ding! Pizza for someone with excellent taste. Mine.",
+		"Order in! Extra garlic. Hold your breath on the way.", "Fresh out of the oven! Like a baby, but cheesier."],
+	"rush": ["A PARTY ORDER! Five pizzas! Hurry!", "Big one! Party pizzas, all over town!", "Mamma mia, look at this order!",
+		"A birthday party! Twenty kids! Pray for the parents!", "Party order! I've used every pepperoni in the building!",
+		"So many pizzas! I can't see over the boxes! Where are you?!", "Party time! If you drop one, you're explaining it to the clown.",
+		"Five pizzas, five stops, zero excuses! GO!"],
+	"crew": ["The builders are hungry! Extra cheese for the crew!", "Lunch for the whole site! Don't drop it!",
+		"The builders want lunch! Ride like they're holding up a wall. They are.", "Hard hats, soft crusts! Get going!",
+		"Construction crew order! They tip in sawdust, but they tip big.", "Builders' lunch! Six meat lovers and one salad. Poor Gary."],
+	"pickup": ["Hot and fresh! Go go go!", "Mind the potholes!", "Don't you dare let it go cold!", "Fastest rider in town, eh? Prove it!",
+		"Hold it flat! It's a pizza, not a frisbee.", "Treat that pie like your own grandmother. Gently. With cheese.",
+		"If the box is upside down when you get there, so are you.", "Go! And no sneaky slices. I counted them. Eight.",
+		"Ride like the cheese is chasing you!", "Watch out for cars. And bears. Mostly bears.",
+		"Smooth roads, hot pie, happy customer. Easy. Go!", "That's my best one yet. Don't make me cry."],
+	"cold": ["You let it go COLD?!", "Cold pizza! In MY town?!", "That was a beautiful pie. Was.",
+		"Cold?! I could have mailed it faster!", "That pizza had dreams. You froze them.",
+		"Cold pizza is a breakfast, not a delivery!", "My nonna is turning in her grave. And she's not even dead yet.",
+		"I've seen glaciers move faster. On this very mountain.", "Next time, I'm hiring a snail. At least it's honest."],
+	"flying": ["My pizza! On the ROAD!", "Was that... my pizza flying?!", "Noooo! The pizza!",
+		"PIZZA OVERBOARD!", "Did that car just eat my pizza?!", "That pizza had a family!",
+		"It's a bird! It's a plane! It's... my MARGHERITA!", "Ten out of ten for the flip. Zero for the landing.",
+		"Somewhere, a pigeon is having the best day of its life."],
 }
 const CHEF_MOODS := {"ring": "happy", "rush": "shocked", "crew": "happy", "pickup": "smug", "cold": "annoyed", "flying": "shocked"}
 

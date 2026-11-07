@@ -33,7 +33,20 @@ const DIFF_ORDER := ["easy", "medium", "hard", "ludicrous"]
 ## harder than the strongest of them (Race._build_riders). Art: bike_max.png / bike_max_fall.png.
 const CHAMPION := {"name": "Maillot Max", "short": "Max", "color": Color(1.0, 0.86, 0.1), "ftp": 280.0, "speed": 4.4, "attack": 0.6,
 	"sig": ["The yellow jersey doesn't wear itself.", "I've won this town's tour three times. Keep up.", "Is that a pizza bike? Adorable.",
-		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels."]}
+		"Allez! Oh wait, that's what my fans shout at ME.", "I trained on this mountain before you had training wheels.",
+		"My shaved legs are worth more than your bike.", "I have a domestique for my domestique.",
+		"Autographs after the race. Cash only.", "I don't race. I parade, quickly."],
+	"lines": {
+		"race_start": ["Line up behind me, {n}. That's where you'll be all day.", "My warm-up was harder than your career, {n}.",
+			"Try to keep me in sight, {n}. It's a long way down."],
+		"race_pass_player": ["Bonjour and au revoir, {n}!", "That breeze was me. You're welcome.", "Smile, {n}! You're in my highlight reel. Briefly."],
+		"race_player_pass": ["Hmph. I'm letting you lead for the cameras.", "Nobody passes Maillot Max! ...Who are you?", "Enjoy it, {n}. I'm just admiring the scenery."],
+		"race_win_rival": ["Another win. I'm running out of shelf space.", "Merci, merci. Hold your applause. Actually, don't.",
+			"Go deliver some pizzas, {n}. Leave the racing to me."],
+		"race_lose_player": ["Beaten by a pizza courier. My agent will hear about this.", "Take the bike, {n}. You've earned it. I hate it, but you have.",
+			"Fine. You're fast. I'm still prettier."],
+		"race_win_player": ["Beaten by a pizza courier. My agent will hear about this.", "Fine. You're fast. I'm still prettier."],
+	}}
 const CHAMPION_EVERY := [2700.0, 4500.0]   # seconds of riding in town between his visits
 const CHAMPION_WAIT := 300.0               # seconds you have to get to Race HQ once he's announced
 const CHAMPION_EDGE := 1.1                 # how much harder he rides than the strongest rival
@@ -46,13 +59,14 @@ const YOLANDA := {"name": "Yellow Jersey Yolanda", "short": "Yolanda", "color": 
 	"title": "three-time winner of the Tour de French Bread", "bonus": 500, "course": "Baguette Boulevard",
 	"sig": ["Three Tours de French Bread. Ask me about the baguette stage.", "I've eaten tougher climbs than this for breakfast. With butter.",
 		"Stay on my wheel if you can, {n}. Nobody can.", "This jersey is yellow because I keep winning in it.",
-		"Rise and shine, {n}. Like good dough."],
+		"Rise and shine, {n}. Like good dough.",
+		"I carb-load on baguettes. Nine a day.", "My legs are like sourdough: tough, and they rise to the occasion.", "Knead for speed, {n}."],
 	"lines": {
 		"race_start": ["Five kilometres of tarmac. I'll see you at the top, {n}. Probably from the podium.", "Bread is proved in the oven. Riders are proved on the climbs.",
-			"Ready, {n}? I've been ready since the Tour de French Bread."],
-		"race_pass_player": ["Coming through, {n}! Mind the crumbs.", "That's how we climb in the Tour de French Bread!", "Don't look so crusty, {n}. Grab my wheel!"],
-		"race_player_pass": ["Ooh, {n}! Now we've got a bake-off!", "Enjoy the view up front. It won't last.", "Well, butter my baguette!"],
-		"race_win_rival": ["Another day, another yellow jersey.", "Good ride, {n}. Come back when you've risen a little more.", "Fresh out of the oven: me, first."],
+			"Ready, {n}? I've been ready since the Tour de French Bread.", "Hope your legs are proofed, {n}. Mine are golden.", "Let's see what you're made of, {n}. Flour and water, I'd guess."],
+		"race_pass_player": ["Coming through, {n}! Mind the crumbs.", "That's how we climb in the Tour de French Bread!", "Don't look so crusty, {n}. Grab my wheel!", "Croissant you see me? I'm going past!", "You're toast, {n}. Lightly buttered."],
+		"race_player_pass": ["Ooh, {n}! Now we've got a bake-off!", "Enjoy the view up front. It won't last.", "Well, butter my baguette!", "You've got a rising star in those legs, {n}!", "Oh, la la! Somebody's been eating their wholegrain!"],
+		"race_win_rival": ["Another day, another yellow jersey.", "Good ride, {n}. Come back when you've risen a little more.", "Fresh out of the oven: me, first.", "Crumbs for second, {n}. Enjoy.", "That's how you bake a winner. Takes years. You'll get there."],
 		"race_lose_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Well done, {n}. That's a ride they'll write about in the bakeries.",
 			"I'm toast. Golden-brown, well-earned toast."],
 		"race_win_player": ["Beaten on my own boulevard? {n}, you're the real deal.", "Respect, {n}. Next time I'm bringing the sourdough legs."],
@@ -63,16 +77,18 @@ const YOLANDA := {"name": "Yellow Jersey Yolanda", "short": "Yolanda", "color": 
 ## bike_mcgee.png / bike_mcgee_fall.png, face_mcgee.png. "lines": what he says for each Talk category ("sig" otherwise).
 const THUNDER := {"name": "Thunder Thighs McGee", "short": "McGee", "color": Color(0.95, 0.22, 0.2), "attack": 0.0,
 	"sig": ["These quads have their own postcode.", "I don't skip leg day. Leg day skips everything else.", "Do you even squat, bro?",
-		"My thighs have thighs.", "I warm up by leg-pressing the Zamboni."],
+		"My thighs have thighs.", "I warm up by leg-pressing the Zamboni.",
+		"I've split three pairs of shorts today. It's not even noon.", "My quads need their own seat on the plane.",
+		"I squat the Velodoughm on my rest days.", "Calves? I've got full-grown cows."],
 	"lines": {
 		"race_start": ["One lap. One chance. One pair of LEGENDARY THIGHS.", "Hope you ate your pasta, {n}. All of it.",
-			"Feel that rumble? That's my quads warming up.", "750 metres of pain, {n}. Mostly yours."],
+			"Feel that rumble? That's my quads warming up.", "750 metres of pain, {n}. Mostly yours.", "My thighs are clapping for me already, {n}.", "I had twelve eggs for breakfast. Raw. With the shells."],
 		"race_pass_player": ["THUNDER COMING THROUGH!", "Hear that, {n}? That's thunder. From my THIGHS.", "Out of the sprinter's lane, small legs!",
-			"Was that a breeze? No, that was me."],
+			"Was that a breeze? No, that was me.", "Feel the THUNDER, {n}!", "My thighs just lapped your thighs!"],
 		"race_player_pass": ["WHAT?! Who taught those little legs to do that?", "Impossible! I did 900 squats this morning!",
-			"Enjoy it, {n}. The thunder always comes back.", "Hey! My calves weren't ready!"],
+			"Enjoy it, {n}. The thunder always comes back.", "Hey! My calves weren't ready!", "That's ILLEGAL! Probably! I didn't read the rules!", "Somebody check {n} for hidden quads!"],
 		"race_win_rival": ["THUNDER THIGHS WINS AGAIN! Flex for the crowd!", "Go home and do some lunges, {n}.",
-			"The Velodoughm belongs to the THIGHS!"],
+			"The Velodoughm belongs to the THIGHS!", "Now if you'll excuse me, I have to flex in a mirror.", "Thighs: one. Everybody else: zero."],
 		"race_lose_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too.",
 			"My quads... they've never felt this way before."],
 		"race_win_player": ["Beaten? By THOSE legs? I need a protein shake. A big one.", "Respect, {n}. You've got thunder too."],
@@ -244,6 +260,41 @@ const MECHANIC_PITY := ["Oh, you poor thing. You look like you need help. This o
 	"Kid, you look like you need help more than the bike does. Free. Go eat something.",
 	"I've seen pizzas in better shape. Put your wallet away, it's on me.",
 	"You look like you need a hug. I don't do hugs. I do free repairs."]
+
+
+## What the mechanic finds wrong with the bike, by how bad the damage is: a small job (a chain, a seat), a medium one
+## (a derailleur, pedals) or a huge one (a frame, wheels). "says" is the diagnosis, "done" the line after the repair.
+const REPAIR_JOBS := {
+	"small": [
+		{"part": "new chain", "says": "Your chain's so rusty it squeaks in Morse code. I think it's spelling 'help'.", "done": "New chain. It's stopped calling for help."},
+		{"part": "new seat", "says": "Your saddle's split right down the middle. No wonder you ride standing up.", "done": "New seat. Your bum's going to send me a thank-you card."},
+		{"part": "new brake pads", "says": "Brake pads are worn to the metal. You've been stopping on hope and sparks.", "done": "New pads. Now you stop with brakes, like a grown-up."},
+		{"part": "new inner tube", "says": "This tube has more patches than a pirate convention.", "done": "New tube. The patches have retired with full honours."},
+		{"part": "new bar tape", "says": "Your bar tape's unravelling like a mummy at the beach.", "done": "Fresh bar tape. Grippy as a cat on a curtain."},
+		{"part": "new bell", "says": "Your bell goes 'clunk'. Bells should never go 'clunk'.", "done": "New bell. Ding ding, baby."},
+	],
+	"medium": [
+		{"part": "new derailleur", "says": "Your derailleur's pointing at the ground. It's not a compass, it's meant to change gears.", "done": "New derailleur. Shifts like butter. Expensive butter."},
+		{"part": "new pedals", "says": "One pedal's bent and the other one is just... gone. Were you pedalling with your feelings?", "done": "New pedals. Both of them. Matching, even!"},
+		{"part": "new handlebars", "says": "Your handlebars are bent into a smile. At least something round here is happy.", "done": "Straight bars. The smile's gone, but so is the wobble."},
+		{"part": "new cranks", "says": "Your crank arm's bent like a banana. Very healthy. Very unrideable.", "done": "New cranks. The banana's in the bin."},
+		{"part": "new fork", "says": "Your fork's bent. Not the eating kind. Although... you could eat soup with it now.", "done": "New fork. Please don't use it for soup."},
+		{"part": "new brake levers", "says": "Your brake lever snapped clean off. How have you been stopping? Don't say feet.", "done": "New levers. Your shoes can finally rest."},
+	],
+	"huge": [
+		{"part": "new frame", "says": "Your frame's cracked in three places. It's less of a bike and more of a suggestion.", "done": "New frame. Technically that's a new bike with your old bell on it."},
+		{"part": "new wheels", "says": "Your wheels are tacos. Both of them. I'm hungry and horrified at the same time.", "done": "New wheels. Round ones! Like the inventor intended."},
+		{"part": "new frame AND wheels", "says": "I've seen car crashes with more bike left in them. I'm keeping the bell as a souvenir.", "done": "Rebuilt from the bell up. Well, I kept the bell. New one's on there."},
+		{"part": "new frame", "says": "Your frame's bent into a perfect 'L'. Even the L looks disappointed.", "done": "New frame. Straight lines, like nature intended. Nature doesn't do straight lines. You get it."},
+		{"part": "new front end", "says": "The front wheel's folded in half and the fork's in a different postcode.", "done": "New wheel, new fork. Found the old fork, by the way. It was in a tree."},
+	],
+}
+
+
+## How big a job the repair is, by the share of HP missing: "small", "medium" or "huge".
+func repair_tier() -> String:
+	var missing := clampf(1.0 - bike_hp() / float(bike()["hp"]), 0.0, 1.0)
+	return "small" if missing < 0.34 else ("medium" if missing < 0.67 else "huge")
 
 
 ## Whether the bike is short of full HP.

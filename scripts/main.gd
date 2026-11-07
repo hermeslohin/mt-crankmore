@@ -786,10 +786,13 @@ func _on_interact(kind: String) -> void:
 	city.active = false
 	match kind:
 		"bike":
+			_job = {}
 			hud.open_menu(_bike_shop_menu)
-			_mechanic_says(["Welcome to Spokes & Stuff! Mind the grease.", "Back again? What did you break this time?",
-				"Looking for something faster? Or something that still has two wheels?", "Ah, my favourite customer. Kind of."].pick_random(),
-				"annoyed" if Game.hp_ratio() < 0.5 else "happy")
+			if Game.needs_repair():
+				_mechanic_says(_repair_job()["says"], JOB_MOOD[Game.repair_tier()])
+			else:
+				_mechanic_says(["Welcome to Spokes & Stuff! Mind the grease.", "Back again? Bike's fine, so what did YOU break?",
+					"Looking for something faster? Or something that still has two wheels?", "Ah, my favourite customer. Kind of."].pick_random())
 		"race":
 			hud.open_menu(_race_menu)
 		"crit":
@@ -799,6 +802,21 @@ func _on_interact(kind: String) -> void:
 			Game.racer_says.emit("mcgee", Game.THUNDER["name"], Game.THUNDER["sig"].pick_random(), "smug", Game.THUNDER["color"])
 		"rescue":
 			_start_rescue()
+
+
+var _job := {}         # what the mechanic says is broken on the bike, picked once per visit (see _repair_job)
+var _job_key := ""     # ...for which bike and how bad: a new one is picked if either changes
+const JOB_MOOD := {"small": "happy", "medium": "annoyed", "huge": "shocked"}
+
+
+## What the mechanic finds wrong with the bike you're riding: a part from Game.REPAIR_JOBS, bigger the worse the damage.
+## The same one for the whole visit, unless you swap bikes.
+func _repair_job() -> Dictionary:
+	var key := "%d:%s" % [Game.equipped, Game.repair_tier()]
+	if _job.is_empty() or key != _job_key:
+		_job = Game.REPAIR_JOBS[Game.repair_tier()].pick_random()
+		_job_key = key
+	return _job
 
 
 ## The mechanic at Spokes & Stuff says something, in the message box with his face (art/face_mechanic.png).
@@ -842,16 +860,20 @@ func _bike_shop_menu() -> Dictionary:
 	var hurt := Game.needs_repair()
 	var rc := Game.repair_cost()
 	var pity := hurt and Game.equipped == 0   # the Rusty Trash Bike: the mechanic fixes it for nothing
+	var job: Dictionary = _repair_job() if hurt else {}
+	var hp_line := "Bike HP %d / %d." % [int(Game.bike_hp()), int(Game.bike()["hp"])]
 	items.append({"label": ("Repair bike   FREE" if pity else "Repair bike   $%d" % rc) if hurt else "Repair bike   (already perfect)",
 		"fn": func():
 			if Game.repair():
+				_job = {}
 				if pity:
 					_mechanic_says(Game.MECHANIC_PITY.pick_random(), "shocked")
 				else:
-					_mechanic_says(["Good as new. Well, nearly.", "Trued the wheels, bled the brakes. You're welcome.", "There. Now please stop hitting cars."].pick_random(), "smug"),
+					_mechanic_says(job["done"], "smug"),
 		"enabled": hurt and Game.money >= rc,
-		"detail": ("The mechanic looks at you, then at the Rusty Trash Bike, and winces. \"You look like you need help. Let me fix that for you, no charge.\"\nBike HP %d / %d." if pity
-			else "Fresh tape, fresh grease. Bike HP %d / %d.") % [int(Game.bike_hp()), int(Game.bike()["hp"])]})
+		"detail": ("Not much to do. Fresh tape, fresh grease. " + hp_line) if not hurt
+			else ("%s job: %s.\n\"%s\"\n%s%s" % [Game.repair_tier().capitalize(), job["part"], job["says"], hp_line,
+				"\nThe mechanic looks at you, then at the Rusty Trash Bike, and winces. No charge." if pity else "")})
 	items.append({"label": "Leave", "fn": func(): hud.close_menu(); on_menu_closed(), "detail": ""})
 	return {"title": "Spokes & Stuff Bike Shop", "sub": "Cash: $%d.   \"Careful out there. The cars don't brake for dreams.\"" % Game.money, "items": items}
 
